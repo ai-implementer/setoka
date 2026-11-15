@@ -135,6 +135,7 @@ grep -q '出力: ページ' docs/dist/guide/quality/index.html && grep -q '利�
 grep -q 'id="他のツールとの違い"' docs/dist/guide/migrate/index.html && grep -q 'id="生-html-と画像の大きさ"' docs/dist/guide/migrate/index.html  # 他のツールとの違い（Phase 91）
 grep -q '<figcaption>snippets/deploy.yml</figcaption>' docs/dist/guide/deploy/index.html && grep -q 'id="ワークフローの全文"' docs/dist/guide/deploy/index.html  # 雛形 deploy.yml の全文（Phase 91）
 grep -q '<figcaption>snippets/pr-check.yml</figcaption>' docs/dist/guide/quality/index.html && grep -q -- '--no-fmt --format github' docs/dist/guide/quality/index.html  # PR 検証の例・CI の例の --no-fmt（Phase 91）
+grep -q 'id="約束の対象"' docs/dist/reference/compatibility/index.html && grep -q 'id="新しい版に上げる手順"' docs/dist/reference/compatibility/index.html  # 互換性の約束と更新の手順（v0.21 Phase 95）
 cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の写しは雛形とバイト一致（CI の scaffold actions pins。pr-check.yml の SHA とインストール手順も照合する）
 # サブパス配信の favicon（Phase 90。リリース判定。docs/dist を作り直すので docs の確認の最後に）:
 # setoka build --root docs --base-url /setoka/ → <link rel="icon" href="/setoka/…"> とそのファイルが dist にあること
