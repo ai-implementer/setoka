@@ -19,7 +19,7 @@ updates:
       - dependency-name: wasm-bindgen
       # 0.7 はモデルの形式が変わり、同梱のモデル（0.6 の形式）を読めない。上げるにはモデルの差し替え
       # （0.7 の形式のモデルは vaporetto のリリースに添付）と検索 wasm の作り直しが要るので、
-      # 自動では上げず手動で行う（ROADMAP「v0.21 以降の候補」）。2 つは同じ版にする
+      # 自動では上げず手動で行う（ROADMAP「今後の候補」）。2 つは同じ版にする
       - dependency-name: vaporetto
         versions: [">= 0.7.0"]
       - dependency-name: vaporetto_rules
