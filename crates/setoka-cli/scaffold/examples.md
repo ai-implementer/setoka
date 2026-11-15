@@ -1,0 +1,478 @@
+---
+title: 記法の例
+order: 2
+description: setoka で使える記法と機能の見本
+---
+
+# 記法の例
+
+setoka で使える記法と機能の見本です。原稿（`content/guide/examples.md`）と見比べながら使ってください。
+要らなくなったら、このファイルは消してかまいません（[ホーム](../index.md)と[はじめに](getting-started.md)に
+あるこのページへのリンクも消してください）。
+
+## 表
+
+| 記法 | 書き方 |
+| --- | --- |
+| 表 | GFM の表（この表） |
+| 注意書き | `> [!NOTE]` など |
+| 図 | ` ```mermaid ` |
+
+## コードブロック
+
+```rust
+fn main() {
+    println!("こんにちは、setoka!");
+}
+```
+
+言語に続けて `title="..."`（キャプション）・`{2}`（行ハイライト）・
+`showLineNumbers`（行番号）も書けます:
+
+```rust title="src/main.rs" {2} showLineNumbers
+fn main() {
+    println!("こんにちは、setoka!");
+}
+```
+
+`file="..."` と書くと、実ファイルの中身をビルド時に読み込んで表示できます
+（設計書とコードの乖離を防げます）。同梱の `snippets/greet.rs` を引用した例:
+
+```rust file="snippets/greet.rs"
+```
+
+`lines=10-25` のように行範囲だけを切り出すこともできます。
+参照先が無い・範囲外なら `setoka check` がエラーにします。
+
+連続するフェンスに `tab="..."` を書くと、1 つのタブグループになります
+（切り替えは CSS だけで、クライアント JS は使いません）:
+
+```sh tab="macOS / Linux"
+curl -fsSL https://example.com/install.sh | sh
+```
+
+```powershell tab="Windows"
+winget install example
+```
+
+素の Markdown ビューアではコードが縦に並ぶだけなので壊れません。
+
+言語を `include` にすると、**Markdown 断片**を本文へ展開できます
+（共通の注意書き・免責文の一元管理に。次の注意書きは `snippets/note.md` の実例です）:
+
+```include file="snippets/note.md"
+```
+
+断片は散文専用です（見出し・図表キャプション・脚注は `setoka check` がエラーにします）。
+
+## 図（Mermaid）
+
+` ```mermaid ` ブロックで図が描けます。既定は同梱 mermaid.js によるクライアント描画です。
+
+`setoka.toml` で `backend = "ssr"` にすると、**sequence・flowchart・class・
+state・ER・gantt・pie・mindmap・timeline・packet の 10 図種はビルド時に SVG 化**されます
+（JS 不要・ダークモードに即追従）。未対応の図種は自動でクライアント描画にフォールバックし、
+フォールバックが発生したページだけ mermaid.js が読み込まれます
+（クライアント描画もダークモード切替に追従して再描画されます）。
+
+flowchart・state・ER・class 図は `classDef` / `:::` / `style` などの
+スタイル指定にも対応しています（`backend = "ssr"` でもビルド時の SVG に
+反映されます。指定した色はダークモードでも意図どおり固定されます）:
+
+```mermaid
+flowchart TD
+    A[Markdown を書く] --> B{図の種類は?}
+    B -->|対応 10 図種| C[tankan がビルド時に SVG 化]:::ssr
+    B -->|それ以外| D[mermaid.js でクライアント描画]
+    classDef ssr fill:#d5e7fe,stroke:#014ba5
+```
+
+シーケンス図（sequenceDiagram）— `setoka dev` のライブリロードの流れ:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor W as 執筆者
+    participant Y as setoka dev
+    participant B as ブラウザ
+
+    W->>Y: content/*.md を保存
+    Note over Y: 変更を検知して自動再ビルド
+    Y-)B: 再読み込みの通知
+    B->>Y: 再読み込み
+    Y-->>B: 更新された HTML
+```
+
+Figure: ライブリロードの流れ {#fig:reload}
+
+図・表・コードの前後に `Figure:` / `Table:` / `Listing:`（日本語の `図:` /
+`表:` / `リスト:` も可）で始まる行を書くと、ページ内で自動採番された
+キャプションになります。`{#fig:reload}` がラベルで、本文からは
+[](#fig:reload) のように**リンクテキストを空**にすると番号が自動で入ります。
+
+ガントチャート（gantt）:
+
+```mermaid
+gantt
+    title ドキュメント整備の計画（例）
+    dateFormat YYYY-MM-DD
+    excludes weekends
+    section 執筆
+    構成を決める : done, plan, 2026-07-06, 2d
+    本文を書く   : active, write, after plan, 5d
+    section 公開
+    レビュー     : review, after write, 3d
+    公開         : milestone, after review, 1d
+```
+
+ER 図（erDiagram）:
+
+```mermaid
+erDiagram
+    "サイト" ||--|{ "ページ" : contains
+    "ページ" ||--o{ "見出し" : has
+    "ページ" {
+        string title "frontmatter の title"
+        int order
+        bool draft
+    }
+```
+
+状態遷移図（stateDiagram-v2）— ページのライフサイクル:
+
+```mermaid
+stateDiagram-v2
+    [*] --> 下書き
+    下書き --> レビュー中 : draft を外す
+    レビュー中 --> 公開 : 承認
+    レビュー中 --> 下書き : 差し戻し
+    公開 --> [*]
+```
+
+クラス図（classDiagram）:
+
+```mermaid
+classDiagram
+    class ページ {
+        +String title
+        +int order
+        +本文() String
+    }
+    ページ <|-- 下書きページ : draft
+    サイト "1" *-- "many" ページ : contains
+```
+
+円グラフ（pie）:
+
+```mermaid
+pie showData title コンテンツの内訳（例）
+    "ガイド" : 12
+    "リファレンス" : 8
+    "リリースノート" : 5
+```
+
+マインドマップ（mindmap）— インデント階層で書き、中央ルートから左右へ展開:
+
+```mermaid
+mindmap
+  root((ドキュメント計画))
+    構成
+      ガイド
+      リファレンス
+    運用
+      レビュー
+      更新サイクル
+```
+
+タイムライン（timeline）— ロードマップや沿革に:
+
+```mermaid
+timeline
+    title リリースのあゆみ（例）
+    section 立ち上げ
+        4月 : 企画 : 要件整理
+        5月 : プロトタイプ
+    section 公開
+        6月 : v1.0 リリース
+```
+
+## 注意書きと折りたたみ
+
+`> [!NOTE]` 形式の注意書きが使えます（NOTE / TIP / IMPORTANT / WARNING / CAUTION の 5 種）。
+
+> [!NOTE]
+> 補足情報。ラベルは既定で英語です。
+
+> [!TIP]
+> 知っていると便利な使い方のヒント。
+
+> [!IMPORTANT]
+> 目的を達成するために必ず知っておくべきこと。
+
+> [!WARNING]
+> 問題を避けるために注意が必要な内容。
+
+> [!CAUTION] 破壊的操作に注意
+> `> [!CAUTION] タイトル` のように 1 行目へ書くと、ラベルを日本語などへ上書きできます。
+
+種別の直後に `-`（閉じた状態）/ `+`（開いた状態）を付けると折りたたみになります
+（`<details>` で描画。クライアント JS は不要です）:
+
+> [!TIP]- 折りたたみの例
+> 長い補足や付録はここへ畳んでおけます。中身は検索・llms.txt にも収録されます。
+
+## 脚注
+
+本文に脚注参照を書けます[^sample]。表示では定義がページ末尾に集約され、相互リンクされます。
+
+[^sample]:
+    脚注の本文。`setoka fmt` は定義をこの位置のまま温存します。
+
+## 数式
+
+インライン数式 $E = mc^2$ と、ブロック数式が書けます（同梱 KaTeX で描画）:
+
+$$
+\int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
+$$
+
+```math
+a^2 + b^2 = c^2
+```
+
+`$100` のような通貨表記は数式になりません（直後に数字が来る `$` は無効）。
+
+## そのほかの記法
+
+タスクリスト・引用・キーボード表記にもテーマのスタイルが当たります。
+
+- [ ] 未完了のタスク
+- [x] 完了したタスク
+
+> 引用ブロック。出典の明示や補足に使います。
+
+検索ボックスへは <kbd>/</kbd> または <kbd>Cmd</kbd>+<kbd>K</kbd> でフォーカスできます。
+
+## 定義リストと用語集
+
+`setoka.toml` の用語辞書に載っている語は、ページ内の初出だけに説明（点線の下線）が付きます。
+たとえば setoka は SSG です。辞書から[用語集](../glossary.md)のページも自動で作られます。
+
+用語の段落 → 空行 → コロン（`:`）で始まる段落を書くと定義リストになります。
+
+SSG
+
+: Markdown などの原稿から静的な HTML サイトを生成する仕組み。
+
+## API 仕様（OpenAPI / JSON Schema）
+
+` ```openapi ` / ` ```jsonschema ` ブロックに API 仕様（YAML / JSON）を書くと、
+ビルド時に整形済みの HTML へ変換されます（JS 不要・ダークモードに追従）。
+
+```jsonschema
+title: 記事
+type: object
+required: [title, body]
+properties:
+  title:
+    type: string
+    description: 記事タイトル
+  body:
+    type: string
+    description: 本文（Markdown）
+  tags:
+    type: array
+    items:
+      type: string
+    description: タグ一覧
+  status:
+    type: string
+    enum: [draft, published]
+    description: 公開状態
+```
+
+OpenAPI 3.x / Swagger 2.0 の文書全体は ` ```openapi ` ブロックで描画できます
+（info・paths・パラメータ・レスポンスを操作ごとの開閉式パネルで表示。2.0 の
+`definitions` や `in: body` のリクエストボディにも対応）:
+
+```openapi
+openapi: 3.0.3
+info:
+  title: 記事 API
+  version: 1.0.0
+paths:
+  /articles:
+    get:
+      summary: 記事一覧を取得
+      parameters:
+        - name: status
+          in: query
+          description: 公開状態で絞り込む
+          schema:
+            type: string
+            enum: [draft, published]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Article"
+    post:
+      summary: 記事を作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Article"
+      responses:
+        "201":
+          description: 作成成功
+components:
+  schemas:
+    Article:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          description: 記事タイトル
+        status:
+          type: string
+          enum: [draft, published]
+          description: 公開状態
+    ApiError:
+      description: エラー応答（どの操作からも参照されないスキーマも一覧に載ります）
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+```
+
+文書末尾の「スキーマ」には `components/schemas`（2.0 は `definitions`）の
+**全スキーマ**が折りたたみで並びます。上の例の `ApiError` のように、
+どの操作からも参照されないスキーマもここから読めます。
+
+ブロックの中身を `file: specs/api.yaml` の 1 行だけにすると、
+**プロジェクトルート相対**の仕様ファイルを参照できます
+（仕様ファイル側の変更は次のビルドで必ず反映されます）。
+`$ref` はドキュメント内参照（`#/components/schemas/...` など）と
+**プロジェクト内の別ファイル**（`schemas/common.yaml#/...`）を解決します。
+
+## ページを LLM に渡す
+
+各ページの右上にある「**Markdown をコピー**」ボタンで、そのページの
+原文 Markdown をそのままクリップボードへコピーできます（LLM に貼る用途）。
+同じ内容は `dist/<ページのパス>.md` としても配信され、サイト全体の索引
+`llms.txt`（リンク先は各 `.md`）と全文連結 `llms-full.txt` も自動生成されます。
+
+## 用語統一 lint
+
+`setoka.toml` の `lint.terms` に「正しい表記 → ゆれ表記」の辞書を書くと、
+`setoka lint` / `setoka check` が本文・見出しの表記ゆれを行番号付きで報告します
+（コードブロック・URL は対象外）:
+
+```toml
+[lint.terms]
+"サーバー" = ["サーバ"]
+"ユーザー" = ["ユーザ"]
+```
+
+```bash
+setoka lint
+# content/guide/api.md:12:5: warning[term-variant] 「サーバ」は「サーバー」に統一してください
+```
+
+辞書がなくても、**組み込みルール**が機械的なゆれを既定で検出します
+（`lint.rules` に「ルール ID → `false`」を書くとプロジェクト全体で無効化できます）:
+
+- 全角英数字（`fullwidth-alphanumeric`）:
+  <!-- setoka-lint-disable-next-line fullwidth-alphanumeric -->
+  Ｗｅｂ１２３ → `Web123` を提案
+- 半角カナ（`halfwidth-kana`）:
+  <!-- setoka-lint-disable-next-line halfwidth-kana -->
+  ﾃﾞｰﾀ → `データ` を提案
+- 長音符ゆれの混在（`katakana-choon`）:
+  <!-- setoka-lint-disable-next-line katakana-choon -->
+  プロジェクト内に「サーバ」と「サーバー」が混在していたら少数派の側に警告
+  （コードブロック・URL は対象外）
+
+上の例がそのまま警告にならないのは、各例の直前にある
+`<!-- setoka-lint-disable-next-line ルール名 -->` コメントが**次の内容行に限り**
+ルールを抑制しているからです（この原稿自体が抑制記法の実例です）。ページ全体で
+抑制したいときは frontmatter の `lintDisable` を使います。
+
+検出された表記ゆれは `--fix` でまとめて自動修正できます
+（コードブロックは触らず、差分のないファイルには書き込みません。
+長音符ゆれは多数派へ統一し、同数のときは正解を決められないため報告のみ）:
+
+```bash
+setoka lint --fix
+```
+
+表記ゆれのほかに**文書規約**も常時検査します（h1 の重複 `duplicate-h1`・
+見出しレベルの飛び `heading-level-skip`・frontmatter の未知キー
+`frontmatter-unknown-key`・コードブロックの表示メタのタイポ `code-block-meta`・
+図表ラベルの重複 `duplicate-label`）。`setoka.toml` のキーのタイポや型違いは
+診断ではなく設定エラーで、どのコマンドも読み込み時に位置付きで止まります。
+`setoka check` はこれにリンク切れ・アンカー切れ
+（`broken-link` / `broken-anchor`）・引用先の不備（`include-error`）・
+API 仕様の不備（`spec-error`）・整形差分（`fmt`）を足した統合チェックです。
+
+全ルールの一覧は[リファレンス](https://ai.implementer.net/setoka/reference/rules/)にあります。
+
+CI へは終了コード（0 = 違反なし / 1 = 違反あり / 2 = 実行エラー）で組み込めます。
+GitHub Actions なら `--format github` で**注釈として PR の diff 行に**出せます:
+
+```bash
+setoka check --format github   # PR の該当行に注釈
+setoka check --format json     # 機械可読（単一 JSON オブジェクト）
+setoka fmt --diff              # 整形差分を unified diff で確認（patch でそのまま当たる）
+```
+
+## 最終更新日と編集リンク
+
+`setoka.toml` の `git` セクションを有効にすると、ページフッターに
+最終コミット日と「このページを編集」リンクが出ます:
+
+```toml
+[git]
+last_updated = true # 最終コミット日（git が無い環境では自動で非表示）
+edit_url = "https://github.com/me/docs/edit/main/content/{path}"
+```
+
+## 全文検索
+
+ヘッダーの検索ボックス（`/` または `Cmd/Ctrl+K` でフォーカス）から日本語で検索できます。
+1 文字の誤字にも寛容です。サーバは不要で、静的ホスティングだけで動きます。
+
+`"..."` で囲むと**フレーズ検索**になり、囲んだ語句が連続で出現するページだけに
+絞り込めます（例: `"ライブリロード"`）。引用部は誤字補正・同義語の対象外の
+完全一致です。引用符なしの複数語検索でも、語が連続して出現するページが
+自動で上位に来ます（近接ブースト）。
+
+`lint.terms` の用語辞書と `search.synonyms` は検索の**クエリ拡張**にも使われます。
+たとえば辞書に `"サーバー": ["サーバ"]` があれば、`サーバ` で検索しても
+`サーバー` と書かれたページがヒットし、ハイライトも付きます。
+
+`search.index_code = true` にすると**フェンスコードブロックの中身も検索対象**になり、
+関数名や設定キーで設計書を引けます（既定は off。mermaid など特別描画される
+ブロックのソースは対象外です）:
+
+```toml
+[search]
+index_code = true
+```
+
+ターミナルからも同じエンジンで検索できます:
+
+```bash
+setoka search "検索したい言葉"
+```
+
+`search.enabled = false` で機能ごと無効化できます。

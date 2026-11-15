@@ -119,6 +119,33 @@ jobs:
           fi
           exit "$status"
 
+      # cargo-binstall のメタデータ（setoka-cli の Cargo.toml。v0.21 Phase 96）が release.yml の
+      # アーカイブと合っているか。名前の形（setoka-v<版>-<ターゲット>）・形式（Windows は zip、
+      # ほかは tar.gz）・中の配置（直下に setoka）。setoka の名前のアーカイブはリリースで初めて
+      # できるので、実際に binstall で入れるのはリリース後に確かめる
+      - name: binstall metadata
+        run: |
+          status=0
+          m=crates/setoka-cli/Cargo.toml
+          r=.github/workflows/release.yml
+          need() {
+            if ! grep -qF -- "$2" "$1"; then
+              echo "$1 に次の行がありません（binstall のメタデータと release.yml のアーカイブを合わせる）: $2" >&2
+              status=1
+            fi
+          }
+          need "$m" 'pkg-url = "{ repo }/releases/download/v{ version }/setoka-v{ version }-{ target }{ archive-suffix }"'
+          need "$m" 'bin-dir = "{ bin }{ binary-ext }"'
+          need "$m" 'pkg-fmt = "tgz"'
+          need "$r" 'NAME="setoka-v$VERSION-'
+          need "$r" 'tar -czf "$NAME.tar.gz" -C stage .'
+          need "$r" '7z a "../$NAME.zip" .'
+          # zip で配る Windows のターゲットには、すべて pkg-fmt = "zip" の上書きが要る
+          for t in $(grep -oE '[a-z0-9_]+-pc-windows-msvc' "$r" | sort -u); do
+            need "$m" "[package.metadata.binstall.overrides.$t]"
+          done
+          exit "$status"
+
       # 運用文書とコードのコメントが指す参照先（リポジトリのパス・スキル・ROADMAP / CLAUDE.md の節）が
       # 実在するか（v0.20 Phase 93。10-04 見直しの「運用文書の古い記述」の再発防止）
       - name: doc references
@@ -390,6 +417,9 @@ jobs:
           grep -q '<figcaption>snippets/pr-check.yml</figcaption>' docs/dist/guide/quality/index.html && grep -q -- '--no-fmt --format github' docs/dist/guide/quality/index.html
           # v0.21 Phase 95: 互換性の約束と更新の手順のページ
           grep -q 'id="約束の対象"' docs/dist/reference/compatibility/index.html && grep -q 'id="新しい版に上げる手順"' docs/dist/reference/compatibility/index.html
+          # v0.21 Phase 96: インストールの 3 通り（cargo-binstall の節）と、macOS の Gatekeeper の FAQ
+          grep -q 'id="cargo-binstall-で入れる"' docs/dist/guide/install/index.html && grep -q '（quickinstall）は使いません' docs/dist/guide/install/index.html
+          grep -q 'id="macos-で開いていませんと止められる"' docs/dist/guide/faq/index.html
           # 設定例は TOML で書く（JSON / YAML 風の `markdown.mermaid.backend: "ssr"` や
           # `"abbr": false` はコピーすると設定エラーになる）。原稿・README・雛形・スキルを見る
           if grep -rnE '`[a-z_]+(\.[a-z_]+)+: |`"[a-z_]+": |backend: ["]' docs/content README.md crates/setoka-cli/scaffold/*.md .claude/skills/; then
@@ -652,17 +682,17 @@ jobs:
           "$GITHUB_WORKSPACE/target/debug/setoka" fmt --check
           "$GITHUB_WORKSPACE/target/debug/setoka" lint
           "$GITHUB_WORKSPACE/target/debug/setoka" check
-          # Phase 49: scaffold に v0.8〜v0.9 機能の「動く実例」が入っている
+          # Phase 49: scaffold に v0.8〜v0.9 機能の「動く実例」が入っている（v0.21 Phase 96 から記法の例のページ）
           # （エイリアスのリダイレクト HTML と、file= で引用したソースのキャプション）
           test -f dist/guide/intro/index.html
-          grep -q '<figcaption>snippets/greet.rs</figcaption>' dist/index.html
+          grep -q '<figcaption>snippets/greet.rs</figcaption>' dist/guide/examples/index.html
           # Phase 51: scaffold の Markdown 断片が展開されている（フェンス原文ではなく散文で照合）
-          grep -q '参照している全ページに反映されます' dist/index.html
+          grep -q '参照している全ページに反映されます' dist/guide/examples/index.html
           # Phase 52: scaffold の略語が <abbr> 化され、用語集ページが生成される
-          grep -q '<abbr title="Static Site Generator' dist/index.html
+          grep -q '<abbr title="Static Site Generator' dist/guide/examples/index.html
           test -f dist/glossary/index.html
           # Phase 53: 定義リストが描画される
-          grep -q '<dl>' dist/index.html
+          grep -q '<dl>' dist/guide/examples/index.html
           # Phase 53: 未知のセクション名は実行エラー（終了コード 2）
           if "$GITHUB_WORKSPACE/target/debug/setoka" search --section 存在しない "はじめに"; then
             echo "存在しないセクションの絞り込みが成功扱いになった" >&2
@@ -671,7 +701,7 @@ jobs:
           # Phase 22: openapi/jsonschema SSR — scaffold の jsonschema ブロックが
           # 静的 HTML 化されていること＋ file: 参照は仕様ファイルの変更だけで反映されること
           # （jsonschema は class="api-spec api-schema" なので閉じ引用符まで書かない）
-          grep -q 'class="api-spec' dist/guide/getting-started/index.html
+          grep -q 'class="api-spec' dist/guide/examples/index.html
           mkdir -p specs
           printf 'openapi: 3.0.3\ninfo:\n  title: E2E API v1\n  version: 1.0.0\npaths: {}\n' > specs/api.yaml
           printf -- '---\ntitle: API\n---\n\n# API\n\n```openapi\nfile: specs/api.yaml\n```\n' > content/api.md

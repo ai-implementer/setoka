@@ -14,6 +14,20 @@ publish = false
 name = "setoka"
 path = "src/main.rs"
 
+# cargo-binstall のメタデータ（v0.21 Phase 96）。crates.io に出していないので
+# `cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli` で使う。
+# アーカイブの名前と中の配置（直下に setoka）は release.yml の build ジョブと同じにする
+# （ci.yml の binstall metadata が照合する）。quickinstall（第三者のビルド）は使わず、
+# アーカイブを配っていないターゲットではこのリポジトリのソースからビルドする
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/setoka-v{ version }-{ target }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+disabled-strategies = ["quick-install"]
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
 [dependencies]
 setoka-config = { workspace = true }
 setoka-core = { workspace = true }
