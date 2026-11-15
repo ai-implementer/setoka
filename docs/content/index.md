@@ -1,32 +1,32 @@
 ---
-title: yuzu とは
+title: setoka とは
 order: 1
 description: Markdown の設計書を静的 HTML ドキュメントサイトへ変換する Rust 製ツール
 ---
 
-# yuzu とは
+# setoka とは
 
-yuzu 🍊 は、Markdown で書いた設計書を**プロダクション品質の静的 HTML
+setoka 🍊 は、Markdown で書いた設計書を**プロダクション品質の静的 HTML
 ドキュメントサイト**へ変換する Rust 製のツールです。
 
-このサイト自体が yuzu でビルドされています（リポジトリの
-[docs/](https://github.com/ai-implementer/yuzu/tree/main/docs) が原稿で、
+このサイト自体が setoka でビルドされています（リポジトリの
+[docs/](https://github.com/ai-implementer/setoka/tree/main/docs) が原稿で、
 リリースのたびに GitHub Pages へ自動デプロイ。説明は最新のリリースの動作に合わせています）。左のサイドバー・右の目次・
 ヘッダーの検索ボックス・ダークモード切替・各ページの「Markdown をコピー」は、
-すべて yuzu が生成したものです。
+すべて setoka が生成したものです。
 
 ## 特徴
 
 - **書くことに集中できる**: `content/**/*.md` を置くだけでナビ・目次・
-  前後ページリンク・パンくずが付いたサイトになります。`yuzu dev` は
+  前後ページリンク・パンくずが付いたサイトになります。`setoka dev` は
   保存から約 1 秒でブラウザを自動リロードします
 - **設計書のための表現力**: シンタックスハイライト・数式（KaTeX）・
   Mermaid 記法の図（既定はブラウザで描画。設定で 10 図種をビルド時に SVG 化）・
   OpenAPI / JSON Schema の静的レンダリングを標準装備
 - **日本語のための検索**: 日本語の分かち書きに対応した全文検索が、静的ホスティング
   だけで動きます。誤字に寛容で、フレーズ検索・同義語展開・コードブロック検索にも対応
-- **品質を保つ道具**: `yuzu fmt`（決定的整形）・`yuzu lint`（表記ゆれ検出と
-  自動修正）・`yuzu check`（リンク切れ検査）を CI にそのまま組み込めます
+- **品質を保つ道具**: `setoka fmt`（決定的整形）・`setoka lint`（表記ゆれ検出と
+  自動修正）・`setoka check`（リンク切れ検査）を CI にそのまま組み込めます
 - **LLM 連携**: llms.txt / llms-full.txt と、ページ単位の Markdown 配信・
   コピーボタンを自動生成します
 - **速い**: インクリメンタルビルド＋ページ並列化で、編集のたびの再ビルドは
@@ -52,10 +52,10 @@ yuzu 🍊 は、Markdown で書いた設計書を**プロダクション品質�
 ## 質問・不具合の報告
 
 質問・不具合の報告・機能の要望は
-[GitHub の Issues](https://github.com/ai-implementer/yuzu/issues) で受け付けています
+[GitHub の Issues](https://github.com/ai-implementer/setoka/issues) で受け付けています
 （報告のしかたは[よくある質問とトラブル](guide/faq.md#質問不具合の報告)）。
 
 ## ライセンス
 
 MIT または Apache-2.0 のデュアルライセンスです。ソースコードは
-[GitHub](https://github.com/ai-implementer/yuzu) にあります。
+[GitHub](https://github.com/ai-implementer/setoka) にあります。

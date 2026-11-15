@@ -1,9 +1,9 @@
 # Rust
 target/
 
-# yuzu 生成物
+# setoka 生成物
 dist/
-.yuzu/
+.setoka/
 
 # insta の未承認スナップショット
 *.snap.new

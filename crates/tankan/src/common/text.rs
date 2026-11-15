@@ -189,7 +189,7 @@ mod tests {
         let w = text_width("iW", 1000.0);
         assert!((w - 1166.0).abs() < 0.01, "w={w}");
         // 混在
-        assert!(text_width("柚子yuzu", 14.0) > text_width("yuzu", 14.0));
+        assert!(text_width("柚子setoka", 14.0) > text_width("setoka", 14.0));
     }
 
     #[test]

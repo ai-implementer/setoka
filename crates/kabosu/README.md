@@ -10,8 +10,8 @@ TOML の解析・型変換・検証・生成を担う**依存ゼロ**の Rust �
 - **手書き decode / encode** — derive マクロなし。必須・任意・既定値・ネスト・
   検証・未知キー検出（Warn / Deny / Ignore）を `TableDecoder` で書く
 - **正規化出力** — 同じ値から常に同じバイト列を生成する（ハッシュキーにも使える）
-- **特定ツール非依存の汎用設計**（開発は [yuzu](https://github.com/ai-implementer/yuzu)
-  monorepo で行っているが `yuzu-*` に依存しない独立ライブラリ）
+- **特定ツール非依存の汎用設計**（開発は [setoka](https://github.com/ai-implementer/setoka)
+  monorepo で行っているが `setoka-*` に依存しない独立ライブラリ）
 
 ## インストール
 

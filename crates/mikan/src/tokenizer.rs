@@ -95,8 +95,8 @@ mod tests {
     #[test]
     fn 半角英字は小文字化される() {
         let t = tokenizer();
-        let joined = t.tokenize("Yuzu Build Watch").concat();
-        assert!(joined.contains("yuzu"), "joined={joined}");
+        let joined = t.tokenize("Setoka Build Watch").concat();
+        assert!(joined.contains("setoka"), "joined={joined}");
         assert!(joined.contains("build"));
     }
 

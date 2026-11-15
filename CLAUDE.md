@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-yuzu は Markdown の設計書を静的 HTML ドキュメントサイトに変換する Rust 製ツール
+setoka は Markdown の設計書を静的 HTML ドキュメントサイトに変換する Rust 製ツール
 （Cargo workspace、MSRV 1.99 / edition 2024。公開ライブラリの kabosu・tankan も同じ）。
 
 - **日本語で書く** — 対話・コメント・ドキュメント・テスト名すべて
@@ -32,8 +32,8 @@ apple container CLI 自体の汎用リファレンスはユーザスキル `appl
 ```bash
 cargo build --workspace
 cargo test --workspace                        # insta スナップショットテストを含む
-cargo test -p yuzu-core 正規化                # 単一 crate・テスト名でフィルタ（テスト名は日本語）
-cargo test -p yuzu-core --test normalize_test # ファイル単位で絞るならこちら
+cargo test -p setoka-core 正規化                # 単一 crate・テスト名でフィルタ（テスト名は日本語）
+cargo test -p setoka-core --test normalize_test # ファイル単位で絞るならこちら
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 ```
@@ -45,10 +45,10 @@ rustup target add wasm32-unknown-unknown
 cargo check -p mikan-wasm --target wasm32-unknown-unknown
 cargo check -p tankan --target wasm32-unknown-unknown
 
-# e2e（CLI 実機確認）— cargo test は target/debug/yuzu を更新しないので必ず先にビルドする
-cargo build -p yuzu-cli
-./target/debug/yuzu new /tmp/e2e-docs && cd /tmp/e2e-docs
-"$OLDPWD/target/debug/yuzu" build && "$OLDPWD/target/debug/yuzu" check
+# e2e（CLI 実機確認）— cargo test は target/debug/setoka を更新しないので必ず先にビルドする
+cargo build -p setoka-cli
+./target/debug/setoka new /tmp/e2e-docs && cd /tmp/e2e-docs
+"$OLDPWD/target/debug/setoka" build && "$OLDPWD/target/debug/setoka" check
 ```
 
 - **CLI の終了コード規約**: 0 = 成功 / 1 = 違反あり（lint・check・fmt --check）/ 2 = 実行エラー
@@ -57,7 +57,7 @@ cargo build -p yuzu-cli
   正規化済み絶対パス」が不変条件）。グローバル引数を足すときは
   `cli.rs` の `GlobalArgs` へ（`global = true` が必須）
   - **グローバル引数同士の排他は `conflicts_with` だけでは足りない** — clap は
-    トップレベルとサブコマンドを別々に検証するので `yuzu -q build -v` が通る。
+    トップレベルとサブコマンドを別々に検証するので `setoka -q build -v` が通る。
     `Cli::parse_validated` のパース後検証に足す（`main` とテストはこれを通す）
 - **insta スナップショット**: 差分が出たら内容を必ず目視してから更新する
   - `cargo insta review` は cargo-insta が要る（**ホストに入っていないことがある**。
@@ -87,27 +87,26 @@ cargo build -p yuzu-cli
     （`cargo tree`）と照合して知らせる（Phase 82）。**Cargo.lock に版があるかだけで照合しない** =
     同じ crate の旧版がネイティブ側に残ると見逃す（PR #32 のレビュー指摘）
   - vendor 資産の勧告は `scripts/vendor-advisories.sh`（deps.yml が週次）。版は
-    `crates/yuzu-theme/licenses/` の記録から読み、除外は「GHSA の ID とパッケージ@版」の組
+    `crates/setoka-theme/licenses/` の記録から読み、除外は「GHSA の ID とパッケージ@版」の組
 
 ## アーキテクチャ
 
 ワークスペース構成と依存方向は**凍結**（逆方向依存を作らない）:
 
 ```
-yuzu-cli → {yuzu-server, yuzu-render, yuzu-index, yuzu-core, yuzu-config}
-yuzu-render → yuzu-core, yuzu-config, yuzu-theme, tankan
-yuzu-index → yuzu-core, mikan       mikan-wasm → mikan
-yuzu-config → kabosu（通常依存はこれだけ）
+setoka-cli → {setoka-server, setoka-render, setoka-index, setoka-core, setoka-config}
+setoka-render → setoka-core, setoka-config, setoka-theme, tankan
+setoka-index → setoka-core, mikan       mikan-wasm → mikan
+setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
-tankan・mikan・mikan-wasm・kabosu は他の yuzu crate 非依存の汎用ライブラリ
+tankan・mikan・mikan-wasm・kabosu は他の setoka crate 非依存の汎用ライブラリ
 （tankan・mikan・kabosu は crates.io で公開済み。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
-yuzu-index はページ抽出とファイル I/O だけの薄い呼び出し側）
-mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に改名）
+setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
 
-- **yuzu-core** — comrak パース → Document / サイトモデル（nav・TOC・slug・sourcepos・
+- **setoka-core** — comrak パース → Document / サイトモデル（nav・TOC・slug・sourcepos・
   lint・リンク検査）。パーサは内部に隠蔽し、公開 API は comrak 非依存
   - `markdown/mod.rs` が **comrak を触る唯一の場所**
   - 配下: `fence.rs`（フェンス情報文字列 = title / 行ハイライト / 行番号 / `file=` /
@@ -115,9 +114,9 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     `collapse.rs`（`[!NOTE]-` → `<details>`）
   - ほかに `include.rs`（インクルードの読み込みと行切り出し。canonicalize でルート配下強制）・
     `aliases.rs`（エイリアスの正規化と検証）
-- **yuzu-render** — サイトモデル → HTML（minijinja テンプレート、syntect ハイライト、
+- **setoka-render** — サイトモデル → HTML（minijinja テンプレート、syntect ハイライト、
   Mermaid 変換、base_url 解決）。数式は comrak math 出力を同梱 KaTeX がクライアント描画
-- **yuzu-config** — `yuzu.toml` を cwd から上方向に探索してプロジェクトルートを確定し、
+- **setoka-config** — `setoka.toml` を cwd から上方向に探索してプロジェクトルートを確定し、
   kabosu で読んで既定値をマージする
   - `schema.rs` が構造体と既定値
   - `codec.rs` が kabosu の Decode / Encode（`table_codec!` で「キー名 => フィールド」を
@@ -127,19 +126,19 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   - 通常依存は kabosu だけ（serde / jsonc-parser / thiserror / tracing は使わない。
     ログは cli の `commands::load_project` が出す）
   - **`--root` 指定時は上方向探索をしない**（探索すると「指定したのに親の
-    `yuzu.toml` を拾う」事故になる）。指定先に無いときの `ConfigFileNotFound` は
+    `setoka.toml` を拾う」事故になる）。指定先に無いときの `ConfigFileNotFound` は
     `find_project_root` 専用の `ProjectRootNotFound` と別物で、**文言に「上方向に探索」を
     含めない**（探索していないため）
-- **yuzu-theme** — デフォルトテーマを rust-embed でバイナリ埋め込み。プロジェクトの
+- **setoka-theme** — デフォルトテーマを rust-embed でバイナリ埋め込み。プロジェクトの
   `theme/` に同じ相対パスのファイルを置くとファイル単位で上書き
 - **tankan** — Mermaid 互換 SSR（sequence / flowchart / class / state / ER / gantt / pie /
   mindmap / timeline / packet → SVG）
-  - render_svg が Err を返すと yuzu 側が自動でクライアント描画にフォールバックするので
+  - render_svg が Err を返すと setoka 側が自動でクライアント描画にフォールバックするので
     未対応でも壊れない
   - ただし**図種を足すと「従来フォールバックしていたページが SSR 成功へ変わる」＝
     本文 HTML が変わる**
   - 追随先は tankan 内（`kind.rs::is_supported` / `lib.rs` の mod ＋ match / corpus）
-    だけでなく yuzu 側の `CACHE_FORMAT_VERSION` とスナップショットも
+    だけでなく setoka 側の `CACHE_FORMAT_VERSION` とスナップショットも
     （`tankan-add-diagram` スキル参照）
 
 ### 凍結した設計判断（docs `development/index.md`「凍結した設計判断」参照。差し替えないこと）
@@ -150,14 +149,14 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 - TOML 設定は自作の kabosu（依存ゼロ。v0.14 で serde + JSONC から移行。
   JSONC の互換読み込みは作らない）
 - YAML（frontmatter・openapi / jsonschema）は saphyr（v0.20 Phase 88 で serde_yaml_ng から移行）。
-  型の解釈は yuzu-core `yaml.rs` が自前で行う（下の「1 実装で共有する箇所」）
+  型の解釈は setoka-core `yaml.rs` が自前で行う（下の「1 実装で共有する箇所」）
 - rayon（ページ並列化。出力はスレッド数に依らずバイト同一）
 - comrak・syntect・two-face は onig（C 依存）を引かないよう **必ず
   `default-features = false`**（Cargo.toml のコメント参照）。`deny.toml` の bans が onig・
   TLS・HTTP クライアントの混入を止める。syntect は `default-fancy` も使わず feature を並べる
   （plist-load・yaml-load が勧告付きの依存を引く。Phase 82）
 - **ネットワーク I/O は build / check / dev の既定経路に入れない** — 外部リンク検査は
-  `yuzu check --external-links` の opt-in で、HTTP は curl へ委譲 = HTTP クライアント・
+  `setoka check --external-links` の opt-in で、HTTP は curl へ委譲 = HTTP クライアント・
   TLS を依存に持ち込まない（`commands/extlink.rs`）
 
 ### 検索の最重要制約
@@ -165,18 +164,18 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 - index 時（ネイティブ）と query 時（wasm）で**同一トークナイザコード（mikan）＋
   同一モデルバイト**を使う
 - 抜粋生成・ハイライトのロジックも mikan に 1 実装で native/wasm 共有する（別実装を作らない）
-- `yuzu search` はブラウザと同じエンジンを通るので整合検証に使える
-- 検索 UI の動作確認は `yuzu preview` / `yuzu dev` 経由（`file://` では fetch が動かない）
+- `setoka search` はブラウザと同じエンジンを通るので整合検証に使える
+- 検索 UI の動作確認は `setoka preview` / `setoka dev` 経由（`file://` では fetch が動かない）
 
 ### 1 実装で共有する箇所（片方だけ直さない）
 
 同じ規則を 2 箇所で解釈すると必ずズレるため、意図的に 1 実装へ寄せてある。触るときは対になる側も確認する。
 
-- **特別レンダリング言語** — yuzu-core の `is_special_render_lang` と yuzu-render
+- **特別レンダリング言語** — setoka-core の `is_special_render_lang` と setoka-render
   `highlight.rs::render` のディスパッチは**集合を同期**させる
   - openapi / jsonschema は `SPEC_LANGS` が唯一の定義で、render 側 `SpecKind` との一致は
     speccheck のテストが縛る
-- **URL 分類** — `linkcheck.rs` の判定と yuzu-render `urls.rs` の `UrlResolver::rewrite` を揃える
+- **URL 分類** — `linkcheck.rs` の判定と setoka-render `urls.rs` の `UrlResolver::rewrite` を揃える
   - 外部 URL の判定は `urlpath::is_external_url`、フル URL かは `has_url_scheme`（先頭の `scheme://`）。
     **`contains("://")` で判定しない** = `/search/?q=https://…` を外部扱いにして base が付かず、
     リンク検査も飛ばしていた（PR #66 のレビュー指摘）
@@ -196,9 +195,9 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     ルート配下強制の同じ規律 `read_under_root` を共有する
   - 本文の解決 `resolve_spec_source`（読み込み口はクロージャで受ける）と参照の検証
     `validate_spec_refs` もここ
-  - **仕様の中身の検証だけが yuzu-render**
+  - **仕様の中身の検証だけが setoka-render**
 - **エイリアス** — `aliases.rs`（render と check）
-- **YAML の読み込み** — yuzu-core `yaml.rs`（frontmatter・未知キーの lint・openapi / jsonschema。
+- **YAML の読み込み** — setoka-core `yaml.rs`（frontmatter・未知キーの lint・openapi / jsonschema。
   Phase 88）。スカラーの解釈 `resolve` は置き換え前の serde_yaml_ng と同じ境界（`010` は文字列等）
   - **saphyr の位置は文字数**（バイトではない）。`byte_offset` を通してからバイト基準の列にする
   - **saphyr は別名（`*x`）の展開を数えない** = 入れ子の別名で指数的に膨らむ。`load` の
@@ -206,10 +205,10 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   - **`early_parse` 無効だと saphyr はキーをスタイルとタグ込みで比べる** = `draft` と `"draft"` を
     別のキーとして通す（後の値が黙って勝つ）。同名キーの重複と、明示のコアタグ（`!!bool "true"`）を
     引用符より先に見るのは `load` の `validate` と `resolve`（PR #55 のレビュー指摘）
-- **dist に出すサイト単位の生成物** — yuzu-core `site_output.rs` の `SiteOutput`
+- **dist に出すサイト単位の生成物** — setoka-core `site_output.rs` の `SiteOutput`
   （404.html・llms・sitemap・syntect.css・build_id・`_assets`・`_search`）。書き出し（pipeline）・
   止めた生成物の掃除（`unpublished_outputs`）・check のリンクの有効ターゲットがすべて
-  `SiteOutput::emitted` と `yuzu_render::output_switches` を通る（10-12 レビューの R1。3 か所が
+  `SiteOutput::emitted` と `setoka_render::output_switches` を通る（10-12 レビューの R1。3 か所が
   別々の一覧で食い違っていた）。**生成物を足すときは `site_outputs!` に variant を足す**
   （`path` / `is_dir` / `emitted` は網羅 match。パス文字列を直に書かない）
   - 出力の記録（`OutputTracker`）には、書く側が出どころ `OutputKind`（ページ・リダイレクト・
@@ -220,21 +219,21 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     孤児掃除と同じくファイルの同一性で同じファイルかを判定する（文字列で照合すると、区別しない FS で
     `public/INDEX.html` が生成した `index.html` を上書きしても警告が出ない。PR #69 のレビュー指摘）
   - トップページ・ページ 0 件の警告に添える「原稿がページにならなかった理由」は、ページの読み込みと
-    同じ走査で分けた `yuzu_core::markdown_census`（読み込み・ignore・シンボリックリンク）とビルドした
+    同じ走査で分けた `setoka_core::markdown_census`（読み込み・ignore・シンボリックリンク）とビルドした
     ページから作る。**ファイルシステムを別に調べない**（`is_file()` はリンクを辿るので、走査が読まない
     シンボリックリンクの `index.md` を draft と案内していた。PR #69 の 2 回目のレビュー指摘）
 - **診断の収集** — cli の `commands/collect.rs`（check と build の件数の報告が共有。R2）。
   抑制は `Collected::suppress` を通した後でしか読めない。build はルールで絞って数える
   （以前は build が `lint.rules` を直接読み、`lintDisable` が効かなかった）。`Diagnostic` は
   `Rule` を持ち、深刻度はそこから決まる（`Diagnostic::new(rule, rel, span, message)`）
-  - **`yuzu lint` が評価しないルールは `rules::CHECK_ONLY` に足す**。lint は
+  - **`setoka lint` が評価しないルールは `rules::CHECK_ONLY` に足す**。lint は
     `diag::lint_options(rc, Evaluates::Lint)` でこれを「評価しなかったルール」として渡す。
     足し忘れると lint がその抑制を `unused-lint-suppression` にして終了コード 1 になる
     （PR #68 のレビュー指摘。`route-case-conflict` は Phase 85 からこうなっていた）。
-    docs の「yuzu check が追加するルール」の節との一致はテストが縛る
+    docs の「setoka check が追加するルール」の節との一致はテストが縛る
 - **設定値の検証** — cli の `commands::read_config`（`load_project` と watch 中の読み直しが共有。
-  R3）。yuzu-core・yuzu-render が持つ規則（`synth_page_problem`・`toc_levels_problem`）を
-  `yuzu_config::load_with` に渡し、位置付きの設定エラーにする。**使う側で不正値を黙って捨てない**
+  R3）。setoka-core・setoka-render が持つ規則（`synth_page_problem`・`toc_levels_problem`）を
+  `setoka_config::load_with` に渡し、位置付きの設定エラーにする。**使う側で不正値を黙って捨てない**
 - `comrak_options_keep_footnotes` は fmt / normalize / linkcheck 専用。
   **HTML レンダと extract_meta に使うと壊れる**
 
@@ -242,12 +241,12 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 
 `RenderCtx` / `IndexCtx` の**全フィールド None = 従来のフルビルドと同一動作**（ライブラリ単体テストはこの形。キャッシュ配線は cli 層の責務）。
 
-- **yuzu-core** — `cache.rs`（ページ派生物キャッシュ。envKey / routesKey / sourceHash の
+- **setoka-core** — `cache.rs`（ページ派生物キャッシュ。envKey / routesKey / sourceHash の
   3 層無効化）＋ `output.rs`（compare-before-write・出力マニフェスト・孤児掃除）
-- **yuzu-render** — `RenderCtx`（cache / outputs / shared）と `RenderShared`
+- **setoka-render** — `RenderCtx`（cache / outputs / shared）と `RenderShared`
   （watch 間で再利用する minijinja Env・syntect）
-- **yuzu-index** — `IndexCtx` と `IndexSession`（vaporetto トークナイザの遅延構築・再利用）
-- **yuzu-cli** `commands/build.rs` — `BuildSession` が上記を束ね、envKey 計算・
+- **setoka-index** — `IndexCtx` と `IndexSession`（vaporetto トークナイザの遅延構築・再利用）
+- **setoka-cli** `commands/build.rs` — `BuildSession` が上記を束ね、envKey 計算・
   routesKey 設定・マニフェスト保存を行う唯一の場所
 
 - キャッシュするのは高価なページ派生物（メタ・本文 HTML・検索 tf・llms 正規化 md）だけ。
@@ -274,30 +273,30 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 
 ## リリース手順（vX.Y.Z）
 
-- **yuzu 本体** — 手順と罠は **`release` スキル**に集約（マイナーとパッチで ROADMAP.md の
+- **setoka 本体** — 手順と罠は **`release` スキル**に集約（マイナーとパッチで ROADMAP.md の
   書き方が違う・**タグは打った時点の main を切り出す**ので機能コミットをタグの後に
   積まない等）
-- **汎用ライブラリ（tankan / mikan / kabosu）** — yuzu のリリースと非同期。手順は
+- **汎用ライブラリ（tankan / mikan / kabosu）** — setoka のリリースと非同期。手順は
   **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須）
   - fuzz.yml は 3 crate の対象（kabosu 3・mikan のシャード・tankan の `render_svg`）を週 1 回実行する
     （v0.20 Phase 92）。合否は artifact と終了コードで決め、tankan の panic だけは最後まで実行できたら
     （終了コード 0）受け流して件数を出す（ハング・メモリ超過・0 以外の終了は必ず失敗。panic があるだけで
     終了コードを見ないと、OOM killer 等で artifact を残さず止まった実行を成功にする。PR #81 のレビュー指摘）。制限の値は fuzz.yml の `env` の 1 か所。mikan の種
     `fuzz/seeds/shard/` は `FORMAT_VERSION` を上げたら書き直す（mikan のテストが照合する）
-- **公開しない crate** — mikan-wasm と yuzu 本体の crate は `publish = false`
-  （名前 `yuzu`・`yuzu-core` は別プロジェクトに取得済み。本体を公開する将来構想は ROADMAP.md）
+- **公開しない crate** — mikan-wasm と setoka 本体の crate は `publish = false`
+  （本体を公開する将来構想は ROADMAP.md）
 
 ## 罠・注意点
 
 ### ビルドとキャッシュ
 
-- `cargo test --workspace` は `target/debug/yuzu` を**更新しない**。CLI の実機確認前に
-  `cargo build -p yuzu-cli` を忘れない
-- `yuzu build` / `dev` は常時インクリメンタル（`.yuzu/cache/`）
-  - キャッシュ起因の不具合を疑うときは `--force`（または `.yuzu/cache/` 削除。いつでも安全）
-  - **`--force` / `.yuzu` の削除は出力マニフェストも消す** = `output.clean = false` だと孤児掃除の
+- `cargo test --workspace` は `target/debug/setoka` を**更新しない**。CLI の実機確認前に
+  `cargo build -p setoka-cli` を忘れない
+- `setoka build` / `dev` は常時インクリメンタル（`.setoka/cache/`）
+  - キャッシュ起因の不具合を疑うときは `--force`（または `.setoka/cache/` 削除。いつでも安全）
+  - **`--force` / `.setoka` の削除は出力マニフェストも消す** = `output.clean = false` だと孤児掃除の
     材料が無くなる。設定で止めた生成物（原稿の `.md`・llms・sitemap・syntect.css・build_id）は
-    記録に頼らず `yuzu_render::unpublished_outputs` と今回書いたものの差で消す（PR #42 の指摘）。
+    記録に頼らず `setoka_render::unpublished_outputs` と今回書いたものの差で消す（PR #42 の指摘）。
     一覧は `SiteOutput` から作るので、生成物は variant を足せば掃除にも載る（上の「1 実装で共有する箇所」）
   - 止めた `_search/` は中のファイルを `output::list_files_under` で列挙し、同じく今回書いたもの
     以外を消す。**ディレクトリごと消す・中に今回書いたものがあれば丸ごと飛ばす、のどちらもしない**
@@ -308,8 +307,8 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     **文字列の大文字小文字を無視して判定しない** = 区別する FS（Linux）で旧出力が残り、
     マニフェストから落ちて二度と掃除されない（PR #29 のレビュー指摘）
   - **キャッシュ内容の意味が変わる変更**（本文 HTML の生成ロジック・検索 tf の重み等）では
-    `yuzu-core/src/cache.rs` の `CACHE_FORMAT_VERSION` を上げ、隣の `CACHE_FINGERPRINT` も書き直す。
-    yuzu-cli のテスト `キャッシュの中身が変わったら版を上げる` が、記法を一通り使う試験用のプロジェクトを
+    `setoka-core/src/cache.rs` の `CACHE_FORMAT_VERSION` を上げ、隣の `CACHE_FINGERPRINT` も書き直す。
+    setoka-cli のテスト `キャッシュの中身が変わったら版を上げる` が、記法を一通り使う試験用のプロジェクトを
     ビルドしてキャッシュの中身の SHA-256 を照合するので、上げ忘れは CI で落ちる（失敗時に書き直す値を
     出す。v0.20 Phase 93・10-12 レビューの R9）。依存の更新で出力が変わったときも同じ
 - **検索 tf のキャッシュはページ source ハッシュ ＋ インクルード参照先の内容ハッシュで
@@ -319,7 +318,7 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     エントリを丸ごと作り直し、meta / body / llms まで巻き添えで毎ビルド全ミスになる
 - **ログのサブスクライバは `log_internal_errors(false)` 必須**（`main.rs`）。
   `tracing_subscriber::fmt()` の既定は true で、stderr への書き込み失敗時に同じ stderr へ
-  `eprintln!` して panic する = `yuzu build 2>&1 | head` のように読み手が先に閉じると
+  `eprintln!` して panic する = `setoka build 2>&1 | head` のように読み手が先に閉じると
   ビルドが途中で落ち、`--force` なら dist を作り直した後なので `_search` が消えたままになる
   （`-q` / `-v` は `GlobalArgs` → `log_filter` で解決し、`RUST_LOG` より優先する）
 
@@ -345,9 +344,9 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   参照先が content 外にもあるため）
   - **出力ディレクトリの除外は必須** = 外すと「再ビルド → 変更検知 → 再ビルド」の
     無限ループになる
-  - 隠しディレクトリと `build.watch_ignore` の glob も除外する（`yuzu-server/src/watch.rs` の
-    `WatchIgnore`。glob 判定は yuzu-core の `IgnoreMatcher` を**述語で**渡す =
-    server は yuzu-core を知らない）
+  - 隠しディレクトリと `build.watch_ignore` の glob も除外する（`setoka-server/src/watch.rs` の
+    `WatchIgnore`。glob 判定は setoka-core の `IgnoreMatcher` を**述語で**渡す =
+    server は setoka-core を知らない）
   - **除外はイベントのフィルタで監視登録は減らない**（notify にパス単位の除外が無い）
   - **イベントは種類でも絞る** — Linux の inotify は開いた・読んだだけのイベントも届け、
     絞らないとビルドが原稿を読むたびに再ビルドして止まらない（macOS では起きないので
@@ -356,9 +355,9 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     `WatchFailure` で `serve` に知らせ、配信ごと止めて exit 2 にする
 - **panic hook の中で終了させない**（`main.rs` の `install_panic_hook`）。hook は
   `catch_unwind` で回収する panic でも先に呼ばれるので、exit すると Mermaid 描画・
-  comrak 整形の回収（`yuzu_core::recover`）が動かなくなる。回収区間の出力抑制は
+  comrak 整形の回収（`setoka_core::recover`）が動かなくなる。回収区間の出力抑制は
   スレッドごとの印（`is_recovering`）で行い、hook の差し替えで黙らせない
-- **watch 中の `yuzu.toml` 変更は取り込むが、監視・配信の前提になる設定は起動時固定**
+- **watch 中の `setoka.toml` 変更は取り込むが、監視・配信の前提になる設定は起動時固定**
   （`build.rs` の `WatchBuild` / `StartupSettings` / `pin_restart_only`）
   - `output.dir` を差し替えると新しい出力先が監視除外から外れて無限ループになるため、
     `output.dir` / `base_url` / `dev.host` / `dev.port` / `dev.live_reload` /
@@ -366,14 +365,14 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   - **サーバや監視スレッドへ起動時に渡す設定を増やしたら `StartupSettings` に足す**。配信
     （`preview::serve_dist`。dev / preview / build --watch が共有）はこの値から組み、
     `pin_restart_only` の分割代入はワイルドカード無しなので、差し戻しを書くまでコンパイルが止まる
-  - `dev.host` / `--host` は `yuzu_config::BindAddr`（IP アドレスだけ。読み込みの時点で検証）
-- **dev / preview の Host / Origin の検査は IP アドレスを通すのが仕様**（`yuzu-server/src/host.rs`。
+  - `dev.host` / `--host` は `setoka_config::BindAddr`（IP アドレスだけ。読み込みの時点で検証）
+- **dev / preview の Host / Origin の検査は IP アドレスを通すのが仕様**（`setoka-server/src/host.rs`。
   Phase 83）。DNS リバインディングはドメイン名を使うので、拒否するのは `localhost`・
   `*.localhost`・IP 以外で `dev.allowed_hosts` に無いホスト名だけ（`dev.host = "0.0.0.0"` で
   LAN の IP から開く使い方を壊さない。Vite と同じ考え方）。検査は Router の最後の
   `layer` で全経路に掛けるので、**経路を足すときは layer より前に足す**。WebSocket は
   Origin も照合し、Origin の無い接続（ブラウザ以外・テスト）は通す
-- yuzu-server の serve テストは TCP バインドするため、サンドボックス内では
+- setoka-server の serve テストは TCP バインドするため、サンドボックス内では
   PermissionDenied で落ちる（コード起因ではない）
 - **監視の隠しディレクトリ判定は監視ルートからの相対パスで行う**（`WatchIgnore::is_ignored`）。
   イベントは絶対パスで届くので、全構成要素を見るとルートの祖先（`~/.config/notes/`・
@@ -412,32 +411,32 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   ときの OS 追従 `@media (prefers-color-scheme: dark)` の `html:not([data-theme])`
   - **`data-theme` を付けない状態が「OS の設定に従う」**。FOUC 回避の script は保存済みの
     選択があるときだけ付ける（OS の値を書き込むと JS 無効で効かず、OS 側の切替にも追従しない）
-  - theme.css の手書きの 2 ブロックは同じ中身にする（yuzu-theme のテストが縛る）。
+  - theme.css の手書きの 2 ブロックは同じ中身にする（setoka-theme のテストが縛る）。
     syntect.css と `css_vars_dark` は `css.rs` の `dark_two_ways` が 2 系統を出す
   - JS で配色を判定するときは「`data-theme` があればそれ、無ければ `matchMedia`」
     （`theme.js` / `mermaid-init.js`）
 - minijinja はデフォルトで属性中の `/` をエスケープするため、テンプレートの URL 値には
-  **自前の `| url` フィルタ**（`yuzu-render/src/templates.rs`）を通す
+  **自前の `| url` フィルタ**（`setoka-render/src/templates.rs`）を通す
   - **`| url` は HTML 属性専用**（`&` を `&amp;` にする。生のままだと `&copy;` を
     パーサがデコードして別の URL になる）。`<script>` 内の文字列は実体参照がデコード
     されないので **`| url_js`**（`&` を残す）を使う。文脈で使い分ける
   - `| safe` は `page.body`（レンダ済み HTML）・`site.footer_html`（`site.footer` を
-    `yuzu_core::render_inline_markdown` で描画した HTML。本文と同じく書き手が書いたもの。Phase 90）・
+    `setoka_core::render_inline_markdown` で描画した HTML。本文と同じく書き手が書いたもの。Phase 90）・
     `theme_css_vars`（`css.rs` で検証済み）だけに残す
   - 設定に書いたリンク（`site.favicon`・`site.header_links`・フッターのリンク）は
     `pipeline.rs` の `site_link_url` が base を前置する（`site.logo` と同じ規則。外部 URL・
     `mailto:` はそのまま）。`header_links` の `javascript:` 等は codec が設定エラーにする
-  - **URL 値へ `| safe` を使わない** = yuzu は slug 化をせずファイル名がそのまま
+  - **URL 値へ `| safe` を使わない** = setoka は slug 化をせずファイル名がそのまま
     route → URL になるため、引用符や `<` を含むファイル名で属性・`<script>` を抜けられる
     （`<script>` 内は実体参照がデコードされないので HTML エスケープでは直らない）
 - rust-embed は debug ビルドだとテーマをファイルシステムから読む（テーマ編集が再コンパイル
   不要で反映される一方、debug バイナリ単体を別マシンへ持ち出すとアセットを見失う）。
   リリースビルドは常に埋め込み
   - **埋め込みフォルダへの新規ファイル追加は cargo の再コンパイル判定に載らない**ため、
-    yuzu-theme は build.rs の `rerun-if-changed=assets` で監視している
+    setoka-theme は build.rs の `rerun-if-changed=assets` で監視している
   - これが無いと「debug では動くのに release が古い埋め込みを使い回して template not found」
     になる。埋め込み crate を増やすときは同じ build.rs を付けること
-- `yuzu-index`（rust-embed で `assets/search/` を埋め込む）にも同じ build.rs がある
+- `setoka-index`（rust-embed で `assets/search/` を埋め込む）にも同じ build.rs がある
   （Phase 81 で `THIRD-PARTY-LICENSES.txt` を足すときに付けた）。**埋め込み crate を増やすときは
   同じ build.rs を付ける**
 - テーマの `static/` 配下は全部 `dist/_assets/` へ出るので、開発用の記録は `#[exclude]` で
@@ -451,7 +450,7 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   - `build_site_model` と `build_source_pages` の両方に混ぜてあるので route 衝突検査・
     linkcheck のターゲット・routesKey は無料で効く
   - ただし **`page.src` は実在しない**。`fs::write(&page.src)` する fmt / lint --fix は
-    必ず除外する（`fs::write` は新規作成するので、忘れると `yuzu fmt` が
+    必ず除外する（`fs::write` は新規作成するので、忘れると `setoka fmt` が
     `content/glossary.md` を実体化する）
   - lint・整形差分・診断のリンク元・集計行のページ数も同様（機械的な除外は `is_generated()`）
   - **集約（nav・検索索引・sitemap・ページ単位 .md）に載せるかは種別で違う** —
@@ -467,7 +466,7 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 
 ### 出力先への書き込み
 
-- **出力ディレクトリ（と `.yuzu`）への書き込みは `yuzu_core::output::write_under`、
+- **出力ディレクトリ（と `.setoka`）への書き込みは `setoka_core::output::write_under`、
   削除は `remove_dir_all_under` を必ず通す**（`root.join(rel)` ＋ `fs::write` を直に書かない）
   - 両者が `resolve_output_rel`（rel の字句検証）と `ensure_no_symlink_under`
     （経路のリンク検査）を内包している
@@ -477,12 +476,12 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
     書き込みも孤児掃除もリンク先へ抜ける。基点自身がリンクなら配下をいくら検査しても無意味）
   - 逆に**基点の祖先は見ない** — macOS の `/tmp -> private/tmp` があり、`current_dir()` は
     解決済みパスを返すのでプロジェクトルート自身は常に実体
-  - `output.dir` 自体の字句検証（ルート外・`input.dir` / `public` / `theme` / `.yuzu` との
-    重なり）は `yuzu-config` の `load`（唯一の変換点）にある
+  - `output.dir` 自体の字句検証（ルート外・`input.dir` / `public` / `theme` / `.setoka` との
+    重なり）は `setoka-config` の `load`（唯一の変換点）にある
 
 ### fmt と診断
 
-- `yuzu fmt` の不変条件: 本文は format_commonmark の正規形・**frontmatter は生テキストを
+- `setoka fmt` の不変条件: 本文は format_commonmark の正規形・**frontmatter は生テキストを
   バイト温存**・冪等・差分なしなら書き込まない（mtime 温存）
   - **改行コードは原稿のまま**（`format_document` は LF にそろえて整形し、`LineEnding::of` で
     原稿の改行コードへ戻す）。整形差分の判定は `same_ignoring_line_endings` を通す（fmt と
@@ -498,7 +497,7 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   行き先の一時名も、まだ何も無い名前を選ぶ）
 - **fmt の独自記法温存は fmt 経路限定**
   - format_commonmark は `{#fig:x}` を `{\#fig:x}` へ、`[!NOTE]-` を `[!NOTE] -` へ変えるので
-    `restore_yuzu_syntax` が書いた形に戻すが、これを呼ぶのは `format_document` だけ
+    `restore_setoka_syntax` が書いた形に戻すが、これを呼ぶのは `format_document` だけ
   - `normalize_markdown`（llms-full.txt）は復元しないため、**llms-full.txt にエスケープ形が
     出るのは仕様**（バグと誤認して直さない）
 - fmt / lint / check は **draft ページも対象**（build_source_pages）。build_site_model は
@@ -507,7 +506,7 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 
 ### docs サイトと CI
 
-- `docs/` はこのリポジトリ自身のドキュメントサイト（yuzu プロジェクト。`docs/yuzu.toml` が
+- `docs/` はこのリポジトリ自身のドキュメントサイト（setoka プロジェクト。`docs/setoka.toml` が
   ルート）
   - **リリースのタグ（`v*`）の push** で `.github/workflows/docs.yml` が GitHub Pages へ
     デプロイする（Phase 84。main から公開すると配布中の版より docs が先に進む）。
@@ -515,14 +514,14 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
   - **リポジトリルートから `--root docs` で実行する**（`cd docs` しない。ci.yml・docs.yml・
     docs-links.yml・`verify` スキルすべて。出力は `docs/dist/`）。cwd からの上方向探索の
     経路は scaffold の e2e が検証する
-  - 原稿は `yuzu fmt` の正規形・表記は長音符なし（`lint.terms` 準拠）で書く
+  - 原稿は `setoka fmt` の正規形・表記は長音符なし（`lint.terms` 準拠）で書く
 - **ci.yml の docs ゲートは docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用）
-  - 特に `docs/yuzu.toml` の 27-47 行目（`[markdown]` ブロック）はインクルードの `lines=` で
+  - 特に `docs/setoka.toml` の 27-47 行目（`[markdown]` ブロック）はインクルードの `lines=` で
     引用されているので、この範囲を動かすと原稿の中身と CI が同時に壊れる
     （`verify` スキルに直す箇所の一覧あり）
   - **雛形 deploy.yml を変えたら `docs/snippets/deploy.yml` へ写す**（docs は雛形を docs のルートの
     外から `file=` で取り込めないので写しを置いている。v0.20 Phase 91）。ci.yml の `scaffold actions pins` が
-    バイト一致と、PR 検証の例 `docs/snippets/pr-check.yml` の actions の SHA・yuzu のインストール手順
+    バイト一致と、PR 検証の例 `docs/snippets/pr-check.yml` の actions の SHA・setoka のインストール手順
     （コメントを除く）が雛形と同じかを照合する
 - **ci.yml の check ジョブは `target/package` を消してからキャッシュする**（`drop target/package
   before caching`）。Swatinem/rust-cache の掃除が `target/` の下をたどって kabosu のソースの `tests/` を
@@ -558,6 +557,6 @@ mikan = 旧 yuzu-index-format・mikan-wasm = 旧 yuzu-search-wasm（v0.7 後に�
 ### 開発コンテナ
 
 - 開発コンテナ内（`.devcontainer/`）は `CARGO_TARGET_DIR=/cargo-target` のため、CLI 実機確認は
-  `"$CARGO_TARGET_DIR/debug/yuzu"` を使う（`./target/debug/yuzu` は**存在しない**）
+  `"$CARGO_TARGET_DIR/debug/setoka"` を使う（`./target/debug/setoka` は**存在しない**）
 - 環境定義は `.devcontainer/Dockerfile` が唯一で、devcontainer.json とラッパーの不変条件は
   `.devcontainer/README.md` の表を参照

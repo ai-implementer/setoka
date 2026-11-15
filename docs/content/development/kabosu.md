@@ -1,16 +1,16 @@
 ---
 title: kabosu の設計
 order: 3
-description: 依存ゼロの TOML 設定ライブラリと yuzu-config の責務分離
+description: 依存ゼロの TOML 設定ライブラリと setoka-config の責務分離
 ---
 
 # kabosu の設計
 
-> 状態: 確定設計（2026-08-16）。v0.1 の実装と yuzu-config への統合は完了済み
-> （2026-08-22。`crates/kabosu/`・`crates/yuzu-config/src/codec.rs`）。以下は設計の原文
+> 状態: 確定設計（2026-08-16）。v0.1 の実装と setoka-config への統合は完了済み
+> （2026-08-22。`crates/kabosu/`・`crates/setoka-config/src/codec.rs`）。以下は設計の原文
 
 `kabosu` は、TOML の解析・型変換・検証・生成を担う汎用ライブラリです。
-yuzu 固有の設定スキーマやファイル操作を含めず、crates.io で単独公開します。
+setoka 固有の設定スキーマやファイル操作を含めず、crates.io で単独公開します。
 
 ## 境界と依存保証
 
@@ -23,9 +23,9 @@ yuzu 固有の設定スキーマやファイル操作を含めず、crates.io �
   完全にゼロにする。dev 依存だけはテストと fuzzing に許可する
 - パッケージ化後の manifest を CI で検査し、依存ゼロを継続的に保証する
 
-`yuzu-config` は非公開の薄いラッパーとして残し、通常依存を `kabosu` だけに
-します。`yuzu.toml` の探索、yuzu 固有スキーマ、デフォルト、パス解決は
-`yuzu-config` が担当します。
+`setoka-config` は非公開の薄いラッパーとして残し、通常依存を `kabosu` だけに
+します。`setoka.toml` の探索、setoka 固有スキーマ、デフォルト、パス解決は
+`setoka-config` が担当します。
 
 ## TOML の対応範囲
 
@@ -66,7 +66,7 @@ TOML 1.0 どおり拒否するもの（秒を省略した `07:32`、インライ
 
 TOML 1.1 で追加された構文は、一般的な構文エラーにせず位置付きの
 `ParseErrorKind::Unsupported(TomlV11)` として返します。「書き間違い」ではなく
-「新しい版の記法」だと伝えるためで、`yuzu.toml` では 1.0 での書き方を添えて
+「新しい版の記法」だと伝えるためで、`setoka.toml` では 1.0 での書き方を添えて
 報告します。対象は `\e` と `\xHH` のエスケープ、インラインテーブルの中の
 改行・コメント・末尾カンマ、秒を省略した時刻の 3 つです。
 
@@ -153,16 +153,16 @@ to_string<T>(&T) -> Result<String, EncodeError>
   維持する
 - parsed document のコメントは正規化出力へ引き継がない
 
-## yuzu への統合
+## setoka への統合
 
-- 設定ファイルは `yuzu.toml` だけをサポートする
+- 設定ファイルは `setoka.toml` だけをサポートする
 - JSONC の互換読み込み、フォールバック、変換コマンドは作らない
 - キーは `snake_case` に変更するが、現行設定の階層と意味は維持する
-- `yuzu new` は主要な既定値と任意項目の説明を含む、注釈付き `yuzu.toml` を生成する
-- yuzu は未知キーを `Deny` とし、設定エラーとして停止する
-- `.yuzu/settings.json` は代替ファイルを作らず廃止する
+- `setoka new` は主要な既定値と任意項目の説明を含む、注釈付き `setoka.toml` を生成する
+- setoka は未知キーを `Deny` とし、設定エラーとして停止する
+- `.setoka/settings.json` は代替ファイルを作らず廃止する
 - `jsonc-parser`、`serde`、`serde_json`、`thiserror`、`tracing` を
-  `yuzu-config` の依存から外す
+  `setoka-config` の依存から外す
 
 ## v0.1 の非スコープ
 

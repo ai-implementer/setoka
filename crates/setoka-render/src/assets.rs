@@ -1,0 +1,174 @@
+//! 静的アセットの書き出し:
+//! テーマアセット（埋め込み→ `theme/static` 上書き）・`public/` パススルー・build_id
+//!
+//! 書き込みはすべて「内容一致ならスキップ」（mtime 温存）。インクリメンタルビルド時は
+//! [`OutputTracker`] に dist 相対パスを記録し、孤児掃除マニフェストの材料にする
+
+use std::fs;
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use setoka_core::{OutputKind, OutputTracker, SiteOutput};
+use walkdir::WalkDir;
+
+use crate::error::RenderError;
+
+/// dist 相対パスへ書き出す（tracker があれば出どころ `kind` と一緒に記録、なければ直接書き込み）。
+/// rel の検証は両分岐とも `resolve_output_rel` に寄せる
+/// （エイリアス由来の `.` / `..` で実ページを上書きさせない）
+pub(crate) fn write_output(
+    outputs: Option<&OutputTracker>,
+    kind: OutputKind,
+    output_dir: &Path,
+    rel: &str,
+    data: &[u8],
+) -> Result<(), RenderError> {
+    match outputs {
+        Some(tracker) => {
+            tracker
+                .write(kind, rel, data)
+                .map_err(RenderError::io(output_dir.join(rel)))?;
+        }
+        // tracker 無し（ライブラリ直接利用）でも同じ検証を通す
+        None => {
+            setoka_core::output::write_under(output_dir, rel, data)
+                .map_err(RenderError::io(output_dir.join(rel)))?;
+        }
+    }
+    Ok(())
+}
+
+/// テーマの静的アセットを `dist/_assets/` へ書き出す。
+/// 埋め込みデフォルトテーマを先に書き、プロジェクト `theme/static/` を上書きコピーする
+pub(crate) fn write_theme_assets(
+    output_dir: &Path,
+    theme_dir: Option<&Path>,
+    outputs: Option<&OutputTracker>,
+) -> Result<(), RenderError> {
+    for path in setoka_theme::iter() {
+        let Some(rest) = path.strip_prefix("static/") else {
+            continue;
+        };
+        let data = setoka_theme::get(&path).expect("iter() で列挙したパスは必ず存在する");
+        write_output(
+            outputs,
+            OutputKind::Site(SiteOutput::ThemeAssets),
+            output_dir,
+            &format!("{}/{rest}", SiteOutput::ThemeAssets.path()),
+            &data,
+        )?;
+    }
+
+    if let Some(theme_static) = theme_dir.map(|d| d.join("static"))
+        && theme_static.is_dir()
+    {
+        copy_tree(
+            &theme_static,
+            SiteOutput::ThemeAssets.path(),
+            output_dir,
+            outputs,
+            OutputKind::Site(SiteOutput::ThemeAssets),
+        )?;
+    }
+    Ok(())
+}
+
+/// `public/` を `dist/` 直下へそのままコピーする
+pub(crate) fn copy_public(
+    public_dir: Option<&Path>,
+    output_dir: &Path,
+    outputs: Option<&OutputTracker>,
+) -> Result<(), RenderError> {
+    if let Some(dir) = public_dir {
+        copy_tree(dir, "", output_dir, outputs, OutputKind::Public)?;
+    }
+    Ok(())
+}
+
+/// content/ の同伴アセット（`.md` 以外。ページ横の画像等）を dist の
+/// 同じ相対パスへコピーする。本文の相対参照は UrlResolver が同じ相対パスの
+/// 絶対 URL へ書き換えるため、コピー先とリンクが必ず一致する
+pub(crate) fn copy_content_assets(
+    content_dir: &Path,
+    ignore: &[String],
+    output_dir: &Path,
+    outputs: Option<&OutputTracker>,
+) -> Result<(), RenderError> {
+    for (abs, rel) in setoka_core::collect_content_assets(content_dir, ignore)? {
+        let data = fs::read(&abs).map_err(RenderError::io(&abs))?;
+        write_output(
+            outputs,
+            OutputKind::ContentAsset,
+            output_dir,
+            &setoka_core::urlpath::rel_to_slash(&rel),
+            &data,
+        )?;
+    }
+    Ok(())
+}
+
+/// オートリフレッシュ用のビルド ID を `dist/__setoka/build_id` に書く。
+/// 呼ぶのは `build --watch`（ポーリング）のときだけ。HTML には埋め込まず、
+/// 通常ビルドでは書かない（出力を決定的に保つため）。
+/// 内容が毎回変わるため常に書き込まれる（--watch のポーリング変更シグナル）
+pub(crate) fn write_build_id(
+    output_dir: &Path,
+    outputs: Option<&OutputTracker>,
+) -> Result<(), RenderError> {
+    let id = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos().to_string())
+        .unwrap_or_else(|_| "0".to_string());
+    write_output(
+        outputs,
+        OutputKind::Site(SiteOutput::BuildId),
+        output_dir,
+        SiteOutput::BuildId.path(),
+        id.as_bytes(),
+    )
+}
+
+/// `src` 配下を dist の `dest_prefix/`（"" なら直下）へ再帰コピーする
+fn copy_tree(
+    src: &Path,
+    dest_prefix: &str,
+    output_dir: &Path,
+    outputs: Option<&OutputTracker>,
+    kind: OutputKind,
+) -> Result<(), RenderError> {
+    for entry in WalkDir::new(src) {
+        // 走査失敗を握りつぶすと public/ の一部が欠けた dist を「成功」として
+        // deploy してしまう。ファイル読み込み失敗（下の fs::read）と扱いを揃える
+        let entry = entry.map_err(|e| {
+            let path = e.path().map(Path::to_path_buf).unwrap_or_default();
+            RenderError::Io {
+                path,
+                source: e.into_io_error().unwrap_or_else(|| {
+                    std::io::Error::other(
+                        "ディレクトリ走査に失敗しました（シンボリックリンクのループ）",
+                    )
+                }),
+            }
+        })?;
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let rel = entry
+            .path()
+            .strip_prefix(src)
+            .expect("walkdir は src 配下のみ返す");
+        let rel = rel
+            .iter()
+            .map(|c| c.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/");
+        let dest_rel = if dest_prefix.is_empty() {
+            rel
+        } else {
+            format!("{dest_prefix}/{rel}")
+        };
+        let data = fs::read(entry.path()).map_err(RenderError::io(entry.path()))?;
+        write_output(outputs, kind, output_dir, &dest_rel, &data)?;
+    }
+    Ok(())
+}

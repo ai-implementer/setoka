@@ -6,7 +6,7 @@ description: Mermaid 記法の図。ブラウザで描くか、ビルド時に S
 
 # 図（Mermaid）
 
-` ```mermaid ` ブロックで図が描けます。描き方は 2 つあり、`yuzu.toml` で選びます:
+` ```mermaid ` ブロックで図が描けます。描き方は 2 つあり、`setoka.toml` で選びます:
 
 ```toml
 [markdown.mermaid]
@@ -14,7 +14,7 @@ backend = "ssr" # 既定は "client"（ブラウザで描く）。"ssr" はビ�
 ```
 
 - **`client`（既定）** — 同梱の mermaid.js がブラウザで図を描きます
-- **`ssr`** — yuzu が**ビルド時に SVG にします**。ブラウザの JavaScript は使わず、
+- **`ssr`** — setoka が**ビルド時に SVG にします**。ブラウザの JavaScript は使わず、
   ダークモードの切り替えにも描き直しなしで追従します
 
 ## client と ssr の選び方
@@ -56,7 +56,7 @@ flowchart TD
 sequenceDiagram
     autonumber
     actor W as 執筆者
-    participant Y as yuzu dev
+    participant Y as setoka dev
     participant B as ブラウザ
 
     W->>Y: content/*.md を保存
@@ -194,7 +194,7 @@ SSR が扱えない図（未対応の図種や `linkStyle` / `click` などの�
 再描画されるため、見た目の追従はどちらの経路でも保たれます。
 
 > [!TIP]
-> tankan は yuzu に依存しない汎用ライブラリで、単体でも
+> tankan は setoka に依存しない汎用ライブラリで、単体でも
 > [crates.io で公開](https://crates.io/crates/tankan)しています
 > （`cargo add tankan`。I/O なし・時刻 / 乱数非依存・wasm32 対応）。
 > 設計の詳細は[アーキテクチャ](../development/index.md)を参照してください。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # KaTeX（katex.min.js / katex.min.css / fonts、MIT）をテーマの vendor へ取得する。
 # 更新するときは KATEX_VERSION と KATEX_ARCHIVE_SHA256 を**セットで**書き換えて実行し、
-# crates/yuzu-theme/assets/static/vendor/README.md の記録も更新すること
+# crates/setoka-theme/assets/static/vendor/README.md の記録も更新すること
 # （新しい sha256 はこのスクリプトの不一致エラーが実測値を表示する）。
 #
 # fonts は woff2 のみ同梱する（katex.min.css は woff2 → woff → ttf の順で
@@ -14,7 +14,7 @@ KATEX_VERSION="${KATEX_VERSION:-0.18.11}"
 # アーカイブが一致すれば中身は一意に決まるので、fonts 20 ファイルもこれで覆える
 KATEX_ARCHIVE_SHA256="${KATEX_ARCHIVE_SHA256:-a11d6ab44180c6e25a09108c6c391866d0600b49a61ef725368d567f4918ffc3}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$ROOT/crates/yuzu-theme/assets/static/vendor/katex"
+DEST="$ROOT/crates/setoka-theme/assets/static/vendor/katex"
 # 完成形は DEST の隣で組んでから差し替える（$TMPDIR は別ファイルシステムの
 # ことがあり mv が跨げないため、staging は同一 FS に置く）
 STAGING="$DEST.new"
@@ -39,7 +39,7 @@ cp "$TMP"/package/dist/fonts/*.woff2 "$STAGING/fonts/"
 # ライセンス文: KaTeX 本体（tarball の LICENSE）と、フォントの生成元 katex-fonts の LICENSE
 # （コミットで固定。フォントは katex-fonts のスクリプトで作られ、同じく MIT）。
 # scripts/third-party-licenses.sh vendor が dist 用の通知へ組み込む
-NOTICE="$ROOT/crates/yuzu-theme/licenses/katex.txt"
+NOTICE="$ROOT/crates/setoka-theme/licenses/katex.txt"
 KATEX_FONTS_LICENSE_URL="https://raw.githubusercontent.com/KaTeX/katex-fonts/feee984b451fea029d921ea0d41b917f56c8b7f6/LICENSE"
 curl -fsSL "$KATEX_FONTS_LICENSE_URL" -o "$TMP/katex-fonts-LICENSE"
 {

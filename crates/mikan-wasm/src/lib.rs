@@ -1,13 +1,13 @@
-//! yuzu のクライアント検索（wasm32-unknown-unknown）。
+//! setoka のクライアント検索（wasm32-unknown-unknown）。
 //!
 //! **ロジックは持たない**薄い wasm-bindgen ラッパ。エンジン本体・トークナイザ・
-//! フォーマットはすべて `mikan` にあり、ネイティブの `yuzu search` と
+//! フォーマットはすべて `mikan` にあり、ネイティブの `setoka search` と
 //! 同一コードを共有する（トークナイザ整合の保証）。
 //!
 //! fetch は JS 側（同梱の `js/search-client.js`。テーマの search-ui.js から
 //! 利用される）の責務（Pagefind 方式）:
 //! 1. manifest.json / terms.fst / model.zst を fetch（OPFS キャッシュ経由）して
-//!    [`YuzuSearch`] を構築
+//!    [`MikanSearch`] を構築
 //! 2. `needed_shards(query)` → 未取得シャードを fetch → `load_shard`
 //! 3. `search(query, limit)` → 上位ヒットの fragment/<docId>.json を fetch して描画
 //!
@@ -20,19 +20,19 @@ use wasm_bindgen::prelude::*;
 use mikan::SearchEngine;
 
 #[wasm_bindgen]
-pub struct YuzuSearch {
+pub struct MikanSearch {
     inner: SearchEngine,
 }
 
 #[wasm_bindgen]
-impl YuzuSearch {
+impl MikanSearch {
     /// manifest.json / terms.fst / model.zst の 3 点から構築する
     #[wasm_bindgen(constructor)]
     pub fn new(
         manifest_json: &[u8],
         terms_fst: &[u8],
         model_zst: &[u8],
-    ) -> Result<YuzuSearch, JsError> {
+    ) -> Result<MikanSearch, JsError> {
         let inner = SearchEngine::new(manifest_json, terms_fst.to_vec(), model_zst)
             .map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Self { inner })

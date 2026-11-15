@@ -1,5 +1,5 @@
 // フェッチ ＋ OPFS キャッシュ ＋ wasm 起動のオーケストレーション。
-// DOM・テーマの知識は一切持たない（yuzu-theme の search-ui.js から利用される）。
+// DOM・テーマの知識は一切持たない（setoka-theme の search-ui.js から利用される）。
 //
 // キャッシュ有効性判定: manifest.json は毎回ネットワークから取得し（軽量・常に
 // 新鮮なものを使う）、contentHash が OPFS 保存済みの前回 manifest（version marker
@@ -80,7 +80,7 @@ export function createSearchClient({ searchBase }) {
         loadCached(cache, "model.zst"),
       ]);
       await mod.default({ module_or_path: searchBase + "search_bg.wasm" });
-      engine = { instance: new mod.YuzuSearch(manifestBytes, terms, model), cache };
+      engine = { instance: new mod.MikanSearch(manifestBytes, terms, model), cache };
       return engine;
     })();
     return enginePromise;

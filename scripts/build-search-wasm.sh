@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mikan-wasm をビルドして yuzu-index の assets へ vendor する。
+# mikan-wasm をビルドして setoka-index の assets へ vendor する。
 #
 # 前提:
 #   rustup target add wasm32-unknown-unknown
@@ -9,7 +9,7 @@
 #   cargo-about（wasm に入る crate のライセンス文を作る。版は scripts/third-party-licenses.sh の
 #   ABOUT_VERSION と同一）
 #
-# 実行後、crates/yuzu-index/assets/search/README.md にサイズを記録すること。
+# 実行後、crates/setoka-index/assets/search/README.md にサイズを記録すること。
 # wasm と一緒に、dist の _search/ へ出るライセンス文（THIRD-PARTY-LICENSES.txt）も作り直す
 # （wasm を変えずに文だけ作り直すなら scripts/third-party-licenses.sh wasm）。
 #
@@ -17,7 +17,7 @@
 #     wasm の作り直し忘れを照合する（CI が呼ぶ。ビルドのツールは要らない）。wasm の入力の
 #     ハッシュ（wasm_inputs_hash）がこのスクリプトの記録（wasm-inputs.sha256）と同じか、
 #     手書きの JS が vendor 先とバイト単位で同じかを見る。CI の検索の照合はネイティブの
-#     `yuzu search` を通り、third-party-licenses.sh check は crate と版の集合しか比べないので、
+#     `setoka search` を通り、third-party-licenses.sh check は crate と版の集合しか比べないので、
 #     版を上げない mikan の変更で wasm が古いままでも通ってしまうため（Phase 89）。
 #     wasm 自体をバイトで比べないのは、ビルドした環境（rustc・wasm-opt の版）で変わるため
 set -euo pipefail
@@ -25,7 +25,7 @@ set -euo pipefail
 export LC_ALL=C
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$ROOT/crates/yuzu-index/assets/search"
+DEST="$ROOT/crates/setoka-index/assets/search"
 RECORD="$DEST/wasm-inputs.sha256"
 
 # 検索 wasm の入力のハッシュ。記録を書くのはこのスクリプトだけ（記録だけを更新する手段は

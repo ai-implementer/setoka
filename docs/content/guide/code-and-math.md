@@ -26,7 +26,7 @@ TypeScript / TSX / TOML / Dockerfile なども
 
 ```toml
 [site]
-title = "yuzu"
+title = "setoka"
 lang = "ja"
 ```
 
@@ -53,7 +53,7 @@ const byOrder = (a: Page, b: Page) => (a.order ?? Infinity) - (b.order ?? Infini
 
 ```rust title="src/hello.rs" {2,4-6} showLineNumbers
 fn main() {
-    let name = "yuzu";
+    let name = "setoka";
     let mut lines = Vec::new();
     for i in 1..=3 {
         lines.push(format!("{i}: こんにちは {name}"));
@@ -64,9 +64,9 @@ fn main() {
 
 行番号は CSS カウンタによる表示なので、コピーボタンや範囲選択のコピーには
 混入しません。メタは検索インデックスにも入りません（コード本文だけが索引
-対象）。`yuzu fmt` は情報文字列を逐語で温存します。書き間違い
+対象）。`setoka fmt` は情報文字列を逐語で温存します。書き間違い
 （`showLineNumbers` のタイポ・コードの行数を超えた行ハイライトなど）は
-描画では無視されますが、`yuzu lint` が行番号付きで警告します。
+描画では無視されますが、`setoka lint` が行番号付きで警告します。
 
 なお mermaid / openapi / jsonschema / math のような特別レンダリングされる
 ブロックでは、これらのメタは無視されます。
@@ -77,7 +77,7 @@ fn main() {
 コードブロックにします。設計書にコードを転記して古くなる問題を防げます:
 
 ````markdown
-```toml file="yuzu.toml" lines=27-47
+```toml file="setoka.toml" lines=27-47
 ````
 
 - パスは**プロジェクトルート相対**です（ルート外への参照は拒否されます）
@@ -86,21 +86,21 @@ fn main() {
 - 言語を省略した場合は拡張子から推定します
 - 行ハイライト `{2}` は**切り出した後の相対行**を指します
 
-下は、このサイト自身の `yuzu.toml` から Markdown 設定の部分を引用した例です
+下は、このサイト自身の `setoka.toml` から Markdown 設定の部分を引用した例です
 （設定を変更すれば、このページの表示も次のビルドで自動的に変わります）:
 
-```toml file="yuzu.toml" lines=27-47
+```toml file="setoka.toml" lines=27-47
 ```
 
-参照先を編集すると、`yuzu dev` はプロジェクトルートを監視しているので
+参照先を編集すると、`setoka dev` はプロジェクトルートを監視しているので
 自動で再ビルドされます（`dist/` や隠しディレクトリは監視対象外）。
-参照切れ・行範囲外は `yuzu check` がエラーとして報告し、ビルド時は
+参照切れ・行範囲外は `setoka check` がエラーとして報告し、ビルド時は
 エラーボックスを表示して他のページの生成は続けます。
 
 > [!NOTE]
 > 埋め込んだ内容は `search.index_code` が有効なら検索インデックスに載ります
 > （表示されているものは検索できる、を保つため）。一方 llms.txt は原文の
-> ままです（`yuzu fmt` の正規形と一致する不変条件を保つため）。
+> ままです（`setoka fmt` の正規形と一致する不変条件を保つため）。
 
 ## タブ / コードグループ
 
@@ -137,7 +137,7 @@ winget install example
 > [!NOTE]
 > `tab=` を 1 つのフェンスだけに書くと切り替え先が無いため、通常のコード
 > ブロックとして描画されます。指定が効かないまま気づけないので、
-> `yuzu lint` が `code-block-meta` で警告します。
+> `setoka lint` が `code-block-meta` で警告します。
 
 Markdown の断片（注意書き・免責文など）を取り込みたい場合は、コード引用ではなく
 [Markdown 断片のインクルード](writing.md#markdown-断片のインクルード)

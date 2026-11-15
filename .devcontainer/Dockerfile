@@ -1,4 +1,4 @@
-# yuzu 開発環境の唯一の定義。
+# setoka 開発環境の唯一の定義。
 # devcontainer.json（Docker 系）と scripts/dev-container.sh（apple container / docker）の
 # 両経路がこのファイルを参照する。環境の実体（env・ユーザ・作業ディレクトリ・常駐コマンド）は
 # すべてここに集約し、各経路では再定義しない（経路間の食い違い防止）。
@@ -8,7 +8,7 @@
 #   エージェント実行環境（Claude Code / Codex CLI / gh）を焼き込む。
 #   vendor 更新ツール（wasm-bindgen-cli / binaryen）は焼かない（頻度が低く重いため）
 # - ユーザ・HOME・作業ディレクトリは ARG でパラメタ化する。既定値 = Docker 経路
-#   （devcontainer.json。vscode/1000 + /workspaces/yuzu）。apple container 経路は
+#   （devcontainer.json。vscode/1000 + /workspaces/setoka）。apple container 経路は
 #   scripts/dev-container.sh がホスト値（ユーザ名・uid・$HOME・リポジトリ実パス）を渡し、
 #   ホストと同一パスの環境を作る（~/.claude / ~/.codex / ~/.config/gh を同一パスへ
 #   bind mount して設定・認証を共有するため。詳細は README.md「認証の仕組み」）
@@ -22,7 +22,7 @@ ARG DEV_USER=vscode
 ARG DEV_UID=1000
 ARG DEV_GID=1000
 ARG DEV_HOME=/home/vscode
-ARG DEV_WORKSPACE=/workspaces/yuzu
+ARG DEV_WORKSPACE=/workspaces/setoka
 
 # gcc/libc6-dev: rustc のリンカ用（ネイティブ C 依存 crate は無いので g++ は不要）
 # curl/xz-utils: scripts/*.sh（vendor 系）と各種インストーラ用
@@ -85,7 +85,7 @@ RUN groupadd --gid "$DEV_GID" "$DEV_USER" \
     && echo "$DEV_USER ALL=(root) NOPASSWD:ALL" > "/etc/sudoers.d/$DEV_USER" \
     && chmod 0440 "/etc/sudoers.d/$DEV_USER"
 
-# named volume（yuzu-target）のマウント点。bind mount（virtiofs）上の target/ は
+# named volume（setoka-target）のマウント点。bind mount（virtiofs）上の target/ は
 # 遅いためワークスペース外に置き、CARGO_TARGET_DIR で差し替える
 RUN mkdir /cargo-target && chown "$DEV_UID:$DEV_GID" /cargo-target
 

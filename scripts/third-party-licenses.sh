@@ -2,11 +2,11 @@
 # 第三者ライセンスの通知（THIRD-PARTY-LICENSES）を組み立てる。
 #
 #   vendor           テーマの vendor 資産（mermaid と束ねたパッケージ・KaTeX）の通知
-#                    → crates/yuzu-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt
-#                      （dist の _assets/vendor/ へ出る。材料は crates/yuzu-theme/licenses/ の
+#                    → crates/setoka-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt
+#                      （dist の _assets/vendor/ へ出る。材料は crates/setoka-theme/licenses/ の
 #                      mermaid.txt・katex.txt で、vendor-mermaid.sh / vendor-katex.sh が作る）
 #   wasm             検索 wasm（mikan-wasm の wasm32 向け依存）と分かち書きモデルの通知
-#                    → crates/yuzu-index/assets/search/THIRD-PARTY-LICENSES.txt
+#                    → crates/setoka-index/assets/search/THIRD-PARTY-LICENSES.txt
 #                      （dist の _search/ へ出る。build-search-wasm.sh が wasm と一緒に呼ぶ）
 #   binary <出力>    リリースのアーカイブに入れる通知（release.yml が呼ぶ）。バイナリの
 #                    依存 crate（配布する 4 ターゲット）・two-face と syntect の同梱データ・
@@ -96,7 +96,7 @@ check_license_lists() {
 # とき（bincode 1.3.3 / 2.0.1 など）に見逃す（PR #32 のレビュー指摘）ので、依存グラフと
 # 集合で比べる。新しく入った crate も、外れた crate もここで分かる
 check_wasm_notice() {
-  local notice="$ROOT/crates/yuzu-index/assets/search/THIRD-PARTY-LICENSES.txt"
+  local notice="$ROOT/crates/setoka-index/assets/search/THIRD-PARTY-LICENSES.txt"
   local notice_set private tree_set
   notice_set="$(sed -n 's/^  - \([^ ]*\) \([0-9][^（ ]*\)（.*/\1 \2/p' "$notice" | sort -u)"
   if [ -z "$notice_set" ]; then
@@ -120,7 +120,7 @@ check_wasm_notice() {
     comm -23 <(printf '%s\n' "$notice_set") <(printf '%s\n' "$tree_set") | sed 's/^/  通知だけ: /' >&2
     comm -13 <(printf '%s\n' "$notice_set") <(printf '%s\n' "$tree_set") | sed 's/^/  依存だけ: /' >&2
     echo "依存が変わったので、scripts/build-search-wasm.sh で wasm と通知を作り直してください" >&2
-    echo "（vendor-update スキル。作り直したら yuzu search で検索の整合を確かめる）" >&2
+    echo "（vendor-update スキル。作り直したら setoka search で検索の整合を確かめる）" >&2
     exit 1
   fi
 }
@@ -198,9 +198,9 @@ def line: "  - \(.name) \(.version)" + (if .repository then "（\(.repository)�
 '
 
 vendor_notice() {
-  local out="$ROOT/crates/yuzu-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt"
+  local out="$ROOT/crates/setoka-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt"
   NEW_FILE="$out.new"
-  local parts="$ROOT/crates/yuzu-theme/licenses"
+  local parts="$ROOT/crates/setoka-theme/licenses"
   local part
   for part in mermaid katex; do
     if [ ! -f "$parts/$part.txt" ]; then
@@ -209,7 +209,7 @@ vendor_notice() {
     fi
   done
   {
-    echo "yuzu が利用者のサイトへ配る第三者の資産（_assets/vendor/）のライセンス表記"
+    echo "setoka が利用者のサイトへ配る第三者の資産（_assets/vendor/）のライセンス表記"
     echo
     echo "- mermaid.min.js（図のブラウザ描画）と、mermaid が束ねている npm パッケージ"
     echo "- katex/（数式のブラウザ描画。JS・CSS・フォント）"
@@ -250,10 +250,10 @@ model_section() {
 
 wasm_notice() {
   require_about
-  local out="$ROOT/crates/yuzu-index/assets/search/THIRD-PARTY-LICENSES.txt"
+  local out="$ROOT/crates/setoka-index/assets/search/THIRD-PARTY-LICENSES.txt"
   NEW_FILE="$out.new"
   {
-    echo "yuzu のブラウザ検索（_search/search_bg.wasm・search.js）と分かち書きモデル"
+    echo "setoka のブラウザ検索（_search/search_bg.wasm・search.js）と分かち書きモデル"
     echo "（_search/model.zst）に含まれる第三者のソフトウェアのライセンス表記"
     echo
     echo "- Rust の crate: mikan-wasm の wasm32-unknown-unknown 向けの通常依存（cargo-about ${ABOUT_VERSION}）"
@@ -280,9 +280,9 @@ binary_notice() {
   version="$(grep -m1 '^version = ' "$ROOT/Cargo.toml" | cut -d'"' -f2)"
   for t in "${BINARY_TARGETS[@]}"; do targets+=(--target "$t"); done
   {
-    echo "yuzu ${version} のバイナリに含まれる第三者のソフトウェアのライセンス表記"
+    echo "setoka ${version} のバイナリに含まれる第三者のソフトウェアのライセンス表記"
     echo
-    echo "1. Rust の crate（yuzu-cli の通常依存。配布する 4 ターゲットの和集合。cargo-about ${ABOUT_VERSION}）"
+    echo "1. Rust の crate（setoka-cli の通常依存。配布する 4 ターゲットの和集合。cargo-about ${ABOUT_VERSION}）"
     echo "2. two-face ${TWO_FACE_VERSION} が同梱する構文定義・テーマ"
     echo "3. syntect が同梱する既定のテーマ・構文定義"
     echo "4. 利用者のサイトへ配る資産（mermaid・KaTeX。dist の _assets/vendor/THIRD-PARTY-LICENSES.txt と同じ）"
@@ -293,7 +293,7 @@ binary_notice() {
     echo "$RULE"
     echo "1. Rust の crate"
     echo "$RULE"
-    (cd "$ROOT" && about -m crates/yuzu-cli/Cargo.toml "${targets[@]}")
+    (cd "$ROOT" && about -m crates/setoka-cli/Cargo.toml "${targets[@]}")
     echo
     echo "$RULE"
     echo "2. two-face ${TWO_FACE_VERSION} が同梱する構文定義・テーマ"
@@ -311,13 +311,13 @@ binary_notice() {
     echo "4. 利用者のサイトへ配る資産"
     echo "$RULE"
     echo
-    cat "$ROOT/crates/yuzu-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt"
+    cat "$ROOT/crates/setoka-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt"
     echo
     echo "$RULE"
     echo "5. ブラウザ検索の wasm と分かち書きモデル"
     echo "$RULE"
     echo
-    cat "$ROOT/crates/yuzu-index/assets/search/THIRD-PARTY-LICENSES.txt"
+    cat "$ROOT/crates/setoka-index/assets/search/THIRD-PARTY-LICENSES.txt"
   } > "$out"
   check_placeholders "$(cat "$out")" "$out"
   NEW_FILE=""

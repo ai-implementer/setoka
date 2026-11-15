@@ -25,23 +25,23 @@ pub struct Manifest {
     pub synonyms: Vec<Vec<String>>,
     /// このインデックス一式（terms.fst ＋ 全シャード ＋ モデルバイト）の内容ハッシュ
     /// （sha256 hex）。ブラウザ側の OPFS キャッシュの版管理に使う。
-    /// [`crate::build`] は空文字で返し、実際の計算は呼び出し側（yuzu-index）が行う
+    /// [`crate::build`] は空文字で返し、実際の計算は呼び出し側（setoka-index）が行う
     /// （このクレートに sha2 依存を持ち込まないため）。無いと空文字扱い
     #[serde(default)]
     pub content_hash: String,
     /// doc_id（= 添字）→ グループ id（[`Manifest::groups`] の添字）。
     /// 未分類は [`crate::UNGROUPED`]。`doc_lens` と同じ添字方式。
     ///
-    /// ⚠️ ここでいう「グループ」は**結果の絞り込み単位**（yuzu ではナビの第 1 階層）で、
+    /// ⚠️ ここでいう「グループ」は**結果の絞り込み単位**（setoka ではナビの第 1 階層）で、
     /// [`crate::SectionInput`] の「セクション」（h2/h3 = doc 単位）とは別物。
     /// `synonyms` / `content_hash` と同じく `default` で後方互換にしてあるので、
     /// 古い manifest では空 = 絞り込みが出ないだけの縮退になる
     #[serde(default)]
     pub doc_groups: Vec<u16>,
-    /// グループ id（= 添字）→ 表示名。並び順は書き手が決める（yuzu ではナビ順）
+    /// グループ id（= 添字）→ 表示名。並び順は書き手が決める（setoka ではナビ順）
     #[serde(default)]
     pub groups: Vec<String>,
-    /// doc_id（= 添字）→ その doc のタイトルの term_id（昇順。yuzu では先頭の節がページ
+    /// doc_id（= 添字）→ その doc のタイトルの term_id（昇順。setoka では先頭の節がページ
     /// タイトル、ほかの節が見出し）。検索時にタイトルと一致した doc の点を上げる
     /// （[`crate::SearchEngine`] の `TITLE_BOOST`）。`groups` と同じく `default` で後方互換に
     /// してあり、古い manifest では空 = 倍率が掛からないだけ。古い wasm はこの項目を読まない

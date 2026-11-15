@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# yuzu の開発コンテナを apple container / docker のどちらでも同じ体験で扱うラッパー。
+# setoka の開発コンテナを apple container / docker のどちらでも同じ体験で扱うラッパー。
 # 環境の定義は .devcontainer/Dockerfile が唯一（このスクリプトは配線のみ）。
 #
 # この経路は「ホスト同一パス」構成: ユーザ名・uid・HOME・リポジトリパスをホストと
@@ -21,15 +21,15 @@
 #   scripts/dev-container.sh status  # 状態表示
 #
 # 環境変数:
-#   YUZU_CONTAINER_ENGINE   使用エンジン（既定: Darwin は container、他は docker）
-#   YUZU_CONTAINER_MEMORY   apple container の VM メモリ（既定: 8g）
-#   YUZU_CONTAINER_CPUS     apple container の VM CPU 数（既定: ホスト CPU 数）
+#   SETOKA_CONTAINER_ENGINE   使用エンジン（既定: Darwin は container、他は docker）
+#   SETOKA_CONTAINER_MEMORY   apple container の VM メモリ（既定: 8g）
+#   SETOKA_CONTAINER_CPUS     apple container の VM CPU 数（既定: ホスト CPU 数）
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-IMAGE="${YUZU_CONTAINER_IMAGE:-yuzu-dev:latest}"
-NAME="${YUZU_CONTAINER_NAME:-yuzu-dev}"
+IMAGE="${SETOKA_CONTAINER_IMAGE:-setoka-dev:latest}"
+NAME="${SETOKA_CONTAINER_NAME:-setoka-dev}"
 
 # ホスト同一パス化のための build ARG 値。gid はホスト mac の staff=20 が Debian の
 # 既存 gid と衝突し得るため uid と同値にする（virtiofs が所有権をコンテナユーザへ
@@ -43,12 +43,12 @@ DEV_GID="$DEV_UID"
 # ~/.claude / ~/.codex / ~/.config/gh はこの経路では volume ではなくホストの
 # 実ディレクトリを bind mount する — devcontainer 経路は volume で各自ログイン）
 VOLUMES=(
-  "yuzu-cargo-registry:$HOME/.cargo/registry"
-  "yuzu-target:/cargo-target"
+  "setoka-cargo-registry:$HOME/.cargo/registry"
+  "setoka-target:/cargo-target"
 )
 
-if [ -n "${YUZU_CONTAINER_ENGINE:-}" ]; then
-  ENGINE="$YUZU_CONTAINER_ENGINE"
+if [ -n "${SETOKA_CONTAINER_ENGINE:-}" ]; then
+  ENGINE="$SETOKA_CONTAINER_ENGINE"
 elif [ "$(uname -s)" = "Darwin" ]; then
   ENGINE="container"
 else
@@ -57,7 +57,7 @@ fi
 
 if ! command -v "$ENGINE" >/dev/null 2>&1; then
   echo "error: コンテナエンジン '$ENGINE' が見つかりません" >&2
-  echo "  YUZU_CONTAINER_ENGINE で明示指定するか、apple container / docker を導入してください" >&2
+  echo "  SETOKA_CONTAINER_ENGINE で明示指定するか、apple container / docker を導入してください" >&2
   exit 2
 fi
 
@@ -126,7 +126,7 @@ export_host_env() {
       -e OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.nr-data.net:4318
       -e OTEL_EXPORTER_OTLP_HEADERS
       # 送信元のコンテナを区別する属性。ほかのコンテナでも同じ属性名で値を変えて送る
-      -e OTEL_RESOURCE_ATTRIBUTES=container.name=yuzu
+      -e OTEL_RESOURCE_ATTRIBUTES=container.name=setoka
     )
   else
     echo "warn: 1Password から New Relic のキーを取得できませんでした（テレメトリは送信されません）" >&2
@@ -262,8 +262,8 @@ cmd_up() {
   #   bind mount して代替する（無ければスキップ = git は https か手動設定で）
   if [ "$ENGINE" = "container" ]; then
     args+=(--ssh)
-    args+=(--memory "${YUZU_CONTAINER_MEMORY:-8g}")
-    args+=(--cpus "${YUZU_CONTAINER_CPUS:-$(sysctl -n hw.ncpu)}")
+    args+=(--memory "${SETOKA_CONTAINER_MEMORY:-8g}")
+    args+=(--cpus "${SETOKA_CONTAINER_CPUS:-$(sysctl -n hw.ncpu)}")
   elif [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
     args+=(-v "$SSH_AUTH_SOCK:$SSH_AUTH_SOCK" -e SSH_AUTH_SOCK)
   fi
@@ -322,8 +322,6 @@ cmd_clean() {
     name="${spec%%:*}"
     "$ENGINE" volume rm "$name" >/dev/null 2>&1 || true
   done
-  # 旧構成（~/.claude を volume にしていた頃）の残骸も掃除する
-  "$ENGINE" volume rm yuzu-claude >/dev/null 2>&1 || true
   echo "キャッシュ volume も削除しました"
 }
 
@@ -334,7 +332,7 @@ cmd_status() {
   else
     echo "container: なし（up で起動）"
   fi
-  "$ENGINE" volume ls 2>/dev/null | awk 'NR==1 || /yuzu-/'
+  "$ENGINE" volume ls 2>/dev/null | awk 'NR==1 || /setoka-/'
 }
 
 case "${1:-}" in

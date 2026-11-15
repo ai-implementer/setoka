@@ -1,0 +1,19 @@
+<header class="site-header">
+<div class="header-left">
+{# 狭幅用のナビ開閉。hidden は nav.js が解除する（JS 無効時は出さない） #}
+<button id="nav-toggle" type="button" aria-label="ナビゲーションを開閉"
+        aria-controls="site-sidebar" aria-expanded="false" hidden>☰</button>
+{# ロゴ画像（site.logo）指定時は img を出し、CSS 側で既定の絵文字ロゴを消す。
+   alt は空（直後にタイトル文字が並ぶため装飾扱い）。末尾のハイフンは改行 trim -#}
+<a class="site-title{% if site.logo_url %} has-logo{% endif %}" href="{{ base_url | url }}">{% if site.logo_url %}<img class="site-logo" src="{{ site.logo_url | url }}" alt="">{% endif %}{{ site.title }}</a>
+</div>
+<div class="header-tools">
+{% if site.header_links %}<nav class="header-links" aria-label="サイトのリンク">{% for link in site.header_links %}<a href="{{ link.url | url }}">{{ link.text }}</a>{% endfor %}</nav>
+{% endif %}{% if search_enabled %}<div class="search" id="setoka-search">
+<input type="search" id="setoka-search-input" placeholder="検索 ( / )" aria-label="サイト内を検索" autocomplete="off"
+       role="combobox" aria-expanded="false" aria-controls="setoka-search-results">
+<div class="search-results" id="setoka-search-results" role="listbox" hidden></div>
+</div>
+{% endif %}{% if dark_enabled %}{# 押すたびに OS の設定 → 今の見た目の反対 → もう一方 → OS の設定 の順。今の状態と次の状態は theme.js が aria-label と title に出す #}<button id="theme-toggle" type="button" aria-label="配色を切り替える" title="配色を切り替える">◐</button>
+{% endif %}</div>
+</header>

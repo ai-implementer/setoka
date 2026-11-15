@@ -1,4 +1,4 @@
-//! クエリ一致箇所周辺の動的抜粋（native の `yuzu search` と wasm の両方が使う 1 実装）。
+//! クエリ一致箇所周辺の動的抜粋（native の `setoka search` と wasm の両方が使う 1 実装）。
 //!
 //! tokens は [`crate::Tokenizer::tokenize`] 済み（NFKC + lowercase）だが text は
 //! 生テキスト。大文字・全角の不一致は「元テキストを 1 文字ずつ NFKC + lowercase した
@@ -206,9 +206,9 @@ mod tests {
 
     #[test]
     fn 大文字一致は原文の表記を保持する() {
-        let segments = make_excerpt("Yuzu Build Watch", &tokens(&["build"]), 160);
+        let segments = make_excerpt("Setoka Build Watch", &tokens(&["build"]), 160);
         assert_eq!(marked(&segments), ["Build"]);
-        assert_eq!(joined(&segments), "Yuzu Build Watch");
+        assert_eq!(joined(&segments), "Setoka Build Watch");
     }
 
     #[test]

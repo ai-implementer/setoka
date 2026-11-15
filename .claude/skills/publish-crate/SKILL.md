@@ -1,6 +1,6 @@
 ---
 name: publish-crate
-description: 汎用ライブラリ（tankan / mikan / kabosu）を crates.io へ公開する手順。yuzu のリリースとは非同期で、変更が溜まったときだけ行う。kabosu は publish 前の fuzz 必須。バージョンを上げて publish するときに使う。
+description: 汎用ライブラリ（tankan / mikan / kabosu）を crates.io へ公開する手順。setoka のリリースとは非同期で、変更が溜まったときだけ行う。kabosu は publish 前の fuzz 必須。バージョンを上げて publish するときに使う。
 ---
 
 # 汎用ライブラリの crates.io 公開
@@ -11,12 +11,11 @@ description: 汎用ライブラリ（tankan / mikan / kabosu）を crates.io へ
 | crate | 役割 | 備考 |
 | --- | --- | --- |
 | tankan | Mermaid 互換 SSR | |
-| mikan | 検索エンジン（旧 yuzu-index-format） | native / wasm で 1 実装共有。版を上げると検索 wasm も作り直す（CI の `search wasm inputs`） |
+| mikan | 検索エンジン | native / wasm で 1 実装共有。版を上げると検索 wasm も作り直す（CI の `search wasm inputs`） |
 | kabosu | TOML パーサ（依存ゼロ・no_std + alloc） | **publish 前に fuzz を必ず一度回す** |
 
 公開しない crate: **mikan-wasm**（wasm 成果物を作るビルド用。`publish = false`）と
-yuzu 本体側の crate（名前 `yuzu`・`yuzu-core` が別プロジェクトに取得済み。
-将来構想は ROADMAP.md）。
+setoka 本体側の crate（将来構想は ROADMAP.md）。
 
 ## 手順
 
@@ -41,7 +40,7 @@ cargo publish -p <crate>
 - **公開は取り消せない**（yank で新規取得を止められるだけ）。dry-run と CI green を飛ばさない
 - kabosu は `[dependencies]` セクションを意図的に書かない = 依存ゼロ。CI が package 後の
   manifest を検査する（依存を足すと落ちる）
-- yuzu 側の `Cargo.lock` はバンプの `cargo build` で追随する。yuzu のリリースタグとは
+- setoka 側の `Cargo.lock` はバンプの `cargo build` で追随する。setoka のリリースタグとは
   無関係に進めてよい（非同期）
 - 3 crate とも crate のディレクトリに `LICENSE-MIT` / `LICENSE-APACHE` の**コピー**を置いている
   （`license.workspace = true` だけでは package にライセンス文が入らない。シンボリックリンクは

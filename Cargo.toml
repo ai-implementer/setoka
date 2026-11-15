@@ -9,7 +9,7 @@ edition = "2024"
 # cargo の依存の選び方はワークスペースでいちばん低い MSRV に合わせるので、そろえないと依存を上げられない
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/ai-implementer/yuzu"
+repository = "https://github.com/ai-implementer/setoka"
 authors = ["ai-implementer"]
 
 [workspace.dependencies]
@@ -37,19 +37,19 @@ rayon = "1.11"
 # include-exclude: テーマの vendor 更新メモ（static/vendor/README.md）を埋め込みから外す
 rust-embed = { version = "8.11", features = ["include-exclude"] }
 clap = { version = "4.6", features = ["derive"] }
-# シェル補完スクリプトの生成（`yuzu completions`）。clap と同じリポジトリの公式クレートで、
+# シェル補完スクリプトの生成（`setoka completions`）。clap と同じリポジトリの公式クレートで、
 # default features の依存は clap だけ（動的補完の unstable-dynamic は使わない）
 clap_complete = "4.6"
-# unified diff（`yuzu fmt --diff`）。純 Rust・推移依存なし。
+# unified diff（`setoka fmt --diff`）。純 Rust・推移依存なし。
 # insta（dev 依存）が既に同じバージョンを引いているため Cargo.lock は増えない。
 # 既定 feature の text（TextDiff）だけあれば足りる（inline / bytes / serde は不要）
 similar = { version = "3.2", default-features = false, features = ["text"] }
-# 設定（yuzu.toml）は自作の kabosu で読む（下の内部 crate 参照）。serde はキャッシュ・
+# 設定（setoka.toml）は自作の kabosu で読む（下の内部 crate 参照）。serde はキャッシュ・
 # 検索索引・診断の JSON 出力用で、設定にも YAML にも使わない
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # YAML（frontmatter・openapi / jsonschema）。純 Rust の YAML 1.2 パーサで、位置付きの値の木を
-# 読み、型の解釈は yuzu-core の yaml.rs が行う（Phase 88。serde_yaml_ng は依存の unsafe-libyaml が
+# 読み、型の解釈は setoka-core の yaml.rs が行う（Phase 88。serde_yaml_ng は依存の unsafe-libyaml が
 # メンテナンス終了）。saphyr の既定 feature は encoding だけで、文字列から読むので使わない。
 # saphyr-parser はイベントを数えて別名の展開に上限を掛けるために直接使う（saphyr と同じ版にする）
 saphyr = { version = "0.3.3", default-features = false }
@@ -83,7 +83,7 @@ walkdir = "2"
 same-file = "1"
 globset = "0.4"
 # 9.0 は rc 段階のため 8.2 に固定。debounce とイベントの種類の絞り込みは
-# yuzu-server の監視スレッドで行う（debouncer は種類を捨てるので使わない。
+# setoka-server の監視スレッドで行う（debouncer は種類を捨てるので使わない。
 # Linux の inotify が届ける「開いただけ」のイベントで再ビルドが止まらなくなる）
 notify = "8.2"
 # 既定の features（json・form・query の extractor・matched-path 等）は使わないので外し、配信に要る
@@ -92,7 +92,7 @@ axum = { version = "0.8", default-features = false, features = ["http1", "tokio"
 tower-http = { version = "0.7", features = ["fs"] }
 # broadcast（ライブリロード通知）に "sync" が必須（axum の feature からは有効化されない）
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync"] }
-# `yuzu dev` の dev.open（起動時にブラウザを開く）用
+# `setoka dev` の dev.open（起動時にブラウザを開く）用
 open = "5.3"
 insta = { version = "1.48", features = ["filters"] }
 tempfile = "3"
@@ -104,18 +104,18 @@ tokio-tungstenite = "0.30"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
 # 内部 crate（依存方向の凍結: cli → {server, render, index, core, config} /
-# render, index → core / config → kabosu / 検索スタック: mikan-wasm → mikan・yuzu-index → mikan）
-yuzu-core = { path = "crates/yuzu-core" }
-yuzu-render = { path = "crates/yuzu-render" }
-yuzu-config = { path = "crates/yuzu-config" }
-yuzu-theme = { path = "crates/yuzu-theme" }
-yuzu-server = { path = "crates/yuzu-server" }
-yuzu-index = { path = "crates/yuzu-index" }
-# 検索エンジン本体（yuzu-* 非依存の汎用ライブラリ。crates.io で公開）
+# render, index → core / config → kabosu / 検索スタック: mikan-wasm → mikan・setoka-index → mikan）
+setoka-core = { path = "crates/setoka-core" }
+setoka-render = { path = "crates/setoka-render" }
+setoka-config = { path = "crates/setoka-config" }
+setoka-theme = { path = "crates/setoka-theme" }
+setoka-server = { path = "crates/setoka-server" }
+setoka-index = { path = "crates/setoka-index" }
+# 検索エンジン本体（setoka-* 非依存の汎用ライブラリ。crates.io で公開）
 mikan = { path = "crates/mikan" }
-# Mermaid 互換描画（yuzu 非依存の汎用ライブラリ。依存方向は yuzu-render → tankan のみ）
+# Mermaid 互換描画（setoka 非依存の汎用ライブラリ。依存方向は setoka-render → tankan のみ）
 tankan = { path = "crates/tankan" }
-# TOML 設定ライブラリ（yuzu 非依存・依存ゼロ・no_std+alloc。crates.io で公開）
+# TOML 設定ライブラリ（setoka 非依存・依存ゼロ・no_std+alloc。crates.io で公開）
 kabosu = { path = "crates/kabosu" }
 
 # 配布バイナリのサイズ最適化（LTO ＋ debuginfo 除去。ビルド時間より配布サイズを優先。

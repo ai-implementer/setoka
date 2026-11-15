@@ -19,12 +19,12 @@ description: llms.txt / llms-full.txt の自動生成とページ単位 Markdown
 - [`/llms-full.txt`](/llms-full.txt) — 全ページの正規化 Markdown を
   連結した 1 ファイル
 
-llms-full.txt の本文は原文そのままではなく、`yuzu fmt` と同じ基盤による
+llms-full.txt の本文は原文そのままではなく、`setoka fmt` と同じ基盤による
 **正規形の Markdown**（見出しの ATX 化・箇条書きの `-` 統一など）です。
 
 - frontmatter に `llms: false` を書いたページは両方から除外されます
 - `public/llms.txt` を手書きで置くと生成版を上書きできます
-- `yuzu llms` / `yuzu llms --full` で、`dist/` を作らずに標準出力へも出せます
+- `setoka llms` / `setoka llms --full` で、`dist/` を作らずに標準出力へも出せます
 
 > [!TIP]
 > 公開サイトでは `build.base_url` にフル URL（`https://…/docs/` など）を

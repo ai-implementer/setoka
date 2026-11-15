@@ -2,7 +2,7 @@
 //!
 //! fetch / ファイル読みは呼び出し側の責務:
 //! - ブラウザ: search-ui.js が fetch して [`SearchEngine::load_shard`] に渡す
-//! - ネイティブ: `yuzu search` が fs::read して同じ API を叩く
+//! - ネイティブ: `setoka search` が fs::read して同じ API を叩く
 //!
 //! 流れ: クエリを tokenize → fst 完全一致（未ヒット token のみ編集距離 1 で展開・
 //! ペナルティ付き）→ 必要シャードの postings をデコード → BM25 で加算スコアリング。
@@ -479,7 +479,7 @@ impl SearchEngine {
     /// doc のグループ id。`doc_groups` が空・短い（= 古い manifest）なら未分類。
     /// `doc_lens` の引き方（`get().unwrap_or()`）と同じ流儀で、
     /// **検索を決して壊さない**ために長さ検証でエラーにはしない
-    /// （長さの整合は yuzu-index の統合テストが縛る）
+    /// （長さの整合は setoka-index の統合テストが縛る）
     fn group_of(&self, doc_id: u32) -> u16 {
         self.manifest
             .doc_groups
@@ -830,7 +830,7 @@ mod tests {
 
     const MODEL: &[u8] = include_bytes!("../assets/model/bccwj-suw_c1.0.model.zst");
 
-    /// テスト用の極小インデクサ（本物は yuzu-index 側。ここではエンジンの検証用）
+    /// テスト用の極小インデクサ（本物は setoka-index 側。ここではエンジンの検証用）
     fn build_index(docs: &[&str], max_terms_per_shard: u32) -> SearchEngine {
         build_index_with_synonyms(docs, max_terms_per_shard, Vec::new())
     }
@@ -979,7 +979,7 @@ mod tests {
     #[test]
     fn 一編集距離の誤字でもヒットする() {
         let engine = build_index(
-            &["yuzu の build コマンドの説明", "無関係な文書です"],
+            &["setoka の build コマンドの説明", "無関係な文書です"],
             10_000,
         );
 
@@ -1520,13 +1520,17 @@ mod tests {
         assert_eq!(marks, ["ライブリロード"], "分割 token ではなく 1 まとまり");
 
         // ASCII の空白入りフレーズも本文どおりの表記で 1 まとまり
-        let segments = engine.excerpt("run yuzu build now", "\"Yuzu Build\"", 160);
+        let segments = engine.excerpt("run setoka build now", "\"Setoka Build\"", 160);
         let marks: Vec<&str> = segments
             .iter()
             .filter(|s| s.mark)
             .map(|s| s.text.as_str())
             .collect();
-        assert_eq!(marks, ["yuzu build"], "大文字ゆれも影文字列の正規化で吸収");
+        assert_eq!(
+            marks,
+            ["setoka build"],
+            "大文字ゆれも影文字列の正規化で吸収"
+        );
     }
 
     // ── グループ絞り込み（Phase 53）──

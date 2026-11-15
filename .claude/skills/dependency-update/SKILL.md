@@ -19,7 +19,7 @@ description: 依存の更新と監視の扱い（dependabot の PR・deps.yml �
 更新は依存ごとに 1 本ずつの PR になる（API の変更で 1 つが壊れても組を止めないため）。
 0.x の版上げ（0.29 → 0.30）も major に数えられる。組を閉じて作り直したときは、元の組に
 入っていた major の更新は「処理済み」として後回しになり、次の実行まで個別の PR が来ない
-（すぐ欲しければ https://github.com/ai-implementer/yuzu/network/updates から手動で実行する）。
+（すぐ欲しければ https://github.com/ai-implementer/setoka/network/updates から手動で実行する）。
 
 - **render-output**（comrak・syntect・two-face）— 本文 HTML が変わりうる。別の PR にしてあるので、
   ほかの組のマージを止めない
@@ -37,17 +37,17 @@ PR のブランチを取ってきて、落ちた検査ごとに直してから�
 
 | 落ちた検査・出た差分 | 原因 | やること |
 | --- | --- | --- |
-| insta スナップショットの差分 | comrak・syntect・two-face 等で本文 HTML・ハイライトが変わった | 差分を目視 → `INSTA_UPDATE=always cargo test -p <crate>` → `git diff` で確認。本文 HTML が変わるなら `yuzu-core/src/cache.rs` の `CACHE_FORMAT_VERSION` を上げる |
-| yuzu-cli の `キャッシュの中身が変わったら版を上げる` | 依存の更新で、試験用のプロジェクトのキャッシュの中身（本文 HTML・メタ・検索 tf・llms）が変わった（スナップショットに差分が出ない依存でも当たる） | `CACHE_FORMAT_VERSION` を上げ、隣の `CACHE_FINGERPRINT` をテストが出す (新しい版, 指紋) に書き直す（v0.20 Phase 93。以前は上げ忘れを CI で検出できなかった） |
+| insta スナップショットの差分 | comrak・syntect・two-face 等で本文 HTML・ハイライトが変わった | 差分を目視 → `INSTA_UPDATE=always cargo test -p <crate>` → `git diff` で確認。本文 HTML が変わるなら `setoka-core/src/cache.rs` の `CACHE_FORMAT_VERSION` を上げる |
+| setoka-cli の `キャッシュの中身が変わったら版を上げる` | 依存の更新で、試験用のプロジェクトのキャッシュの中身（本文 HTML・メタ・検索 tf・llms）が変わった（スナップショットに差分が出ない依存でも当たる） | `CACHE_FORMAT_VERSION` を上げ、隣の `CACHE_FINGERPRINT` をテストが出す (新しい版, 指紋) に書き直す（v0.20 Phase 93。以前は上げ忘れを CI で検出できなかった） |
 | `third-party-licenses.sh check`: two-face の版 | two-face を上げた | `licenses/README.md` の手順で two-face の一覧を作り直し、スクリプトの `TWO_FACE_VERSION` を更新 |
-| `third-party-licenses.sh check`: 検索 wasm の通知が今の依存と合わない・`search wasm inputs`（`build-search-wasm.sh --check`）が落ちた | 検索 wasm に入る crate（serde_json・fst・vaporetto 等）の版が Cargo.lock で変わった・増えた・外れた | `scripts/build-search-wasm.sh` で wasm と通知を作り直す（vendor-update スキル。wasm-bindgen-cli・binaryen・cargo-about が要る）。`yuzu build` → `yuzu search` で整合を確かめる。vaporetto の更新はトークナイザが変わるので特に必須 |
+| `third-party-licenses.sh check`: 検索 wasm の通知が今の依存と合わない・`search wasm inputs`（`build-search-wasm.sh --check`）が落ちた | 検索 wasm に入る crate（serde_json・fst・vaporetto 等）の版が Cargo.lock で変わった・増えた・外れた | `scripts/build-search-wasm.sh` で wasm と通知を作り直す（vendor-update スキル。wasm-bindgen-cli・binaryen・cargo-about が要る）。`setoka build` → `setoka search` で整合を確かめる。vaporetto の更新はトークナイザが変わるので特に必須 |
 | deps.yml の `licenses-notice` | `licenses/about.toml` の clarify の checksum が合わない・crate の本文が無く雛形に戻った | `licenses/README.md`「雛形に戻る crate の扱い」 |
 | `deny` の licenses | 許可していないライセンスの crate が入った | 配布してよいライセンスか確かめ、`licenses/about.toml` の `accepted` と `deny.toml` の `allow` の**両方**に足す（`third-party-licenses.sh check` が一致を照合する） |
 | `deny` の bans | 禁止した crate（onig・TLS・HTTP クライアント）が入った | feature の指定を見直す。CLAUDE.md の凍結判断に反するので、入れる方向で直さない |
 | deps.yml の `advisories` | 上げた版に勧告がある | 下の「勧告が出たとき」 |
 | コンパイルエラー | 0.x の破壊的変更（`0.53` → `0.54` など Cargo.toml の要件ごと上がる更新） | 手で直す。すぐ直せないなら PR を閉じ、`dependabot.yml` の `ignore` に版を足して見送る（理由を書く） |
 | MSRV のジョブ | 依存の新しい版が MSRV（1.99。kabosu・tankan も同じ）より新しい rustc を要求した | 依存を上げないか、MSRV を上げる判断をする（README・release.yml・docs も直す。CLAUDE.md） |
-| ci.yml の `scaffold actions pins` | actions の PR が `.github/workflows/` だけを上げ、雛形 `crates/yuzu-cli/scaffold/deploy.yml`・docs の PR 検証の例 `docs/snippets/pr-check.yml` が古い SHA のまま | 雛形と例の `uses:` を同じ SHA・版のコメントに揃え、雛形を `docs/snippets/deploy.yml` へ写す（dependabot は `.github/` の外を見ない） |
+| ci.yml の `scaffold actions pins` | actions の PR が `.github/workflows/` だけを上げ、雛形 `crates/setoka-cli/scaffold/deploy.yml`・docs の PR 検証の例 `docs/snippets/pr-check.yml` が古い SHA のまま | 雛形と例の `uses:` を同じ SHA・版のコメントに揃え、雛形を `docs/snippets/deploy.yml` へ写す（dependabot は `.github/` の外を見ない） |
 
 マージ前に `verify` スキルの一式を通す。
 
@@ -55,7 +55,7 @@ PR のブランチを取ってきて、落ちた検査ごとに直してから�
 
 - `uses:` の SHA と行末のコメント（`# v7.0.0`）がそろっているかを見る
 - 同じ action はすべてのワークフローで同じ SHA にする（docs-links.yml・docs.yml・release.yml も）。
-  雛形 `crates/yuzu-cli/scaffold/deploy.yml` と docs の PR 検証の例 `docs/snippets/pr-check.yml` も
+  雛形 `crates/setoka-cli/scaffold/deploy.yml` と docs の PR 検証の例 `docs/snippets/pr-check.yml` も
   同じ SHA に揃え、雛形を docs の写し `docs/snippets/deploy.yml` へコピーする（CI の
   `scaffold actions pins` が SHA と写しのバイト一致を照合する）
 - `EmbarkStudios/cargo-deny-action` を上げたら、action の `Dockerfile` の `deny_version` を見て、

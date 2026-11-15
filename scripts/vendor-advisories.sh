@@ -4,9 +4,9 @@
 # deps.yml が週次で呼ぶ。dependabot は vendor したファイルを見ないため）。
 #
 # 照合する版は、vendor スクリプトが書いたライセンスの記録から読む（版の一覧を別に持たない）:
-#   crates/yuzu-theme/licenses/mermaid.txt … 1 行目の「npm の mermaid@x.y.z」と、束ねた
+#   crates/setoka-theme/licenses/mermaid.txt … 1 行目の「npm の mermaid@x.y.z」と、束ねた
 #                                            パッケージの行「  - <名前> <版>（<ライセンス>）」
-#   crates/yuzu-theme/licenses/katex.txt   … 1 行目の「npm の katex@x.y.z」
+#   crates/setoka-theme/licenses/katex.txt   … 1 行目の「npm の katex@x.y.z」
 # mermaid のモノレポ内のパッケージ（@mermaid-js/parser）は版の記録が無いので照合しない。
 #
 #   scripts/vendor-advisories.sh [<パッケージ>@<版> ...]
@@ -29,7 +29,7 @@ IGNORE=(
   # DOMPurify の SAFE_FOR_TEMPLATES・IN_PLACE（フックが親や兄弟を消す場合）・PARSER_MEDIA_TYPE が
   # application/xhtml+xml の場合の不具合（11-06 に追加。修正は 3.4.17）。束ねたコードで mermaid が
   # sanitize に渡す設定は {FORBID_TAGS:["style"]}・{ADD_TAGS, ADD_ATTR, HTML_INTEGRATION_POINTS}・
-  # サイトの dompurifyConfig だけで、どのオプションも渡していない。yuzu の mermaid-init.js は
+  # サイトの dompurifyConfig だけで、どのオプションも渡していない。setoka の mermaid-init.js は
   # dompurifyConfig を設定しない。図のソースは SECURITY.md で信頼する前提のもの
   "GHSA-cg2g-xh64-v4q7 dompurify@3.4.12"
   "GHSA-mrv2-3pqr-j5jr dompurify@3.4.12"
@@ -39,12 +39,12 @@ IGNORE=(
   "GHSA-2883-xcg3-v3hh js-yaml@4.3.0"
   "GHSA-5p4m-2wfm-xmqj js-yaml@4.3.0"
   # mermaid 内の KaTeX。ページに既存のプロトタイプ汚染があることが前提（low）で、0.16 系に
-  # 修正版が無い。yuzu が同梱する KaTeX 0.18.11 は対象外
+  # 修正版が無い。setoka が同梱する KaTeX 0.18.11 は対象外
   "GHSA-238p-pmpm-9mq7 katex@0.16.47"
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LIC="$ROOT/crates/yuzu-theme/licenses"
+LIC="$ROOT/crates/setoka-theme/licenses"
 
 fail() {
   echo "error: $*" >&2

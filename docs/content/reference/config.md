@@ -1,12 +1,12 @@
 ---
-title: 設定（yuzu.toml）
+title: 設定（setoka.toml）
 order: 1
-description: yuzu.toml の全設定キー・型・既定値
+description: setoka.toml の全設定キー・型・既定値
 ---
 
-# 設定（yuzu.toml）
+# 設定（setoka.toml）
 
-設定は TOML で書きます。`yuzu.toml` のあるディレクトリが**プロジェクトルート**です
+設定は TOML で書きます。`setoka.toml` のあるディレクトリが**プロジェクトルート**です
 （コマンドは cwd から上方向に探索します。[`--root`](cli.md#グローバルフラグ) を
 指定したときは探索せずそこを使います）。すべてのキーは省略可能で、
 省略したキーは既定値になります。キーは `snake_case` です。
@@ -18,7 +18,7 @@ description: yuzu.toml の全設定キー・型・既定値
 問題は 1 回の実行で**全件**まとめて出ます。同じキーを 2 回書くと TOML の
 構文エラーです。
 
-TOML 1.0 の全構文が使えます（読み込みには yuzu と同じリポジトリの TOML ライブラリ
+TOML 1.0 の全構文が使えます（読み込みには setoka と同じリポジトリの TOML ライブラリ
 [kabosu](../development/kabosu.md) を使っています）。辞書のような入れ子は `[lint.terms]` のような
 テーブルヘッダーでも、`terms = { "サーバ" = ["サーバー"] }` のようなインライン
 テーブルでも同じ結果になります。インラインテーブルは TOML 1.0 どおり 1 行に
@@ -177,7 +177,7 @@ url = "https://github.com/example/docs"
 - 絶対パス（`"/var/www"`）
 - `..` でルートの外へ出るパス（`"../site"`）
 - プロジェクトルート自身（`""` / `"."`）
-- `input.dir` / `public/` / `theme/` / `.yuzu` と**重なる**パス
+- `input.dir` / `public/` / `theme/` / `.setoka` と**重なる**パス
   （同じ・親・子のいずれも。`"content/sub"` のような子も対象です）
 
 ルートから出力先までの**経路にシンボリックリンクがある**場合もビルドを中断します
@@ -185,10 +185,10 @@ url = "https://github.com/example/docs"
 指していると、書き込みや `output.clean` の削除がそこへ届いてしまうためです。
 この検査は `output.clean` の設定やインクリメンタルビルドに関係なく毎回行います。
 
-出力先をリポジトリの外へ置きたいときは、`yuzu.toml` をその親ディレクトリへ移すか、
+出力先をリポジトリの外へ置きたいときは、`setoka.toml` をその親ディレクトリへ移すか、
 ビルド後に成果物をコピーしてください。
 
-`input.dir` がルートの外を指す場合はエラーにしませんが、`yuzu lint` / `check` が
+`input.dir` がルートの外を指す場合はエラーにしませんが、`setoka lint` / `check` が
 `config-path-outside-root` の警告を出します（診断のパス表示と `input.ignore` の
 glob 評価が想定外になるため）。
 
@@ -264,16 +264,16 @@ glob 評価が想定外になるため）。
 | キー | 型 / 既定 | 説明 |
 | --- | --- | --- |
 | `build.base_url` | string / なし | `site.base_url` より優先する基点（CI 注入用。`--base-url` はさらに優先） |
-| `build.watch_ignore` | string\[\] / `["**/target", "**/node_modules"]` | `yuzu dev` / `build --watch` の監視から除外する glob（プロジェクトルート相対）。**指定すると既定値を置き換えます**（追記ではありません） |
+| `build.watch_ignore` | string\[\] / `["**/target", "**/node_modules"]` | `setoka dev` / `build --watch` の監視から除外する glob（プロジェクトルート相対）。**指定すると既定値を置き換えます**（追記ではありません） |
 | `dev.host` | string / `"127.0.0.1"` | dev / preview のバインド先（IP アドレス。`localhost` のようなホスト名は設定エラー） |
 | `dev.port` | integer / `5173` | ポート |
 | `dev.live_reload` | bool / `true` | WebSocket ライブリロード |
-| `dev.open` | bool / `false` | `yuzu dev` 起動時にブラウザを開く |
+| `dev.open` | bool / `false` | `setoka dev` 起動時にブラウザを開く |
 | `dev.allowed_hosts` | string\[\] / `[]` | dev / preview が受け付けるホスト名の追加（`localhost`・`*.localhost`・IP アドレスは常に受け付ける）。`.` で始めるとそのドメインとサブドメイン（`".example.internal"`）。ほかの Host の要求は 403（下記） |
 
 監視は**プロジェクトルート全体**が対象です（コンテンツインクルードの参照先が
 `content/` の外にもあるため）。出力ディレクトリと隠しディレクトリ（`.git` /
-`.yuzu`）は `build.watch_ignore` の指定に関係なく常に除外されます。
+`.setoka`）は `build.watch_ignore` の指定に関係なく常に除外されます。
 ビルド生成物を大量に書くツールを同居させている場合は、ここへ足してください。
 
 パターンはパス自身と**祖先ディレクトリ**に対して評価します。つまり
@@ -281,7 +281,7 @@ glob 評価が想定外になるため）。
 作成イベント自体も含む）。`"**/target/**"` と書いても配下のファイルは除外
 されますが、`target/` が作られた瞬間の 1 回は再ビルドが走ります。
 
-`yuzu.toml` を保存すると設定を読み直してから再ビルドします。ただし監視と
+`setoka.toml` を保存すると設定を読み直してから再ビルドします。ただし監視と
 配信の前提になっている `output.dir` / `base_url` / `dev.host` / `dev.port` /
 `dev.live_reload` / `dev.allowed_hosts` / `build.watch_ignore` は起動時の値のままで、変更すると
 「再起動しないと反映されません」と警告します。

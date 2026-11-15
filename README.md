@@ -1,22 +1,22 @@
-# yuzu 🍊
+# setoka 🍊
 
-[![CI](https://github.com/ai-implementer/yuzu/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-implementer/yuzu/actions/workflows/ci.yml)
+[![CI](https://github.com/ai-implementer/setoka/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-implementer/setoka/actions/workflows/ci.yml)
 ![MSRV](https://img.shields.io/badge/MSRV-1.99-orange)
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
 
 Markdown で書いた設計書を、プロダクション品質の静的 HTML ドキュメントサイトに
 変換する **Rust 製のドキュメント生成ツール**。
 
-**ドキュメントサイト**: https://ai.implementer.net/yuzu/
+**ドキュメントサイト**: https://ai.implementer.net/setoka/
 
-- yuzu 自身でビルドして GitHub Pages へ公開している実例サイト
+- setoka 自身でビルドして GitHub Pages へ公開している実例サイト
 - 原稿は [docs/](docs/)、デプロイは [.github/workflows/docs.yml](.github/workflows/docs.yml)
   （リリースのタグで公開するので、内容は最新のリリースに合わせてある）
 
 ## できること
 
 - **書くことに集中できる** — `content/**/*.md` を置くだけでナビ・目次・前後ページ
-  リンク・パンくずが付く。`yuzu dev` は保存から約 1 秒で自動リロード
+  リンク・パンくずが付く。`setoka dev` は保存から約 1 秒で自動リロード
 - **設計書のための表現力** — シンタックスハイライト / 数式（KaTeX）/ Mermaid 互換の図 /
   OpenAPI・JSON Schema の静的レンダリング
   - 図は既定ではブラウザが描く（同梱の mermaid.js）。設定で 10 図種をビルド時に SVG に
@@ -25,8 +25,8 @@ Markdown で書いた設計書を、プロダクション品質の静的 HTML �
   実ファイルを取り込む（設計書とコードの乖離を防ぐ）
 - **日本語のための検索** — 分かち書き ＋ BM25 の全文検索が静的ホスティングだけで動く
   - 誤字に寛容。フレーズ検索・同義語展開・コードブロック検索にも対応
-- **品質を保つ道具** — `yuzu fmt`（決定的整形）/ `yuzu lint`（表記ゆれの検出と自動修正）/
-  `yuzu check`（リンク切れ検査）
+- **品質を保つ道具** — `setoka fmt`（決定的整形）/ `setoka lint`（表記ゆれの検出と自動修正）/
+  `setoka check`（リンク切れ検査）
   - 診断は `--format json` / `github` で CI にそのまま乗る
 - **LLM 連携** — llms.txt / llms-full.txt と、ページ単位の Markdown 配信・コピーボタン
 - **速い** — インクリメンタルビルド ＋ ページ並列化で、再ビルドは変更ページ分だけ
@@ -38,44 +38,44 @@ Markdown で書いた設計書を、プロダクション品質の静的 HTML �
 
 インストールは 2 通り。
 
-- **バイナリ** — [GitHub Releases](https://github.com/ai-implementer/yuzu/releases/latest)
+- **バイナリ** — [GitHub Releases](https://github.com/ai-implementer/setoka/releases/latest)
   から取って PATH の通った場所へ置く（macOS arm64/x64・Linux x64・Windows x64）
 - **ソース** — Rust 1.99 以降で `cargo install`。`vX.Y.Z` はリリースの版（`--tag` を省くと
   リリース前の変更を含む main が入る）
 
 ```bash
-cargo install --locked --git https://github.com/ai-implementer/yuzu --tag vX.Y.Z yuzu-cli
-# リポジトリ内での開発中は: cargo install --path crates/yuzu-cli
+cargo install --locked --git https://github.com/ai-implementer/setoka --tag vX.Y.Z setoka-cli
+# リポジトリ内での開発中は: cargo install --path crates/setoka-cli
 ```
 
 ```bash
-yuzu new my-docs
+setoka new my-docs
 cd my-docs
-yuzu dev            # 開発サーバ（監視 + 自動再ビルド + WS ライブリロード）
-yuzu build          # dist/ に静的サイトを出力
-yuzu preview        # http://127.0.0.1:5173/ で確認
-yuzu fmt            # Markdown を正規形へ整形（--check で差分検出・--diff で差分表示）
-yuzu lint --fix     # 表記ゆれ（全角英数字・半角カナ・用語・長音符）を自動修正
-yuzu check          # lint + リンク切れ + fmt 差分の統合チェック（CI 用）
-eval "$(yuzu completions bash)"   # シェル補完（zsh / fish / powershell / elvish も）
+setoka dev            # 開発サーバ（監視 + 自動再ビルド + WS ライブリロード）
+setoka build          # dist/ に静的サイトを出力
+setoka preview        # http://127.0.0.1:5173/ で確認
+setoka fmt            # Markdown を正規形へ整形（--check で差分検出・--diff で差分表示）
+setoka lint --fix     # 表記ゆれ（全角英数字・半角カナ・用語・長音符）を自動修正
+setoka check          # lint + リンク切れ + fmt 差分の統合チェック（CI 用）
+eval "$(setoka completions bash)"   # シェル補完（zsh / fish / powershell / elvish も）
 ```
 
 - **デプロイ** — GitHub に push すると Pages へ自動デプロイ
   （`.github/workflows/deploy.yml` 同梱。リポジトリの Settings > Pages > Source を
   「GitHub Actions」にするだけ）。GitHub Pages はリポジトリが非公開でも公開されます。
-  社内だけに見せるときは[社内で公開する](https://ai.implementer.net/yuzu/guide/internal/)
+  社内だけに見せるときは[社内で公開する](https://ai.implementer.net/setoka/guide/internal/)
   （原稿の `.md` と HTML コメントも配信される点の注意と、Web サーバへの置き方）
-- **設定** — プロジェクトルートの `yuzu.toml` 1 枚（すべてのキーが省略可能）
+- **設定** — プロジェクトルートの `setoka.toml` 1 枚（すべてのキーが省略可能）
 - **終了コード**（全コマンド共通）— `0` = 成功 / `1` = 違反あり / `2` = 実行エラー
 
 ## ドキュメント
 
 | 知りたいこと | 参照先 |
 | --- | --- |
-| インストールから公開まで | [ガイド](https://ai.implementer.net/yuzu/guide/) |
-| 記法（Admonition・図表番号・折りたたみ・インクルード） | [執筆の基本](https://ai.implementer.net/yuzu/guide/writing/) |
-| 設定キー・CLI・診断ルールの一覧 | [リファレンス](https://ai.implementer.net/yuzu/reference/) |
-| 内部設計・凍結した設計判断・ワークスペース構成 | [開発](https://ai.implementer.net/yuzu/development/) |
+| インストールから公開まで | [ガイド](https://ai.implementer.net/setoka/guide/) |
+| 記法（Admonition・図表番号・折りたたみ・インクルード） | [執筆の基本](https://ai.implementer.net/setoka/guide/writing/) |
+| 設定キー・CLI・診断ルールの一覧 | [リファレンス](https://ai.implementer.net/setoka/reference/) |
+| 内部設計・凍結した設計判断・ワークスペース構成 | [開発](https://ai.implementer.net/setoka/development/) |
 | 開発計画（今の版・候補） | [ROADMAP.md](ROADMAP.md) |
 | リリース済みの版の内訳・レビューの記録 | [ROADMAP-history.md](ROADMAP-history.md) |
 
@@ -89,12 +89,12 @@ cargo fmt --all --check
 ```
 
 クレート構成・依存方向・凍結した設計判断は
-[開発ドキュメント](https://ai.implementer.net/yuzu/development/)にまとまっている。
+[開発ドキュメント](https://ai.implementer.net/setoka/development/)にまとまっている。
 
 ## 質問・不具合の報告
 
-質問・不具合の報告・機能の要望は [Issues](https://github.com/ai-implementer/yuzu/issues) へ。
-困ったときは [よくある質問とトラブル](https://ai.implementer.net/yuzu/guide/faq/) も見てください。
+質問・不具合の報告・機能の要望は [Issues](https://github.com/ai-implementer/setoka/issues) へ。
+困ったときは [よくある質問とトラブル](https://ai.implementer.net/setoka/guide/faq/) も見てください。
 
 ## 脆弱性の報告
 

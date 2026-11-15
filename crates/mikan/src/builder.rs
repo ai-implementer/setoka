@@ -1,6 +1,6 @@
 //! セクション化されたドキュメント → postings/fst/シャード/manifest の集約。
 //!
-//! Markdown からのセクション抽出（tf・出現位置の計算）は呼び出し側（yuzu-index）の
+//! Markdown からのセクション抽出（tf・出現位置の計算）は呼び出し側（setoka-index）の
 //! 責務。ここでは計算済みの tf・位置を受け取り、doc_id 採番からバイナリ生成までを行う
 //! （I/O は持たない。書き出しは呼び出し側の責務）。
 
@@ -21,18 +21,18 @@ pub struct SectionInput {
     pub doc_len: u32,
     /// (term, 重み付き出現数, 出現位置の昇順列)
     pub tf: Vec<(String, u32, Vec<u32>)>,
-    /// この doc のタイトルの token（yuzu では先頭の節がページタイトル、ほかの節が見出し）。
+    /// この doc のタイトルの token（setoka では先頭の節がページタイトル、ほかの節が見出し）。
     /// 検索時にタイトルと一致した doc の点を上げるのに使う（[`Manifest::doc_title_terms`]）。
     /// `tf` に無い token は語彙に無いので無視される
     pub title_terms: Vec<String>,
 }
 
-/// 1 ドキュメント（yuzu では 1 ページ）ぶんの入力。1 ページは複数セクション（doc）を持つ
+/// 1 ドキュメント（setoka では 1 ページ）ぶんの入力。1 ページは複数セクション（doc）を持つ
 pub struct DocumentInput {
     pub title: String,
     /// サイト相対 URL（route）
     pub url: String,
-    /// 結果の絞り込み単位（yuzu ではナビ第 1 階層）の表示名。`None` なら未分類。
+    /// 結果の絞り込み単位（setoka ではナビ第 1 階層）の表示名。`None` なら未分類。
     /// ⚠️ 下の `sections`（h2/h3 = doc）とは**別概念**
     pub group: Option<String>,
     pub sections: Vec<SectionInput>,

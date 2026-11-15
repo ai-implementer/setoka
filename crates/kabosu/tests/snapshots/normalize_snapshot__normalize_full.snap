@@ -2,7 +2,7 @@
 source: crates/kabosu/tests/normalize_snapshot.rs
 expression: text
 ---
-title = "柚子 \"yuzu\" と\\改行\n"
+title = "柚子 \"setoka\" と\\改行\n"
 description = "説明つき"
 port = 5173
 dark = true

@@ -1,7 +1,7 @@
 ---
 title: 品質チェック
 order: 9
-description: yuzu fmt / lint / check で文書の品質を CI で保つ
+description: setoka fmt / lint / check で文書の品質を CI で保つ
 aliases: ["guide/lint/"]
 lintDisable:
   - fullwidth-alphanumeric
@@ -10,16 +10,16 @@ lintDisable:
 
 # 品質チェック
 
-コードにフォーマッタと linter があるように、yuzu は設計書にも同じ道具を
+コードにフォーマッタと linter があるように、setoka は設計書にも同じ道具を
 用意しています。3 コマンドとも終了コードは **0 = 違反なし / 1 = 違反あり /
 2 = 実行エラー**の規約で、そのまま CI に組み込めます。
 
-## yuzu fmt — 決定的整形
+## setoka fmt — 決定的整形
 
 ```bash
-yuzu fmt          # 正規形へ整形して書き込む
-yuzu fmt --check  # 差分があれば終了コード 1（CI 用）
-yuzu fmt --diff   # 書き換えず、整形前後の差分を表示（--check を含意）
+setoka fmt          # 正規形へ整形して書き込む
+setoka fmt --check  # 差分があれば終了コード 1（CI 用）
+setoka fmt --diff   # 書き換えず、整形前後の差分を表示（--check を含意）
 ```
 
 Markdown を解析してから書き直す整形で、見出しを `#` の形に揃える・箇条書きの記号を
@@ -29,12 +29,12 @@ Markdown を解析してから書き直す整形で、見出しを `#` の形に
 - **2 回かけても結果は同じ**
 - 差分のないファイルには書き込まない（ファイルの更新日時が変わらない）
 - 改行コード（CRLF / LF）は原稿のまま保ち、改行コードだけの違いは整形差分にしない
-  （Windows の git が原稿を CRLF で取り出しても `yuzu check` は通る）
+  （Windows の git が原稿を CRLF で取り出しても `setoka check` は通る）
 - 書き込みは一時ファイルを経由して置き換える（途中で止まっても原稿が半端に残らない）。
   ファイルのパーミッションは引き継ぎ、読み込んだ後に原稿が変わっていたら書かずに止まる
 
 整形で変わる主な書き方は次のとおりです。既存の原稿を持ち込むときは、最初に
-`yuzu fmt --diff` で中身を確かめてください。
+`setoka fmt --diff` で中身を確かめてください。
 
 | 書き方 | 整形後 |
 | --- | --- |
@@ -54,18 +54,18 @@ Markdown を解析してから書き直す整形で、見出しを `#` の形に
 そのままパッチとして使えます:
 
 ```bash
-yuzu fmt --diff > format.patch && patch -p1 < format.patch
+setoka fmt --diff > format.patch && patch -p1 < format.patch
 ```
 
 > [!NOTE]
 > 改行コードが CRLF の原稿は**全行が差分**になります（整形結果は常に LF のため）。
 > `--check` でも同じ判定ですが、`--diff` で初めて目に見えます。
 
-## yuzu lint — 文書規約と表記ゆれ
+## setoka lint — 文書規約と表記ゆれ
 
 ```bash
-yuzu lint        # 違反を行番号付きで報告
-yuzu lint --fix  # 表記ゆれ系の変換候補を自動適用
+setoka lint        # 違反を行番号付きで報告
+setoka lint --fix  # 表記ゆれ系の変換候補を自動適用
 ```
 
 文書規約（h1 の重複・見出しレベルの飛び・frontmatter の未知キー・
@@ -110,7 +110,7 @@ yuzu lint --fix  # 表記ゆれ系の変換候補を自動適用
 
 「表記ゆれそのものを解説するページ」「あえて少数派の表記で書くページ」のような
 意図的な例外は、frontmatter の `lintDisable` で**そのページに限り**ルールを
-抑制できます。`yuzu check` を CI に乗せたまま例外ページを共存させる仕組みです:
+抑制できます。`setoka check` を CI に乗せたまま例外ページを共存させる仕組みです:
 
 ```yaml
 ---
@@ -127,25 +127,25 @@ lintDisable:
 - 書いたのにそのページで一度も発火しなかった抑制は `unused-lint-suppression`
   の警告になります。原稿を直したら抑制も削除してください（放置すると
   「効いているつもり」の指定が溜まります）
-- 抑制された出現は `yuzu lint --fix` でも書き換えません。集計行には
+- 抑制された出現は `setoka lint --fix` でも書き換えません。集計行には
   「（抑制 N 件）」と件数が出ます
 
 なお、このページ自身も上の「組み込みルール」の表で例を生のまま載せるために、
 frontmatter の `lintDisable` を使っています（原文 Markdown の frontmatter が
 そのまま実例です）。
 
-### 行単位の抑制（yuzu-lint-disable-next-line）
+### 行単位の抑制（setoka-lint-disable-next-line）
 
 ページ全体ではなく 1 箇所だけ例外を通したいときは、HTML コメントで
 **次の内容行に限り**ルールを抑制できます:
 
 ```md
-<!-- yuzu-lint-disable-next-line term-variant -->
+<!-- setoka-lint-disable-next-line term-variant -->
 この行のゆれ表記だけ報告されません。次の行からは通常どおりです。
 ```
 
 - 対象は「コメントの後、空行を飛ばした次の内容行」です。コメントと対象行は
-  密着させて書くのが正規形で、`yuzu fmt` もこの形へ整えます
+  密着させて書くのが正規形で、`setoka fmt` もこの形へ整えます
 - ルール名は空白区切りで複数指定できます。抑制できるのは warning のルールだけで、
   未知・抑制不可のルール名は `invalid-lint-suppression` の警告になります
 - コメントは同じ行で `-->` を閉じてください。閉じ忘れると以降の本文が丸ごと
@@ -159,7 +159,7 @@ frontmatter の `lintDisable` を使っています（原文 Markdown の frontm
 
 ### プロジェクト全体の無効化（lint.rules）
 
-方針と合わないルールは `yuzu.toml` で丸ごと切れます。既存プロジェクトへの
+方針と合わないルールは `setoka.toml` で丸ごと切れます。既存プロジェクトへの
 段階導入（まず気になるルールを off で入れて、直しながら少しずつ有効化する）の
 入口です:
 
@@ -169,7 +169,7 @@ katakana-choon = false
 ```
 
 - 対象は warning のルールだけです（error は生成物が壊れるのを防ぐ正なので
-  切れません）。warning でも `config-*`（`yuzu.toml` 自体の検査）と抑制機構自身
+  切れません）。warning でも `config-*`（`setoka.toml` 自体の検査）と抑制機構自身
   （`invalid-lint-suppression` / `unused-lint-suppression`）は切れません。
   書かない ID は有効のままです
 - ルール ID のタイポや旧形式のキーは、無効化できる ID の一覧付きの設定エラーに
@@ -184,26 +184,26 @@ katakana-choon = false
   になりません（外部リンクの例外指定を書いても既定のオフライン CI は落ちません）。
   `--external-links` を付けた実行でも、到達性を判定できずスキップした URL
   （接続失敗・タイムアウト・5xx・429）への抑制は同じ扱いです
-- `yuzu lint` は check が追加するルール（`link-outside-content`・`route-case-conflict`・
+- `setoka lint` は check が追加するルール（`link-outside-content`・`route-case-conflict`・
   `spec-warning` など）を評価しないので、それらへの抑制も lint では
-  `unused-lint-suppression` になりません（不要になった抑制は `yuzu check` が知らせます）
+  `unused-lint-suppression` になりません（不要になった抑制は `setoka check` が知らせます）
 
 ### ディレクトリ階層の制限（`lint.max_directory_depth`）
 
 `content` 配下のディレクトリの深さを制限できます（直下 = 0）。サイトの
 構成が意図せず深くなるのを防ぎます。
 
-## yuzu check — 統合チェック
+## setoka check — 統合チェック
 
 ```bash
-yuzu check
+setoka check
 ```
 
 lint のすべてに加えて、**内部リンク・アンカー切れ**（ページ間リンク・
 `#見出し` 参照・画像などの添付ファイル参照）を行番号付きで報告する
 統合コマンドです。CI ではこれ 1 つを回せば十分です。
 
-画像などの添付ファイルは、`yuzu build` が `dist/` へコピーするファイルと照合します。
+画像などの添付ファイルは、`setoka build` が `dist/` へコピーするファイルと照合します。
 隠しファイル（`.` で始まる名前）・`input.ignore` に一致するファイル・シンボリックリンクは
 コピーされないので、ディスクにあってもリンク切れとして報告します。
 
@@ -211,20 +211,20 @@ lint のすべてに加えて、**内部リンク・アンカー切れ**（ペ�
 `--no-fmt` で整形差分の検査だけを外せます:
 
 ```bash
-yuzu check --no-fmt
+setoka check --no-fmt
 ```
 
-`yuzu build` も、ビルドしたページのリンク切れ・`content/` の外を指すリンク・取り込み
+`setoka build` も、ビルドしたページのリンク切れ・`content/` の外を指すリンク・取り込み
 （`file=`・` ```include `・仕様ファイル）の失敗を数えて、1 件以上あれば最後に 1 行で
 知らせます（終了コードは 0 のまま）。
 
-    WARN リンク切れ 2 件・取り込みの失敗 1 件があります。詳細は `yuzu check` で確認できます
+    WARN リンク切れ 2 件・取り込みの失敗 1 件があります。詳細は `setoka check` で確認できます
 
-`yuzu dev` / `yuzu build --watch` では再ビルドのたびに出ます。数えるのは公開するページ
-（`draft: true` は除く。`--drafts` のときは含む）で、件数の内訳と場所は `yuzu check` で
+`setoka dev` / `setoka build --watch` では再ビルドのたびに出ます。数えるのは公開するページ
+（`draft: true` は除く。`--drafts` のときは含む）で、件数の内訳と場所は `setoka check` で
 確かめます。
 
-次の場合も、`yuzu build` と `yuzu dev` が警告します（終了コードは 0 のまま）:
+次の場合も、`setoka build` と `setoka dev` が警告します（終了コードは 0 のまま）:
 
 - トップページ（`dist/index.html`）が無い。サイトの `/` が 404 になるためで、
   `index.md` が無い・draft・`input.ignore` で外れている・シンボリックリンク（読みません）、
@@ -247,18 +247,18 @@ build のページ数は check（原稿だけを数えます）より多くな�
 > fmt / lint / check は `draft: true` の下書きページも対象です
 > （公開前の文書も同じ規約で保てます）。
 > 
-> このサイト自身も、デプロイ前に `yuzu check` を通しています
+> このサイト自身も、デプロイ前に `setoka check` を通しています
 > （[配信とデプロイ](deploy.md)参照）。外部リンクはデプロイとは別に、
-> 週次の workflow で `yuzu check --external-links` を掛けています。
+> 週次の workflow で `setoka check --external-links` を掛けています。
 
 ### 外部リンクの検査（opt-in）
 
 `--external-links` を付けると、本文中の `http://` / `https://` リンクの到達性も
-検査します。既定の `yuzu check` はネットワークに触れません（ビルドと検査は
+検査します。既定の `setoka check` はネットワークに触れません（ビルドと検査は
 オフラインで決定的、が契約です）:
 
 ```bash
-yuzu check --external-links
+setoka check --external-links
 ```
 
 - HTTP 4xx を返した URL は `external-link-broken`（warning）として出現箇所ごとに
@@ -278,23 +278,23 @@ GitHub Actions の注釈としてプルリクエストの diff 行に直接出�
 
 ```yaml
 - name: docs check
-  run: yuzu check --root docs --format github
+  run: setoka check --root docs --format github
 ```
 
 パスは `GITHUB_WORKSPACE` からの相対に自動で付け替わるので、上のように
 `--root` でサブディレクトリを指定しても、`cd docs` してから実行しても、
 正しいファイルに紐づきます。
 
-既存の原稿を持ち込んだ直後は、整形差分で `yuzu check` が失敗します。整形を後回しに
+既存の原稿を持ち込んだ直後は、整形差分で `setoka check` が失敗します。整形を後回しに
 する間は `--no-fmt` を付けます:
 
 ```yaml
 - name: docs check
-  run: yuzu check --root docs --no-fmt --format github
+  run: setoka check --root docs --no-fmt --format github
 ```
 
 プルリクエストごとに原稿を検査して、ビルドが通ることを確かめるワークフローの例です
-（公開はしません）。`.github/workflows/` に置き、`__YUZU_VERSION__` を `yuzu --version` が
+（公開はしません）。`.github/workflows/` に置き、`__SETOKA_VERSION__` を `setoka --version` が
 表示する版の番号（`v` は付けない）に書き換えます:
 
 ```yaml file="snippets/pr-check.yml"

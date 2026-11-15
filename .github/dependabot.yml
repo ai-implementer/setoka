@@ -43,7 +43,7 @@ updates:
           - patch
 
   # actions はフルコミット SHA でピン留めしたまま、SHA と版のコメントを上げてもらう。
-  # 雛形 crates/yuzu-cli/scaffold/deploy.yml は対象外なので、PR のブランチで同じ SHA に揃える
+  # 雛形 crates/setoka-cli/scaffold/deploy.yml は対象外なので、PR のブランチで同じ SHA に揃える
   # （ci.yml の scaffold actions pins が食い違いを止める）
   - package-ecosystem: github-actions
     directory: /

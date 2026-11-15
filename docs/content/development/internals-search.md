@@ -13,7 +13,7 @@ index 時（ネイティブ）と query 時（wasm）で**同一のトークナ�
 1 トークンでもずれると検索は静かに壊れるため、抜粋生成・ハイライトの
 ロジックも mikan に 1 実装だけ置き、native / wasm で共有します。
 
-`yuzu search` はブラウザとまったく同じエンジンを通るので、この整合の
+`setoka search` はブラウザとまったく同じエンジンを通るので、この整合の
 検証にも使えます。
 
 ## インデックスの構造
@@ -76,9 +76,9 @@ manifest の `contentHash`（fst ＋ 全シャード ＋ モデルバイトの s
 | 資産 | 置き場所 | 更新スクリプト |
 | --- | --- | --- |
 | vaporetto モデル | `crates/mikan/assets/model/` | `scripts/vendor-vaporetto-model.sh` |
-| 検索 wasm 成果物 | `crates/yuzu-index/assets/search/` | `scripts/build-search-wasm.sh` |
-| mermaid.min.js | `crates/yuzu-theme/assets/static/vendor/` | `scripts/vendor-mermaid.sh` |
-| KaTeX | `crates/yuzu-theme/assets/static/vendor/` | `scripts/vendor-katex.sh` |
+| 検索 wasm 成果物 | `crates/setoka-index/assets/search/` | `scripts/build-search-wasm.sh` |
+| mermaid.min.js | `crates/setoka-theme/assets/static/vendor/` | `scripts/vendor-mermaid.sh` |
+| KaTeX | `crates/setoka-theme/assets/static/vendor/` | `scripts/vendor-katex.sh` |
 
 wasm 成果物の再生成では、wasm-bindgen-cli を workspace の
 `wasm-bindgen = "=x.y.z"` と完全同一バージョンにする必要があります。

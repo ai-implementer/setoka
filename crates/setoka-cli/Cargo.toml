@@ -1,0 +1,36 @@
+[package]
+name = "setoka-cli"
+description = "setoka の CLI（bin: setoka。new / build / dev / preview / search / llms / fmt / lint / check / completions）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# crates.io へは公開しない（配布は GitHub Release のバイナリ + cargo install --git。将来構想は ROADMAP「今後の候補」）
+publish = false
+
+[[bin]]
+name = "setoka"
+path = "src/main.rs"
+
+[dependencies]
+setoka-config = { workspace = true }
+setoka-core = { workspace = true }
+setoka-index = { workspace = true }
+setoka-render = { workspace = true }
+setoka-server = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+open = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+similar = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+# 並列処理中の panic が main の catch_unwind まで伝わることのテスト用
+rayon = { workspace = true }
+tempfile = { workspace = true }

@@ -1,0 +1,1589 @@
+//! `setoka build [--watch]`: サイトのビルド（と監視・配信）
+//!
+//! ビルドは常にインクリメンタル（`.setoka/cache/`）。正しさはキャッシュ層が
+//! envKey / routesKey / sourceHash で担保し、ここでは配線だけを行う。
+//! `--force` でキャッシュを破棄してフルビルドに戻せる。
+
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
+
+use anyhow::Context;
+
+use setoka_config::ResolvedConfig;
+use setoka_core::{BuildCache, IgnoreMatcher, OutputTracker, SiteOutput, output};
+use setoka_render::{LiveReloadMode, RenderCtx, RenderParams, RenderShared};
+
+use crate::commands::collect::{self, Scope};
+use crate::commands::preview;
+
+/// エディタの連続保存をまとめる debounce 幅（build --watch / dev 共通）
+pub(crate) const DEBOUNCE: Duration = Duration::from_millis(300);
+
+/// 監視除外（build --watch / dev 共通）。
+/// **出力ディレクトリの除外は必須**（含めると再ビルド → 変更検知の無限ループ）。
+/// `.setoka` / `.git` 等の隠しディレクトリは setoka_server 側で常に無視される。
+///
+/// これに加えて `build.watch_ignore` の glob をプロジェクトルート相対で評価する
+/// （既定は `target/` と `node_modules/`。ビルド生成物の大量イベントで
+/// 再ビルドが暴発するのを防ぐ）。glob の解釈は `input.ignore` と同じ
+/// setoka-core の [`IgnoreMatcher`] を通す
+pub(crate) fn watch_ignore(rc: &ResolvedConfig) -> anyhow::Result<setoka_server::WatchIgnore> {
+    let matcher = IgnoreMatcher::new(&rc.config.build.watch_ignore)
+        .context("build.watch_ignore のパターンが不正です")?;
+    let root = rc.root.clone();
+    Ok(
+        setoka_server::WatchIgnore::new(vec![rc.output_dir.clone(), rc.root.join(".setoka")])
+            .with_extra(move |path| {
+                // 監視イベントは絶対パスで来る。ルート外（シンボリックリンク先など）は
+                // 相対化できないので除外しない。
+                // 祖先まで見るのは、ディレクトリ作成イベント（`target` そのもの）と
+                // その配下のファイルを 1 つのパターンで扱うため
+                path.strip_prefix(&root)
+                    .is_ok_and(|rel| matcher.is_match_or_ancestor(rel))
+            }),
+    )
+}
+
+/// 変更パスの一覧をログ用に整形する（build --watch / dev 共通）。
+/// プロジェクトルート相対へ落とし、git checkout 等の一括変更で 1 行が
+/// 暴れないよう先頭 5 件＋「他 N 件」で切り詰める。
+/// ルート外（シンボリックリンク先など）は相対化できないので絶対パスのまま出す
+pub(crate) fn format_changed(root: &std::path::Path, changed: &[PathBuf]) -> String {
+    const MAX: usize = 5;
+    let mut names: Vec<String> = changed
+        .iter()
+        .take(MAX)
+        .map(|p| p.strip_prefix(root).unwrap_or(p).display().to_string())
+        .collect();
+    if changed.len() > MAX {
+        names.push(format!("他 {} 件", changed.len() - MAX));
+    }
+    names.join(", ")
+}
+
+/// CLI フラグによる設定の上書き（`--base-url` / `--host`）。
+/// watch 中に `setoka.toml` を読み直してもフラグ優先の契約を保つため保持する
+#[derive(Clone, Default)]
+pub(crate) struct Overrides {
+    /// `--base-url`（build）。site/build の設定より優先
+    pub(crate) base_url: Option<String>,
+    /// `--host`（dev / preview / build --watch）。dev.host より優先（コンテナ内から 0.0.0.0 で
+    /// 配信する用途）
+    pub(crate) host: Option<setoka_config::BindAddr>,
+}
+
+impl Overrides {
+    /// フラグを設定へ当てる（`build` / `dev` / `preview` 共用。
+    /// 「フラグは設定より優先」の解釈をここ 1 箇所に置く）
+    pub(crate) fn apply(&self, rc: &mut ResolvedConfig) {
+        if let Some(raw) = &self.base_url {
+            rc.base_url = setoka_config::normalize_base_url(raw);
+        }
+        if let Some(host) = self.host {
+            rc.config.dev.host = host;
+        }
+    }
+}
+
+/// プロジェクトルートを確定して設定を読み、CLI 上書きを当てる（build / dev 共通の入口）。
+///
+/// **`.setoka` のリンク検査を通るのは build / dev だけ**という非対称は意図したもの。
+/// あれは「これから `.setoka` へ書き込む」側の事前条件で、`.setoka` に触れない
+/// 読み取り専用コマンド（check / lint / fmt / llms / search / preview）まで
+/// リンク構成で落とすのは過剰。配信パスの検査は preview 側の `symlink_guard` が持つ
+pub(crate) fn load_config(
+    cx: &crate::cx::Cx,
+    overrides: &Overrides,
+) -> anyhow::Result<ResolvedConfig> {
+    let mut rc = crate::commands::load_project(cx)?;
+    overrides.apply(&mut rc);
+    // ツール管理ディレクトリの経路も検証する。ここは `BuildSession::new` の
+    // キャッシュ書き込み・破棄（--force）より前なので、`.setoka` 系の書き込み・削除を
+    // 1 箇所で覆える（setoka-config は setoka-core に依存しないので検証は cli の責務）
+    for rel in [".setoka", ".setoka/cache"] {
+        let path = rc.root.join(rel);
+        setoka_core::output::ensure_no_symlink_under(&rc.root, &path)
+            .with_context(|| format!("{} を使えません", path.display()))?;
+    }
+    Ok(rc)
+}
+
+pub fn run(
+    cx: &crate::cx::Cx,
+    watch: bool,
+    base_url: Option<String>,
+    force: bool,
+    drafts: bool,
+    port: Option<u16>,
+    host: Option<setoka_config::BindAddr>,
+) -> anyhow::Result<()> {
+    // フラグの値は watch 中も変わらないので、検証はここで 1 回（setoka.toml 側は load が見る）
+    if let Some(raw) = &base_url
+        && let Some(problem) = setoka_config::base_url_problem(raw)
+    {
+        anyhow::bail!("--base-url の値 `{raw}` は使えません。{problem}");
+    }
+    let overrides = Overrides { base_url, host };
+    let rc = load_config(cx, &overrides)?;
+
+    // --watch のときだけオートリフレッシュ JS（ポーリング式）を注入する
+    let mode = if watch {
+        LiveReloadMode::Poll
+    } else {
+        LiveReloadMode::None
+    };
+    let mut session = BuildSession::new(&rc, force)?;
+    build_once(&rc, mode, &mut session, drafts)?;
+
+    if !watch {
+        return Ok(());
+    }
+
+    // プロジェクトルート全体を監視する（コンテンツインクルード `file=` の
+    // 参照先は content/ の外にもあるため）。出力ディレクトリは必ず除外する
+    let paths = vec![rc.root.clone()];
+    let ignore = watch_ignore(&rc)?;
+    // session と設定はクロージャへ move してセッション全体で再利用する
+    //（キャッシュ・テンプレート Env・ハイライタ・トークナイザ）
+    let mut watcher = WatchBuild::new(rc.clone(), overrides, mode, drafts, session);
+    let root = rc.root.clone();
+    let mut watch_handle = setoka_server::watch(&paths, ignore, DEBOUNCE, move |changed| {
+        tracing::info!(changed = %format_changed(&root, changed), "変更を検知 → 再ビルド");
+        if let Err(e) = watcher.rebuild() {
+            // 執筆中の一時的な構文エラー等でプロセスは落とさない
+            // （panic は別。監視スレッドが受けて配信ごと止める = exit 2）
+            tracing::error!("再ビルドに失敗しました: {e:#}");
+        }
+    })?;
+
+    // 受け入れ条件「編集 → ブラウザ自動更新」を 1 コマンドで満たすため、
+    // preview と同じ静的サーバも起動する（ブロッキング）。
+    // ポート・ホストは `dev` と同じく上書きできる（両方を並走させる用途）
+    preview::serve_dist(&rc, port, None, watch_handle.take_failure())
+}
+
+/// 監視ビルド 1 本ぶんの状態（`build --watch` / `dev` 共通）。
+///
+/// **設定の持ち主はここ**。`setoka.toml` も監視対象なので、起動時の設定で
+/// 固定すると「保存 → 再ビルドもライブリロードも走るのに設定だけ効かない」
+/// という気づきにくい状態になる（Phase 42 の副作用）
+pub(crate) struct WatchBuild {
+    rc: ResolvedConfig,
+    session: BuildSession,
+    overrides: Overrides,
+    live_reload: LiveReloadMode,
+    drafts: bool,
+    /// 最後に読み込んだ `setoka.toml` の生テキスト。
+    /// 差分があるときだけ読み直す（無変更なら再ビルド 1 回あたり
+    /// 小さいファイルの読み込み 1 回で済み、セッション再構築も起きない）
+    config_text: String,
+}
+
+impl WatchBuild {
+    pub(crate) fn new(
+        rc: ResolvedConfig,
+        overrides: Overrides,
+        live_reload: LiveReloadMode,
+        drafts: bool,
+        session: BuildSession,
+    ) -> Self {
+        // 起動時に読めているので失敗はまず無い（空なら次回の差分判定で読み直す）
+        let config_text =
+            fs::read_to_string(rc.root.join(setoka_config::CONFIG_FILE_NAME)).unwrap_or_default();
+        Self {
+            rc,
+            session,
+            overrides,
+            live_reload,
+            drafts,
+            config_text,
+        }
+    }
+
+    /// 変更検知 1 回ぶん。設定の変更を取り込んでから再ビルドする
+    pub(crate) fn rebuild(&mut self) -> anyhow::Result<()> {
+        self.reload_config();
+        self.refresh_session_if_env_changed();
+        build_once(&self.rc, self.live_reload, &mut self.session, self.drafts)
+    }
+
+    /// envKey が前回のセッションから変わっていたらセッションを作り直す。
+    ///
+    /// `setoka.toml` の文字列が同じでも、辞書ファイル（`search.dictionary`）の中身だけが変わる
+    /// ことがある（10-07 見直しの B5）。セッションの Tokenizer は作り直されず、検索の
+    /// キャッシュに当たったページも旧辞書で数えたまま残るので、索引とブラウザの分かち書きが
+    /// ずれていた。Tokenizer だけを持ち直しても足りない（キャッシュが残る。PR #29 の指摘）ので、
+    /// envKey ごと比べてキャッシュも捨てる。辞書を読めないときは前回のセッションで続行する
+    fn refresh_session_if_env_changed(&mut self) {
+        match env_key(&self.rc) {
+            Ok(key) if key == self.session.env_key => {}
+            Ok(_) => match BuildSession::new(&self.rc, false) {
+                Ok(session) => {
+                    self.session = session;
+                    tracing::info!("辞書ファイルの変更を反映しました（検索の索引を作り直します）");
+                }
+                Err(e) => tracing::error!(
+                    "辞書ファイルの変更を反映できません（前回の辞書で続行します）: {e}"
+                ),
+            },
+            Err(e) => {
+                tracing::error!("辞書ファイルを読み込めません（前回の辞書で続行します）: {e}")
+            }
+        }
+    }
+
+    /// `setoka.toml` の変更を取り込む。読めない・不正なときは**前回の設定で続行**する
+    /// （編集途中の壊れた TOML でプロセスを落とさない。設定エラーの位置はログに出す）
+    fn reload_config(&mut self) {
+        let path = self.rc.root.join(setoka_config::CONFIG_FILE_NAME);
+        let Ok(text) = fs::read_to_string(&path) else {
+            return; // 一時的に消えた（エディタの保存方式）等
+        };
+        if text == self.config_text {
+            return;
+        }
+        self.config_text = text;
+
+        let mut next = match crate::commands::read_config(&self.rc.root) {
+            Ok(next) => next,
+            Err(e) => {
+                tracing::error!(
+                    "{} を読み込めません（前回の設定で続行します）: {e}",
+                    setoka_config::CONFIG_FILE_NAME
+                );
+                return;
+            }
+        };
+        crate::commands::warn_config_diagnostics(&next);
+        self.overrides.apply(&mut next);
+        pin_restart_only(&mut next, &self.rc);
+
+        // envKey が変わるのでセッションごと作り直す（キャッシュはディスクから
+        // 読み直し、envKey 一致なら中身を引き継ぐので無駄な全再計算にはならない）。
+        // force は渡さない（設定変更でユーザのキャッシュを消す理由はない）
+        match BuildSession::new(&next, false) {
+            Ok(session) => {
+                self.session = session;
+                self.rc = next;
+                tracing::info!("{} の変更を反映しました", setoka_config::CONFIG_FILE_NAME);
+            }
+            Err(e) => tracing::error!("設定の変更を反映できません（前回の設定で続行します）: {e}"),
+        }
+    }
+}
+
+/// 監視・配信の前提になる設定（起動時に固定し、watch 中の `setoka.toml` の変更では差し替えない）。
+///
+/// dev / preview / `build --watch` の配信はこの値から組み（`preview::serve_dist`）、
+/// watch 中の変更は [`pin_restart_only`] がこの値の項目を起動時へ戻す。以前は配信へ渡す設定と
+/// 固定する設定が別々の一覧で、テストも `dev.host` と `dev.allowed_hosts` を見ていなかった
+/// （10-12 レビューの R3）。項目を足すと `pin_restart_only` の分割代入がコンパイルエラーになる
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StartupSettings {
+    /// 出力先。配信するディレクトリで、監視の除外にも入っている（差し替えると新しい出力先が
+    /// 除外から外れ、再ビルド → 変更検知の無限ループになる）
+    pub(crate) output_dir: PathBuf,
+    /// 配信の URL 接頭辞
+    pub(crate) base_url: String,
+    /// 配信の bind アドレス（`dev.host`）
+    pub(crate) host: std::net::IpAddr,
+    /// 配信のポート（`dev.port`。`--port` はこれより優先）
+    pub(crate) port: u16,
+    /// `setoka dev` の WebSocket ライブリロード（注入済みの JS と WS 通知の有無）
+    pub(crate) live_reload: bool,
+    /// 起動済みサーバの Host / Origin の検査
+    pub(crate) allowed_hosts: Vec<String>,
+    /// 監視除外の glob（起動時に監視スレッドへ渡している）
+    pub(crate) watch_ignore: Vec<String>,
+}
+
+impl StartupSettings {
+    pub(crate) fn of(rc: &ResolvedConfig) -> Self {
+        let dev = &rc.config.dev;
+        Self {
+            output_dir: rc.output_dir.clone(),
+            base_url: rc.base_url.clone(),
+            host: dev.host.0,
+            port: dev.port,
+            live_reload: dev.live_reload,
+            allowed_hosts: dev.allowed_hosts.clone(),
+            watch_ignore: rc.config.build.watch_ignore.clone(),
+        }
+    }
+}
+
+/// 監視・配信の前提になる設定（[`StartupSettings`]）を起動時の値へ戻し、
+/// 再起動が必要だと警告する
+fn pin_restart_only(next: &mut ResolvedConfig, current: &ResolvedConfig) {
+    let started = StartupSettings::of(current);
+    // ワイルドカード（`..`）を書かない: 項目を足すと、比較と差し戻しを書くまでコンパイルが止まる
+    let StartupSettings {
+        output_dir,
+        base_url,
+        host,
+        port,
+        live_reload,
+        allowed_hosts,
+        watch_ignore,
+    } = StartupSettings::of(next);
+    let mut pinned: Vec<&str> = Vec::new();
+    if output_dir != started.output_dir {
+        pinned.push("output.dir");
+        next.config.output.dir = current.config.output.dir.clone();
+        next.output_dir = current.output_dir.clone();
+    }
+    if base_url != started.base_url {
+        pinned.push("base_url");
+        next.base_url = current.base_url.clone();
+        next.config.site.base_url = current.config.site.base_url.clone();
+        next.config.build.base_url = current.config.build.base_url.clone();
+    }
+    if watch_ignore != started.watch_ignore {
+        pinned.push("build.watch_ignore");
+        next.config.build.watch_ignore = current.config.build.watch_ignore.clone();
+    }
+    if host != started.host {
+        pinned.push("dev.host");
+        next.config.dev.host = current.config.dev.host;
+    }
+    if port != started.port {
+        pinned.push("dev.port");
+        next.config.dev.port = current.config.dev.port;
+    }
+    if live_reload != started.live_reload {
+        pinned.push("dev.live_reload");
+        next.config.dev.live_reload = current.config.dev.live_reload;
+    }
+    if allowed_hosts != started.allowed_hosts {
+        pinned.push("dev.allowed_hosts");
+        next.config.dev.allowed_hosts = current.config.dev.allowed_hosts.clone();
+    }
+    debug_assert_eq!(StartupSettings::of(next), started, "差し戻しの漏れ");
+    if !pinned.is_empty() {
+        tracing::warn!(
+            "{} の変更は再起動しないと反映されません（起動時の値のままビルドします）",
+            pinned.join(" / ")
+        );
+    }
+}
+
+/// ビルド間で再利用する状態一式。単発 build では 1 回だけ、
+/// watch / dev では全再ビルドを通して使い回す
+pub(crate) struct BuildSession {
+    cache: BuildCache,
+    shared: RenderShared,
+    index_session: setoka_index::IndexSession,
+    manifest_path: PathBuf,
+    /// このセッションを作ったときの envKey（watch の再ビルドで比べる。[`WatchBuild::rebuild`]）
+    env_key: String,
+}
+
+impl BuildSession {
+    /// `.setoka/cache/` を読み込む。force なら先に破棄する（＝全再計算＋dist 再クリーン）
+    pub(crate) fn new(rc: &ResolvedConfig, force: bool) -> anyhow::Result<Self> {
+        let cache_dir = rc.root.join(".setoka/cache");
+        if force {
+            // 経路にシンボリックリンクがあればリンク先を消さずに中断する
+            output::remove_dir_all_under(&rc.root, &cache_dir)
+                .with_context(|| format!("キャッシュを削除できません: {}", cache_dir.display()))?;
+        }
+        let env_key = env_key(rc)?;
+        Ok(Self {
+            cache: BuildCache::load(&cache_dir, &env_key),
+            shared: RenderShared::new(rc)?,
+            index_session: setoka_index::IndexSession::default(),
+            manifest_path: cache_dir.join("output-manifest.json"),
+            env_key,
+        })
+    }
+}
+
+/// envKey: キャッシュ済みページ派生物に影響しうる全入力のハッシュ。
+/// 不一致は全キャッシュ破棄（フルビルド）に縮退するだけなので、
+/// 迷ったら含めて安全側に倒す
+fn env_key(rc: &ResolvedConfig) -> anyhow::Result<String> {
+    // 正規形の TOML（同じ値からは常に同じバイト列）。キー順・書式の揺れで
+    // キャッシュが無駄に落ちない
+    let config_toml = rc.config.to_toml();
+    // 辞書ファイルは設定（パス）が同じでも中身が変わりうるため内容ハッシュを採る
+    let model = if rc.config.search.enabled {
+        let dictionary = rc
+            .config
+            .search
+            .dictionary
+            .as_ref()
+            .map(|p| rc.root.join(p));
+        setoka_index::model_fingerprint(dictionary.as_deref())?
+    } else {
+        String::new()
+    };
+    Ok(BuildCache::sha256_hex_parts(&[
+        env!("CARGO_PKG_VERSION").as_bytes(),
+        config_toml.as_bytes(),
+        rc.base_url.as_bytes(),
+        model.as_bytes(),
+    ]))
+}
+
+pub(crate) fn build_once(
+    rc: &ResolvedConfig,
+    live_reload: LiveReloadMode,
+    session: &mut BuildSession,
+    include_drafts: bool,
+) -> anyhow::Result<()> {
+    let started = std::time::Instant::now();
+    session.cache.begin_build();
+    // watch 中のテーマ編集を拾うため、theme/ があれば毎回 Env だけ再構築する
+    //（テンプレート解析は軽い。重い syntect 側はセッション共有のまま）
+    if rc.theme_dir.is_some() {
+        session.shared.reload_templates(rc.theme_dir.as_deref())?;
+    }
+
+    let md_opts = setoka_render::markdown_options(&rc.config);
+    let site = setoka_core::build_site_model_cached(
+        &rc.content_dir,
+        &rc.config.input.ignore,
+        &md_opts,
+        Some(&session.cache),
+        include_drafts,
+    )?;
+    warn_if_no_pages(rc, &site);
+
+    // routesKey: 本文 HTML がページ自身の原文以外から受ける影響（rel→route 集合と、
+    // サイト通し番号の各ページの開始位置）。変化時はキャッシュ層が本文 HTML だけを
+    // 安全側で全破棄する。組み立ては core の SiteModel::routes_key が唯一の定義
+    session.cache.set_routes_key(site.routes_key());
+
+    // ⚠️ ページの検証は**破壊的な clean より前**に行う。render_site の中でも
+    // 検証するが、そこへ到達する前に dist を消してしまうと「不正なページのせいで
+    // 既存の正常な成果物を失う」ことになる
+    setoka_render::validate_pages(&site, rc)?;
+
+    // 前回の出力マニフェスト。無い（初回・--force 後・破損）なら既知状態がないので、
+    // output.clean に従い dist を作り直してから全書き出しする
+    let previous = output::load_manifest(&session.manifest_path);
+    if previous.is_none() && rc.config.output.clean {
+        output::remove_dir_all_under(&rc.root, &rc.output_dir)
+            .with_context(|| format!("dist を削除できません: {}", rc.output_dir.display()))?;
+    }
+
+    // git 連携メタ（有効時のみ。git 不在・リポジトリ外は None に縮退）
+    let git_dates = rc
+        .config
+        .git
+        .last_updated
+        .then(|| collect_git_dates(rc))
+        .flatten();
+
+    let tracker = OutputTracker::new(&rc.output_dir)
+        .with_context(|| format!("出力先を使えません: {}", rc.output_dir.display()))?;
+    setoka_render::render_site(&RenderParams {
+        config: rc,
+        site: &site,
+        live_reload,
+        ctx: RenderCtx {
+            cache: Some(&session.cache),
+            outputs: Some(&tracker),
+            shared: Some(&session.shared),
+        },
+        git_dates: git_dates.as_ref(),
+    })?;
+
+    // 検索インデックスは render の後（描画結果とは独立だが、ログ順を保つ）。
+    // 出すかどうかは render の書き出し・下の掃除と同じ SiteOutput の判断を通す
+    let switches = setoka_render::output_switches(rc, live_reload);
+    if SiteOutput::SearchIndex.emitted(&switches) {
+        let search = &rc.config.search;
+        // 同義語グループ = lint.terms（正表記＋ゆれ表記で 1 グループ）＋ search.synonyms。
+        // lint が本文を正表記へ寄せ、検索がゆれ側を吸収する対の設計（Phase 20）
+        let synonyms: Vec<Vec<String>> = rc
+            .config
+            .lint
+            .terms
+            .iter()
+            .map(|(canonical, variants)| {
+                let mut group = vec![canonical.clone()];
+                group.extend(variants.iter().cloned());
+                group
+            })
+            .chain(search.synonyms.iter().cloned())
+            .collect();
+        setoka_index::build_search_index_with(
+            &site,
+            &md_opts,
+            &setoka_index::IndexParams {
+                // 相対パスはプロジェクトルート基準
+                dictionary: search.dictionary.as_ref().map(|p| rc.root.join(p)),
+                typo_enabled: search.typo_tolerance.enabled,
+                max_edits: search.typo_tolerance.max_edits.min(1),
+                max_terms_per_shard: search.shard.max_terms_per_shard.max(1),
+                synonyms,
+                index_code: search.index_code,
+                // コンテンツインクルード（file=）を索引へ展開するための基準
+                project_root: Some(rc.root.clone()),
+            },
+            &rc.output_dir,
+            &setoka_index::IndexCtx {
+                cache: Some(&session.cache),
+                outputs: Some(&tracker),
+                session: Some(&session.index_session),
+            },
+        )?;
+    }
+
+    // ここから下はビルド成功時のみ: 孤児掃除 → マニフェスト・キャッシュ保存
+    let record = tracker.into_record();
+    let written = record.written();
+    let mut removed = match &previous {
+        Some(prev) => output::remove_orphans(&rc.output_dir, prev, &written)
+            .context("孤児出力の削除に失敗しました")?,
+        None => 0,
+    };
+    // 今回出さない生成物（原稿の .md・llms.txt / llms-full.txt・sitemap.xml・syntect.css・
+    // build_id・検索インデックス）は、前回の記録の有無に関係なく消す。`--force` や `.setoka` の
+    // 削除の後は記録が無く、`output.clean = false` だと上の孤児掃除も dist の作り直しも
+    // 働かないため（止めた原稿の .md が frontmatter ごと残っていた。PR #42 のレビュー指摘。
+    // syntect.css と build_id も同じく残っていた = 10-12 レビューの R1）。
+    // 今回書いたもの（public/ に置いた同じパスのファイル）は消さない
+    let unpublished = setoka_render::unpublished_outputs(rc, &site, live_reload);
+    let mut stale = unpublished.files;
+    // 検索インデックスはファイルの顔ぶれが索引の大きさで変わるので、`_search/` にある
+    // ファイルを列挙して今回書かなかったものを消す。ディレクトリごとは消さない
+    // （public/_search/ に置いた利用者のファイルを残すため。残っていると索引の削除まで
+    // 飛ばしていた = PR #42 の再レビューの指摘）
+    for dir in unpublished.dirs {
+        stale.extend(
+            output::list_files_under(&rc.output_dir, dir)
+                .with_context(|| format!("{dir}/ の出力を列挙できません"))?,
+        );
+    }
+    removed += output::remove_orphans(&rc.output_dir, &stale, &written)
+        .context("止めた生成物の削除に失敗しました")?;
+    output::save_manifest(&session.manifest_path, &written)
+        .context("出力マニフェストを保存できません")?;
+    session
+        .cache
+        .save()
+        .context("ビルドキャッシュを保存できません")?;
+
+    // 数えられなくてもビルドは成功のまま（終了コードを変えない。dev では失敗扱いにすると
+    // ブラウザの再読み込みまで止まる）
+    if let Err(e) = report_problems(rc, &site, &md_opts, include_drafts, live_reload) {
+        tracing::warn!("リンク切れの件数を数えられませんでした: {e:#}");
+    }
+    // 上書き・トップページの警告と、何を出したかの 1 行（v0.20 Phase 91）
+    super::summary::report(rc, &site, &record);
+
+    // キャッシュの内訳は開発者向けの値なので -v のときだけ（Phase 85）
+    let stats = session.cache.stats();
+    tracing::debug!(
+        body_hits = stats.body_hits,
+        body_misses = stats.body_misses,
+        search_hits = stats.search_hits,
+        search_misses = stats.search_misses,
+        orphans_removed = removed,
+        elapsed = %format!("{:.2}s", started.elapsed().as_secs_f64()),
+        "インクリメンタルビルド"
+    );
+    Ok(())
+}
+
+/// ビルドしたページが 0 件なら知らせる（ビルドは成功のまま）。何も言わないと、原稿の
+/// 置き場所や `input.dir` の書き間違いに気づけない（`pages=0` の INFO だけだった）
+fn warn_if_no_pages(rc: &ResolvedConfig, site: &setoka_core::SiteModel) {
+    if let Some(message) = no_pages_message(rc, site) {
+        tracing::warn!("{message}");
+    }
+}
+
+/// [`warn_if_no_pages`] の文言（ページが 1 件でもあれば None）
+fn no_pages_message(rc: &ResolvedConfig, site: &setoka_core::SiteModel) -> Option<String> {
+    if site.pages.iter().any(|p| !p.is_generated()) {
+        return None;
+    }
+    let input = &rc.config.input.dir;
+    let mut message = if rc.content_dir.is_dir() {
+        // `input.dir` の下の .md も数え、draft・input.ignore・シンボリックリンクのどれで外れたかを
+        // 添える（v0.20 Phase 91。以前はプロジェクトルート直下の .md しか数えなかった）。分け方は
+        // ページの読み込みと同じ走査で、読み込んだのにページが無いなら draft（build が外すのは
+        // draft だけ）。ファイルシステムを別に調べない（シンボリックリンクの .md を数えて
+        // draft と案内していた。PR #69 のレビュー指摘）
+        let census = setoka_core::markdown_census(&rc.content_dir, &rc.config.input.ignore)
+            .unwrap_or_default();
+        let (drafts, ignored, symlinks) = (
+            census.loaded.len(),
+            census.ignored.len(),
+            census.symlinks.len(),
+        );
+        let all = drafts + ignored + symlinks;
+        if all == 0 {
+            format!(
+                "ビルドしたページが 0 件です（原稿のディレクトリ `{input}` に .md がありません）"
+            )
+        } else {
+            let mut reasons = Vec::new();
+            let mut notes = String::new();
+            if drafts > 0 {
+                reasons.push(format!("draft が {drafts} 件"));
+                notes.push_str("。draft は --drafts のときだけビルドします");
+            }
+            if ignored > 0 {
+                reasons.push(format!("input.ignore の対象が {ignored} 件"));
+            }
+            if symlinks > 0 {
+                reasons.push(format!("シンボリックリンクが {symlinks} 件"));
+                notes.push_str(
+                    "。シンボリックリンクの .md は読まないので、実体のファイルを置いてください",
+                );
+            }
+            format!(
+                "ビルドしたページが 0 件です（`{input}` の下に .md が {all} 件ありますが、{}です{notes}）",
+                reasons.join("・")
+            )
+        }
+    } else {
+        format!(
+            "原稿のディレクトリ `{input}`（input.dir）がありません。ビルドしたページは 0 件です"
+        )
+    };
+    let at_root = fs::read_dir(&rc.root)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+                .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+                .count()
+        })
+        .unwrap_or(0);
+    if at_root > 0 {
+        message.push_str(&format!(
+            "。プロジェクトルート直下に .md が {at_root} 件あります。原稿を `{input}` へ移すか、\
+             input.dir で原稿のあるディレクトリを指定してください（ルート自身は指定できません）"
+        ));
+    }
+    Some(message)
+}
+
+/// ビルドしたページの問題を知らせる（終了コードは変えない = 成功のまま。詳細と CI の判定は
+/// `setoka check`）。
+///
+/// - 大文字小文字だけが違う URL は 1 件ずつ警告する（区別する FS とサーバでは別の URL として
+///   動くため止めない）
+/// - リンク切れ（画像切れ・見出しへのリンクも含む）・content の外を指すリンク・取り込みの失敗は
+///   数えて、1 件以上なら 1 行で知らせる（Phase 85。外を指すリンクは v0.20 Phase 91）
+///
+/// 診断は check と同じ収集（`collect`）と抑制を通す。frontmatter の `lintDisable`・
+/// `lint.rules` の解釈が check と食い違わない（10-12 レビューの R2）。ページ集合はビルドの
+/// もの（draft を除く。`--drafts` なら含む）。描画中の検出を数えないのは、本文キャッシュに
+/// 当たったページは描き直さず、2 回目以降の build で同じリンク切れが黙るため（数えるには
+/// 検出結果をキャッシュに載せる = キャッシュ形式の変更が要る）。docs の規模で数十ミリ秒
+fn report_problems(
+    rc: &ResolvedConfig,
+    site: &setoka_core::SiteModel,
+    md_opts: &setoka_core::MarkdownOptions,
+    include_drafts: bool,
+    live_reload: LiveReloadMode,
+) -> anyhow::Result<()> {
+    let BuildProblems {
+        case_conflicts,
+        links,
+        outside,
+        includes,
+    } = build_problems(rc, site, md_opts, include_drafts, live_reload)?;
+    for d in &case_conflicts {
+        tracing::warn!(page = %d.rel.display(), "{}", d.message);
+    }
+    if links + outside + includes == 0 {
+        return Ok(());
+    }
+    let mut counts = Vec::new();
+    if links > 0 {
+        counts.push(format!("リンク切れ {links} 件"));
+    }
+    if outside > 0 {
+        counts.push(format!("content/ の外を指すリンク {outside} 件"));
+    }
+    if includes > 0 {
+        counts.push(format!("取り込みの失敗 {includes} 件"));
+    }
+    tracing::warn!(
+        "{}があります。詳細は `{}` で確認できます",
+        counts.join("・"),
+        check_command(&rc.root)
+    );
+    Ok(())
+}
+
+/// build が知らせる問題（[`report_problems`] が表示する）
+struct BuildProblems {
+    /// 大文字小文字だけが違う URL（抑制を適用した後の診断）
+    case_conflicts: Vec<setoka_core::Diagnostic>,
+    /// リンク切れ・見出しへのリンク切れの件数
+    links: usize,
+    /// content の外を指す相対リンクの件数（warning。書いたまま残す。v0.20 Phase 91）
+    outside: usize,
+    /// コンテンツインクルードと仕様の `file:` 参照の失敗の件数
+    includes: usize,
+}
+
+/// check と同じ収集と抑制を通し、build が知らせるルールだけを取り出す
+/// （抑制の不使用・不正の警告などは check が報告する）
+fn build_problems(
+    rc: &ResolvedConfig,
+    site: &setoka_core::SiteModel,
+    md_opts: &setoka_core::MarkdownOptions,
+    include_drafts: bool,
+    live_reload: LiveReloadMode,
+) -> anyhow::Result<BuildProblems> {
+    use setoka_core::rules;
+
+    let outcome = collect::collect(
+        rc,
+        &site.pages,
+        md_opts,
+        &Scope::Build {
+            include_drafts,
+            live_reload,
+        },
+    )?
+    .suppress(&site.pages, md_opts);
+    let count = |targets: &[rules::Rule]| {
+        outcome
+            .diags
+            .iter()
+            .filter(|d| targets.contains(&d.rule))
+            .count()
+    };
+    let links = count(&[rules::BROKEN_LINK, rules::BROKEN_ANCHOR]);
+    let outside = count(&[rules::LINK_OUTSIDE_CONTENT]);
+    let includes = count(&[rules::INCLUDE_ERROR, rules::SPEC_ERROR]);
+    let case_conflicts = outcome
+        .diags
+        .into_iter()
+        .filter(|d| d.rule == rules::ROUTE_CASE_CONFLICT)
+        .collect();
+    Ok(BuildProblems {
+        case_conflicts,
+        links,
+        outside,
+        includes,
+    })
+}
+
+/// build と同じプロジェクトを check するコマンド。cwd がプロジェクトの中なら
+/// 上方向の探索で見つかるので `setoka check`、外（`--root` で指定した）なら `--root` を付ける
+fn check_command(root: &std::path::Path) -> String {
+    let inside = std::env::current_dir()
+        .and_then(|cwd| cwd.canonicalize())
+        .is_ok_and(|cwd| cwd.starts_with(root));
+    if inside {
+        "setoka check".to_string()
+    } else {
+        format!("setoka check --root {}", root.display())
+    }
+}
+
+/// content 配下ファイルの最終コミット日（YYYY-MM-DD）を 1 回の `git log` で収集する。
+/// キーは content 相対の `/` 区切りパス。git 不在・リポジトリ外・失敗時は None（表示なしに縮退）
+fn collect_git_dates(rc: &ResolvedConfig) -> Option<std::collections::HashMap<String, String>> {
+    // core.quotepath=false: 日本語ファイル名がオクタルエスケープされるのを防ぐ。
+    // --relative: --name-only のパスを rc.root 相対にする。これが無いと
+    // パスは git リポジトリルート相対になり、setoka プロジェクトがリポジトリの
+    // サブディレクトリにある場合（例: monorepo 内の docs/）に
+    // content_prefix の除去が全ファイルで失敗して日付が空になる
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&rc.root)
+        .args([
+            "-c",
+            "core.quotepath=false",
+            "log",
+            "--relative",
+            "--format=\u{1}%cs",
+            "--name-only",
+            "--",
+        ])
+        .arg(&rc.content_dir)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        tracing::debug!("git log が失敗したため最終更新日は表示しません");
+        return None;
+    }
+
+    // repo ルート相対 → content 相対への変換用プレフィクス（例: "content/"）
+    let content_prefix = rc
+        .content_dir
+        .strip_prefix(&rc.root)
+        .ok()?
+        .iter()
+        .map(|c| c.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+        + "/";
+
+    // 出力は新しいコミット順なので、最初に現れた日付がそのファイルの最終コミット日
+    let mut dates = std::collections::HashMap::new();
+    let mut current_date = String::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if let Some(date) = line.strip_prefix('\u{1}') {
+            current_date = date.to_string();
+        } else if let Some(rel) = line.strip_prefix(&content_prefix)
+            && !rel.is_empty()
+            && !current_date.is_empty()
+        {
+            dates
+                .entry(rel.to_string())
+                .or_insert_with(|| current_date.clone());
+        }
+    }
+    Some(dates)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    /// 既定設定のプロジェクト（`/proj`）
+    fn resolved(root: &Path) -> ResolvedConfig {
+        let config = setoka_config::Config::default();
+        ResolvedConfig {
+            content_dir: root.join(&config.input.dir),
+            output_dir: root.join(&config.output.dir),
+            theme_dir: None,
+            public_dir: None,
+            base_url: "/".to_string(),
+            root: root.to_path_buf(),
+            config,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn 変更パスの整形はルート相対で先頭5件に切り詰める() {
+        let root = Path::new("/proj");
+        let paths: Vec<PathBuf> = (1..=7)
+            .map(|i| PathBuf::from(format!("/proj/content/{i}.md")))
+            .collect();
+        assert_eq!(
+            format_changed(root, &paths),
+            "content/1.md, content/2.md, content/3.md, content/4.md, content/5.md, 他 2 件"
+        );
+        assert_eq!(format_changed(root, &paths[..1]), "content/1.md");
+        // ルート外（シンボリックリンク先など）は絶対パスのまま
+        assert_eq!(
+            format_changed(root, &[PathBuf::from("/outside/x.md")]),
+            "/outside/x.md"
+        );
+    }
+
+    /// watch 中に辞書ファイルの中身だけが変わったら、セッション（Tokenizer と検索の
+    /// キャッシュ）を作り直す（10-07 見直しの B5。Phase 89）
+    #[test]
+    fn watch_中に辞書ファイルの中身が変わったらセッションを作り直す() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir_all(root.join("content")).unwrap();
+        fs::write(
+            root.join("content/index.md"),
+            "# ホーム\n\n設定の説明です。\n",
+        )
+        .unwrap();
+        let model = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../mikan/assets/model/bccwj-suw_c1.0.model.zst");
+        let dictionary = root.join("dict.model.zst");
+        fs::copy(&model, &dictionary).unwrap();
+        let mut rc = resolved(root);
+        rc.config.search.dictionary = Some("dict.model.zst".to_string());
+
+        let session = BuildSession::new(&rc, false).unwrap();
+        let first = session.env_key.clone();
+        let mut watch = WatchBuild::new(
+            rc,
+            Overrides::default(),
+            LiveReloadMode::None,
+            false,
+            session,
+        );
+        watch.rebuild().unwrap();
+        assert_eq!(watch.session.env_key, first, "変更が無ければ作り直さない");
+
+        // zstd の skippable frame（magic 0x184D2A50・長さ・中身）を足す = 伸長した中身は
+        // 同じで、バイト列（辞書の指紋）だけが変わる
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&dictionary)
+            .unwrap()
+            .write_all(&[0x50, 0x2A, 0x4D, 0x18, 4, 0, 0, 0, 1, 2, 3, 4])
+            .unwrap();
+        watch.rebuild().unwrap();
+        assert_ne!(
+            watch.session.env_key, first,
+            "辞書の中身が変わったらセッションを作り直す"
+        );
+        // 作り直した後も、新しい辞書で作った索引を検索できる
+        let results = setoka_index::search_dist(&watch.rc.output_dir, "設定", 10).unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(
+            fs::read(watch.rc.output_dir.join("_search/model.zst")).unwrap(),
+            fs::read(&dictionary).unwrap(),
+            "dist のモデルも新しい辞書"
+        );
+    }
+
+    #[test]
+    fn 監視除外は出力ディレクトリと_watch_ignore_の_glob() {
+        let rc = resolved(Path::new("/proj"));
+        let ignore = watch_ignore(&rc).unwrap();
+        // 既定の watchIgnore（ビルド生成物）
+        assert!(ignore.is_ignored(Path::new("/proj/target/debug/setoka")));
+        assert!(ignore.is_ignored(Path::new("/proj/web/node_modules/x/index.js")));
+        // ディレクトリ作成イベント自体も除外する（これを取りこぼすと
+        // `target/` が作られた瞬間に 1 回だけ再ビルドが走る）
+        assert!(ignore.is_ignored(Path::new("/proj/target")));
+        assert!(ignore.is_ignored(Path::new("/proj/target/debug")));
+        // 出力ディレクトリ（除外必須。外すと再ビルドの無限ループ）
+        assert!(ignore.is_ignored(Path::new("/proj/dist/index.html")));
+        // 監視対象（インクルード参照先が content 外にもあるため src も対象）
+        assert!(!ignore.is_ignored(Path::new("/proj/content/guide.md")));
+        assert!(!ignore.is_ignored(Path::new("/proj/src/api.rs")));
+        // パターンは「パス要素」に当たる必要がある（部分一致で消さない）
+        assert!(!ignore.is_ignored(Path::new("/proj/content/target.md")));
+        // ルート外は相対化できないので glob の対象外
+        assert!(!ignore.is_ignored(Path::new("/other/target/x")));
+    }
+
+    #[test]
+    fn watch_ignore_を空にすれば除外しない() {
+        let mut rc = resolved(Path::new("/proj"));
+        rc.config.build.watch_ignore = Vec::new();
+        let ignore = watch_ignore(&rc).unwrap();
+        assert!(!ignore.is_ignored(Path::new("/proj/target/debug/setoka")));
+        // 出力ディレクトリは設定に関係なく常に除外
+        assert!(ignore.is_ignored(Path::new("/proj/dist/index.html")));
+    }
+
+    #[test]
+    fn 不正な_glob_はエラーになる() {
+        let mut rc = resolved(Path::new("/proj"));
+        rc.config.build.watch_ignore = vec!["[".to_string()];
+        assert!(watch_ignore(&rc).is_err());
+    }
+
+    #[test]
+    fn 再起動が必要な設定は起動時の値へ戻す() {
+        let current = resolved(Path::new("/proj"));
+        let mut next = resolved(Path::new("/proj"));
+        next.config.output.dir = "public_html".to_string();
+        next.output_dir = Path::new("/proj/public_html").to_path_buf();
+        next.base_url = "/docs/".to_string();
+        next.config.site.base_url = Some("/docs/".to_string());
+        next.config.dev.port = 9999;
+        next.config.dev.live_reload = !current.config.dev.live_reload;
+        next.config.build.watch_ignore = Vec::new();
+        next.config.dev.host = setoka_config::BindAddr::parse("0.0.0.0").unwrap();
+        next.config.dev.allowed_hosts = vec!["mypc.local".to_string()];
+
+        pin_restart_only(&mut next, &current);
+
+        // 監視・配信の前提は起動時の値のまま（項目の一覧は StartupSettings が持つ）
+        assert_eq!(StartupSettings::of(&next), StartupSettings::of(&current));
+
+        assert_eq!(next.output_dir, current.output_dir);
+        assert_eq!(next.config.output.dir, current.config.output.dir);
+        assert_eq!(next.base_url, current.base_url);
+        assert_eq!(next.config.site.base_url, None);
+        assert_eq!(next.config.dev.port, current.config.dev.port);
+        assert_eq!(
+            next.config.dev.live_reload, current.config.dev.live_reload,
+            "注入済みの JS と WS 通知の有無は途中で変えられない"
+        );
+        assert_eq!(
+            next.config.build.watch_ignore,
+            current.config.build.watch_ignore
+        );
+        assert_eq!(next.config.dev.host, current.config.dev.host);
+        assert!(next.config.dev.allowed_hosts.is_empty());
+    }
+
+    #[test]
+    fn 反映できる設定はそのまま通す() {
+        let current = resolved(Path::new("/proj"));
+        let mut next = resolved(Path::new("/proj"));
+        next.config.site.title = "新しいタイトル".to_string();
+        next.config.markdown.mermaid.enabled = !current.config.markdown.mermaid.enabled;
+        next.config.input.ignore = vec!["**/_wip/**".to_string()];
+        next.config.search.index_code = !current.config.search.index_code;
+
+        pin_restart_only(&mut next, &current);
+
+        assert_eq!(next.config.site.title, "新しいタイトル");
+        assert_ne!(
+            next.config.markdown.mermaid.enabled,
+            current.config.markdown.mermaid.enabled
+        );
+        assert_eq!(next.config.input.ignore, ["**/_wip/**"]);
+        assert_ne!(
+            next.config.search.index_code,
+            current.config.search.index_code
+        );
+    }
+
+    #[test]
+    fn cli_の上書きは設定リロード後も優先する() {
+        let overrides = Overrides {
+            base_url: Some("docs".to_string()),
+            host: Some(setoka_config::BindAddr::parse("0.0.0.0").unwrap()),
+        };
+        let mut rc = resolved(Path::new("/proj"));
+        rc.config.site.base_url = Some("/from-file/".to_string());
+        overrides.apply(&mut rc);
+        assert_eq!(rc.base_url, "/docs/");
+        assert_eq!(rc.config.dev.host.to_string(), "0.0.0.0");
+    }
+
+    /// PR #42 のレビュー指摘: `output.clean = false` のサイトで、`.md` などを止めてから
+    /// `--force`（出力マニフェストも消える）でビルドしても、止めた生成物を dist に残さない
+    #[test]
+    fn 止めた生成物は_force_で記録が無くても消える() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write("content/index.md", "---\ntitle: トップ\n---\n\n# トップ\n");
+        write(
+            "content/guide/secret.md",
+            "---\ntitle: 秘密\nowner: 社外秘メモ\n---\n\n# 秘密\n",
+        );
+        write("setoka.toml", "[output]\nclean = false\n");
+        let build = |force: bool| {
+            let rc = setoka_config::load(&root).unwrap();
+            let mut session = BuildSession::new(&rc, force).unwrap();
+            build_once(&rc, LiveReloadMode::None, &mut session, false).unwrap();
+        };
+        let dist = root.join("dist");
+
+        build(false);
+        for rel in ["index.md", "guide/secret.md", "llms.txt", "llms-full.txt"] {
+            assert!(dist.join(rel).is_file(), "{rel}");
+        }
+        assert!(dist.join("_search").is_dir());
+
+        // 全部止めて --force（`.setoka/cache/` ごと出力マニフェストが消える）
+        write(
+            "setoka.toml",
+            "[output]\nclean = false\n[llms]\nenabled = false\npage_md = false\n[search]\nenabled = false\n",
+        );
+        build(true);
+        for rel in ["index.md", "guide/secret.md", "llms.txt", "llms-full.txt"] {
+            assert!(!dist.join(rel).exists(), "{rel} が残った");
+        }
+        assert!(!dist.join("_search").exists(), "_search が残った");
+        assert!(
+            dist.join("guide/secret/index.html").is_file(),
+            "ページ自体は出す"
+        );
+
+        // public/ に同じパスのファイルを置けば、止めていても消さない（利用者のファイル）
+        write("public/llms.txt", "手書きの llms.txt\n");
+        build(true);
+        assert_eq!(
+            std::fs::read_to_string(dist.join("llms.txt")).unwrap(),
+            "手書きの llms.txt\n"
+        );
+    }
+
+    /// 10-12 レビューの R1: `output.clean = false` のサイトで、ハイライトを止めて `--force` しても
+    /// syntect.css を残さない。`build --watch` の後の通常の build で build_id を残さない
+    /// （どちらも書き出しと掃除が別々の一覧を持っていて、記録が無いと消えなかった）
+    #[test]
+    fn 止めた_syntect_css_と_build_id_は記録が無くても消える() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write("content/index.md", "# トップ\n");
+        write("setoka.toml", "[output]\nclean = false\n");
+        let build = |mode: LiveReloadMode, force: bool| {
+            let rc = setoka_config::load(&root).unwrap();
+            let mut session = BuildSession::new(&rc, force).unwrap();
+            build_once(&rc, mode, &mut session, false).unwrap();
+        };
+        let dist = root.join("dist");
+        let css = dist.join("_assets/css/syntect.css");
+        let build_id = dist.join("__setoka/build_id");
+
+        build(LiveReloadMode::Poll, false);
+        assert!(css.is_file());
+        assert!(build_id.is_file());
+
+        // 通常の build（--force で記録も消える）でも build_id は残らない
+        build(LiveReloadMode::None, true);
+        assert!(!build_id.exists(), "build_id が残った");
+        assert!(css.is_file(), "ハイライトは有効のまま");
+
+        write(
+            "setoka.toml",
+            "[output]\nclean = false\n[markdown.highlight]\nenabled = false\n",
+        );
+        build(LiveReloadMode::None, true);
+        assert!(!css.exists(), "syntect.css が残った");
+        // 後続の通常ビルドでも戻らない
+        build(LiveReloadMode::None, false);
+        assert!(!css.exists());
+        assert!(dist.join("_assets/css/theme.css").is_file(), "テーマは出す");
+    }
+
+    /// PR #52 のレビュー指摘: ハイライトを止めても `theme/static/css/syntect.css` を置けば
+    /// 同じパスに出る。そのファイルを掃除で消さず、本文からのリンクもリンク切れにしない
+    #[test]
+    fn 止めた_syntect_css_でもテーマが出すなら残しリンク先にする() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write(
+            "content/index.md",
+            "# トップ\n\n[配色](/_assets/css/syntect.css)\n",
+        );
+        write("theme/static/css/syntect.css", "/* 独自の配色 */\n");
+        write(
+            "setoka.toml",
+            "[output]\nclean = false\n[markdown.highlight]\nenabled = false\n",
+        );
+        let rc = setoka_config::load(&root).unwrap();
+        for force in [true, false] {
+            let mut session = BuildSession::new(&rc, force).unwrap();
+            build_once(&rc, LiveReloadMode::None, &mut session, false).unwrap();
+            assert_eq!(
+                std::fs::read_to_string(root.join("dist/_assets/css/syntect.css")).unwrap(),
+                "/* 独自の配色 */\n",
+                "force={force}"
+            );
+        }
+        let md_opts = setoka_render::markdown_options(&rc.config);
+        let site =
+            setoka_core::build_site_model(&rc.content_dir, &rc.config.input.ignore, &md_opts)
+                .unwrap();
+        let problems = build_problems(&rc, &site, &md_opts, false, LiveReloadMode::None).unwrap();
+        assert_eq!(problems.links, 0, "出しているファイルをリンク切れにした");
+    }
+
+    /// 10-12 レビューの R2: build の知らせる問題は check と同じ抑制を通す。
+    /// 大文字小文字だけが違う URL を frontmatter の `lintDisable` で抑制したら build も黙る
+    /// （以前は `lint.rules` だけを見ていて、check は黙るのに build は警告していた）
+    #[test]
+    fn build_の問題の報告は_lint_disable_を守る() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write("setoka.toml", "");
+        write("content/Guide.md", "# A\n\n[切れ](nai.md)\n");
+        write("content/guide/index.md", "# B\n");
+        let problems = || {
+            let rc = setoka_config::load(&root).unwrap();
+            let md_opts = setoka_render::markdown_options(&rc.config);
+            let site =
+                setoka_core::build_site_model(&rc.content_dir, &rc.config.input.ignore, &md_opts)
+                    .unwrap();
+            build_problems(&rc, &site, &md_opts, false, LiveReloadMode::None).unwrap()
+        };
+
+        let before = problems();
+        assert_eq!(before.case_conflicts.len(), 1);
+        assert_eq!(before.links, 1);
+
+        // 警告の出るページ（後から見つかった側）で抑制する
+        let page = &before.case_conflicts[0].rel;
+        let path = format!("content/{}", page.display());
+        let source = std::fs::read_to_string(root.join(&path)).unwrap();
+        write(
+            &path,
+            &format!("---\nlintDisable: [route-case-conflict]\n---\n\n{source}"),
+        );
+        let after = problems();
+        assert!(after.case_conflicts.is_empty(), "抑制が効いていない");
+        // 抑制できないリンク切れは数えたまま
+        assert_eq!(after.links, 1);
+    }
+
+    /// v0.20 Phase 91: ページが 0 件のとき、`input.dir` の下の .md が draft と input.ignore の
+    /// どちらで外れたかを添える（以前はプロジェクトルート直下の .md しか数えなかった）
+    #[test]
+    fn ページが_0_件なら_draft_と_ignore_の件数を添える() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let message = || {
+            let rc = setoka_config::load(&root).unwrap();
+            let md_opts = setoka_render::markdown_options(&rc.config);
+            let site =
+                setoka_core::build_site_model(&rc.content_dir, &rc.config.input.ignore, &md_opts)
+                    .unwrap();
+            no_pages_message(&rc, &site)
+        };
+        write("setoka.toml", "[input]\nignore = [\"notes/**\"]\n");
+        std::fs::create_dir_all(root.join("content")).unwrap();
+        let m = message().unwrap();
+        assert!(m.contains("`content` に .md がありません"), "{m}");
+
+        write("content/a.md", "---\ndraft: true\n---\n\n# a\n");
+        write("content/guide/b.md", "---\ndraft: true\n---\n\n# b\n");
+        write("content/notes/c.md", "# c\n");
+        let m = message().unwrap();
+        assert!(
+            m.contains(".md が 3 件ありますが、draft が 2 件・input.ignore の対象が 1 件です"),
+            "{m}"
+        );
+        assert!(m.contains("--drafts"), "{m}");
+        assert!(!m.contains("シンボリックリンク"), "{m}");
+
+        // シンボリックリンクの .md はページにならない（走査がリンクを辿らない）ので、draft と
+        // 数えずに分けて案内する（PR #69 のレビュー指摘）
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.join("content/a.md"), root.join("content/link.md"))
+                .unwrap();
+            let m = message().unwrap();
+            assert!(
+                m.contains(
+                    ".md が 4 件ありますが、draft が 2 件・input.ignore の対象が 1 件・\
+                     シンボリックリンクが 1 件です"
+                ),
+                "{m}"
+            );
+            assert!(m.contains("シンボリックリンクの .md は読まないので"), "{m}");
+        }
+
+        write("content/index.md", "# top\n");
+        assert_eq!(message(), None);
+    }
+
+    /// v0.20 Phase 91: content の外を指すリンクはリンク切れと別に数え、`lint.rules` で外せる
+    #[test]
+    fn build_は_content_の外を指すリンクを数え_lint_rules_で外せる() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write("README.md", "# 外\n");
+        write(
+            "content/index.md",
+            "# t\n\n[外の README](../README.md)\n\n[外のソース](../src/main.rs)\n",
+        );
+        let problems = || {
+            let rc = setoka_config::load(&root).unwrap();
+            let md_opts = setoka_render::markdown_options(&rc.config);
+            let site =
+                setoka_core::build_site_model(&rc.content_dir, &rc.config.input.ignore, &md_opts)
+                    .unwrap();
+            build_problems(&rc, &site, &md_opts, false, LiveReloadMode::None).unwrap()
+        };
+
+        write("setoka.toml", "");
+        let before = problems();
+        assert_eq!((before.links, before.outside), (0, 2));
+
+        write(
+            "setoka.toml",
+            "[lint.rules]\nlink-outside-content = false\n",
+        );
+        assert_eq!(problems().outside, 0);
+    }
+
+    /// PR #42 の再レビューの指摘: public/_search/ に利用者のファイルがあっても、止めた
+    /// 検索インデックス（manifest・索引・本文断片）は消し、利用者のファイルだけ残す
+    #[test]
+    fn 止めた検索インデックスは_public_のファイルを残して消える() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write("content/index.md", "# トップ\n\n検索される本文です。\n");
+        write("public/_search/readme.txt", "利用者のファイル\n");
+        write("setoka.toml", "[output]\nclean = false\n");
+        let build = |force: bool| {
+            let rc = setoka_config::load(&root).unwrap();
+            let mut session = BuildSession::new(&rc, force).unwrap();
+            build_once(&rc, LiveReloadMode::None, &mut session, false).unwrap();
+        };
+        let search = root.join("dist/_search");
+
+        build(false);
+        assert!(search.join("manifest.json").is_file());
+        assert!(search.join("readme.txt").is_file());
+
+        write(
+            "setoka.toml",
+            "[output]\nclean = false\n[search]\nenabled = false\n",
+        );
+        build(true);
+        let left: Vec<String> = std::fs::read_dir(&search)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(left, ["readme.txt"], "索引が残った: {left:?}");
+        // 後続の通常ビルドでも戻らない
+        build(false);
+        assert!(!search.join("manifest.json").exists());
+        assert!(search.join("readme.txt").is_file());
+    }
+
+    /// キャッシュの指紋を取る試験用のプロジェクト（`CACHE_FORMAT_VERSION` を上げる原因になった記法を
+    /// 一通り使う）。改行の違いを持ち込まないよう、チェックアウトしたファイルではなく文字列から作る
+    const FINGERPRINT_PROJECT: &[(&str, &str)] = &[
+        (
+            "setoka.toml",
+            r#"[site]
+title = "指紋"
+base_url = "/docs/"
+
+[markdown.mermaid]
+enabled = true
+backend = "ssr"
+
+[markdown.math]
+enabled = true
+
+[markdown.glossary.terms]
+SSR = "Server-Side Rendering。ビルド時に図を SVG へ変換すること"
+
+[search]
+index_code = true
+"#,
+        ),
+        (
+            "content/index.md",
+            r#"---
+title: 指紋のトップ
+description: キャッシュの指紋を取る試験用のページ
+aliases: [old-top/]
+---
+
+# 指紋のトップ
+
+**「重要」**な日本語の本文です。SSR で図を描きます。
+
+## コード
+
+```rust title="src/lib.rs" {2} showLineNumbers
+fn main() {
+    println!("こんにちは");
+}
+```
+
+```sh tab="macOS / Linux"
+setoka build
+```
+
+```powershell tab="Windows"
+setoka.exe build
+```
+
+## 表と脚注
+
+| 列 | 値 |
+| --- | --- |
+| a | 1 |
+
+Table: 値の表 {#tbl:values}
+
+[](#tbl:values) を参照してください。脚注です[^1]。
+
+[^1]: 脚注の本文
+
+用語
+: 定義リストの説明
+
+[ガイド](guide/index.md)・[図の節](guide/index.md#図)・[外部](https://example.com/)・[検索](/search/?q=https://x)
+
+![画像](img/a.png)
+"#,
+        ),
+        (
+            "content/guide/index.md",
+            r#"---
+title: ガイド
+lintDisable: [broken-link]
+readingTime: false
+pageMd: false
+---
+
+# ガイド
+
+## 図
+
+```mermaid
+flowchart TD
+  A --> B
+```
+
+Figure: 流れ {#fig:flow}
+
+```mermaid
+stateDiagram-v2
+  state	A {
+    B
+  }
+```
+
+```mermaid
+journey
+  title 未対応の図種はクライアント描画に切り替わる
+```
+
+[](#fig:flow) のとおりです。
+
+## 数式
+
+$E = mc^2$ と
+
+$$
+\int_0^1 x\,dx
+$$
+
+> [!NOTE]- 折りたたみ
+> 中身
+
+> [!TIP]
+> 開いた注記
+"#,
+        ),
+        // 外のファイルを取り込むページは本文 HTML をキャッシュしない（v15）ので、取り込みはここに分ける
+        // （検索 tf と llms はキャッシュする）
+        (
+            "content/include.md",
+            r#"---
+title: 取り込み
+---
+
+# 取り込み
+
+```rust file="snippets/greet.rs" lines=2
+```
+
+```include file="snippets/note.md"
+```
+"#,
+        ),
+        (
+            "content/hidden.md",
+            "---\ntitle: 検索から外す\nsearch: false\n---\n\n# 検索から外す\n\n本文です。\n",
+        ),
+        ("content/img/a.png", "png"),
+        (
+            "snippets/greet.rs",
+            "fn greet() {\n    println!(\"やあ\");\n}\n",
+        ),
+        ("snippets/note.md", "取り込まれた Markdown 断片です。\n"),
+    ];
+
+    /// 試験用のプロジェクトを新しい一時ディレクトリでビルドし、保存されたキャッシュの中身
+    /// （meta・body・search・llms。キーの source_sha256 等は外す）の SHA-256 を返す
+    fn cache_fingerprint() -> String {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        for (rel, text) in FINGERPRINT_PROJECT {
+            let path = root.join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let rc = setoka_config::load(&root).unwrap();
+        let mut session = BuildSession::new(&rc, true).unwrap();
+        build_once(&rc, LiveReloadMode::None, &mut session, false).unwrap();
+        let mut entries: Vec<setoka_core::cache::PageCacheEntry> =
+            fs::read_dir(root.join(".setoka/cache/pages"))
+                .unwrap()
+                .map(|entry| {
+                    serde_json::from_slice(&fs::read(entry.unwrap().path()).unwrap()).unwrap()
+                })
+                .collect();
+        entries.sort_by(|a, b| a.rel.cmp(&b.rel));
+        // 原稿のページは 4 つの派生物をすべて持つ（合成ページの用語集は原稿が無いので一部だけ）
+        let summary: Vec<_> = entries
+            .iter()
+            .map(|e| {
+                let has = |b: bool| if b { "o" } else { "-" };
+                format!(
+                    "{} meta{} body{} search{} llms{}",
+                    e.rel,
+                    has(e.meta.is_some()),
+                    has(e.body.is_some()),
+                    has(e.search.is_some()),
+                    has(e.llms.is_some())
+                )
+            })
+            .collect();
+        for rel in ["index.md", "guide/index.md"] {
+            let entry = entries.iter().find(|e| e.rel == rel);
+            assert!(
+                entry.is_some_and(|e| e.meta.is_some()
+                    && e.body.is_some()
+                    && e.search.is_some()
+                    && e.llms.is_some()),
+                "試験用のプロジェクトのキャッシュが揃っていない: {summary:?}"
+            );
+        }
+        let payload: Vec<_> = entries
+            .iter()
+            .map(|e| (&e.rel, &e.meta, &e.body, &e.search, &e.llms))
+            .collect();
+        setoka_core::cache::BuildCache::sha256_hex_parts(&[&serde_json::to_vec(&payload).unwrap()])
+    }
+
+    /// キャッシュの中身が変わったのに `CACHE_FORMAT_VERSION` を上げ忘れるのを止める（10-12 レビューの R9）。
+    /// 版を上げると、利用者の `.setoka/cache/` の古い中身が捨てられる。上げ忘れると、生成のロジックを
+    /// 変えても前の版の本文 HTML 等がキャッシュから出続ける（v13 で起きた）
+    #[test]
+    fn キャッシュの中身が変わったら版を上げる() {
+        use setoka_core::cache::{CACHE_FINGERPRINT, CACHE_FORMAT_VERSION};
+        let fingerprint = cache_fingerprint();
+        assert_eq!(
+            fingerprint,
+            cache_fingerprint(),
+            "キャッシュの中身が実行ごとに変わる（指紋に使えない。並び順や時刻が入っていないか）"
+        );
+        let (version, recorded) = CACHE_FINGERPRINT;
+        assert_eq!(
+            version, CACHE_FORMAT_VERSION,
+            "CACHE_FORMAT_VERSION を上げたら、setoka-core の CACHE_FINGERPRINT も \
+             ({CACHE_FORMAT_VERSION}, \"{fingerprint}\") に書き直す"
+        );
+        assert_eq!(
+            fingerprint,
+            recorded,
+            "キャッシュする派生物（本文 HTML・メタ・検索 tf・llms）の生成結果が変わった。\
+             setoka-core の CACHE_FORMAT_VERSION を {} に上げ（理由を版の一覧に書く）、\
+             CACHE_FINGERPRINT を ({}, \"{fingerprint}\") に書き直す",
+            CACHE_FORMAT_VERSION + 1,
+            CACHE_FORMAT_VERSION + 1,
+        );
+    }
+}

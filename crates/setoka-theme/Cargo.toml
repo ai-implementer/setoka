@@ -1,0 +1,14 @@
+[package]
+name = "setoka-theme"
+description = "setoka のデフォルトテーマ（minijinja テンプレート＋CSS＋JS を rust-embed で同梱）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# crates.io へは公開しない（配布は GitHub Release のバイナリ + cargo install --git。将来構想は ROADMAP「今後の候補」）
+publish = false
+
+[dependencies]
+rust-embed = { workspace = true }

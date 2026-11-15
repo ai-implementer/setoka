@@ -7,7 +7,7 @@ description: vendor 資産（検索 wasm 成果物・mermaid.min.js・KaTeX・va
 
 5 種類の vendor 資産があり、それぞれ更新スクリプトが `scripts/` にある。
 
-## 1. 検索 wasm 成果物（crates/yuzu-index/assets/search/）
+## 1. 検索 wasm 成果物（crates/setoka-index/assets/search/）
 
 ```bash
 scripts/build-search-wasm.sh
@@ -15,7 +15,7 @@ scripts/build-search-wasm.sh
 
 - 前提ツール: wasm32 target（`rustup target add wasm32-unknown-unknown`）、wasm-bindgen-cli、binaryen（wasm-opt）、cargo-about（版は `scripts/third-party-licenses.sh` の `ABOUT_VERSION`。`--features cli` で入れる）。
 - 開発コンテナでも作れる（Dockerfile には焼いていないので、使うときに入れる。コンテナを作り直すと消える）。
-  binaryen は前回と同じ版（`crates/yuzu-index/assets/search/README.md` に記録）を公式リリースから取る。
+  binaryen は前回と同じ版（`crates/setoka-index/assets/search/README.md` に記録）を公式リリースから取る。
   apt の binaryen は古い（bookworm は version_108）ので使わない:
   ```bash
   cargo install wasm-bindgen-cli --version <Cargo.toml の = の版> --locked
@@ -41,9 +41,9 @@ scripts/build-search-wasm.sh
   cargo install wasm-bindgen-cli --version <同一バージョン>
   ```
   を併せて実行し、Cargo.toml の `=` ピンとスクリプトの整合を保つ。
-- 更新後の検証: `yuzu build` → `yuzu search <クエリ>`。ネイティブと wasm は `mikan` の**同一トークナイザコード＋同一モデルバイト**を使う制約があり、`yuzu search` はブラウザと同じエンジンを通るので整合検証になる。
+- 更新後の検証: `setoka build` → `setoka search <クエリ>`。ネイティブと wasm は `mikan` の**同一トークナイザコード＋同一モデルバイト**を使う制約があり、`setoka search` はブラウザと同じエンジンを通るので整合検証になる。
 
-## 2. mermaid.min.js（crates/yuzu-theme/assets/static/vendor/）
+## 2. mermaid.min.js（crates/setoka-theme/assets/static/vendor/）
 
 ```bash
 scripts/vendor-mermaid.sh
@@ -52,12 +52,12 @@ scripts/vendor-mermaid.sh
 - 約 3.4MB。`backend = "ssr"` で運用していても未対応図種のフォールバック用に同梱は継続する。
 - npm の tarball（sha256 固定）から取る。mermaid.min.js は約 60 の npm パッケージを束ねているので、
   スクリプトが tarball 同梱の source map から束ねたパッケージを取り出し、各パッケージの
-  LICENSE を集めて `crates/yuzu-theme/licenses/mermaid.txt` を書き、`THIRD-PARTY-LICENSES.txt`
+  LICENSE を集めて `crates/setoka-theme/licenses/mermaid.txt` を書き、`THIRD-PARTY-LICENSES.txt`
   （dist の `_assets/vendor/`）を組み直す。**jq が要る**。LICENSE ファイルが無いパッケージは README の
   License 節から取り、著作権表示と許諾文がそろわなければ止まる（手で調べて対処する）
 - 更新後は client 描画ページ（`run` スキル参照）で図が描画されることを確認。
 
-## 3. KaTeX（crates/yuzu-theme/assets/static/vendor/katex/）
+## 3. KaTeX（crates/setoka-theme/assets/static/vendor/katex/）
 
 ```bash
 scripts/vendor-katex.sh
@@ -68,7 +68,7 @@ scripts/vendor-katex.sh
 - 更新後は `run` スキルで数式ページ（scaffold の getting-started「記法サンプル > 数式」）のライト/ダーク描画と、fonts が 404 なく取得されることを確認。
 - 未取得でもビルド・テストは通り、数式は原文（TeX ソース）表示になるだけ。
 - ライセンス文（本体の LICENSE とフォントの生成元 katex-fonts の LICENSE）を
-  `crates/yuzu-theme/licenses/katex.txt` に書き、`THIRD-PARTY-LICENSES.txt` を組み直す。
+  `crates/setoka-theme/licenses/katex.txt` に書き、`THIRD-PARTY-LICENSES.txt` を組み直す。
 
 ## 4. vaporetto モデル（crates/mikan/assets/model/）
 
@@ -79,7 +79,7 @@ scripts/vendor-vaporetto-model.sh
 - 現行: bccwj-suw_c1.0（圧縮 372KB、MIT OR Apache-2.0）。ライセンスが再配布可能なものだけを使う。
 - アーカイブ同梱の `LICENSE-MIT` / `LICENSE-APACHE` もモデルの隣に保存する（mikan の crate と
   dist の `_search/THIRD-PARTY-LICENSES.txt` が使う）。モデルを替えたら `scripts/third-party-licenses.sh wasm` も流す。
-- **モデルのバイト列が変わると索引（index 時）と検索（query 時）の整合が崩れる**。更新後は必ずサイトを再ビルドし、`yuzu search`（誤字クエリ込み）で確認する。ブラウザは初回検索時にモデルを遅延ダウンロードする設計。
+- **モデルのバイト列が変わると索引（index 時）と検索（query 時）の整合が崩れる**。更新後は必ずサイトを再ビルドし、`setoka search`（誤字クエリ込み）で確認する。ブラウザは初回検索時にモデルを遅延ダウンロードする設計。
 
 ## 5. 公式 toml-test（crates/kabosu/tests/toml-test/）
 
@@ -106,12 +106,12 @@ scripts/vendor-toml-test.sh
 ## 共通の注意
 
 - **vendor ディレクトリの README が provenance の一次情報**。スクリプトを流したら必ず更新する:
-  - `crates/yuzu-index/assets/search/README.md` — 成果物のサイズ（`build-search-wasm.sh` 自身が「実行後に記録すること」と要求している）
+  - `crates/setoka-index/assets/search/README.md` — 成果物のサイズ（`build-search-wasm.sh` 自身が「実行後に記録すること」と要求している）
   - `crates/mikan/assets/model/README.md` — 取得元 URL・ライセンス・取得日・**sha256**・圧縮サイズ
-  - `crates/yuzu-theme/assets/static/vendor/README.md` — mermaid / KaTeX の取得バージョンと日付
+  - `crates/setoka-theme/assets/static/vendor/README.md` — mermaid / KaTeX の取得バージョンと日付
 - vendor 更新は生成物の差分が大きい。コミットは vendor 更新単独で分け、由来（スクリプト・バージョン）をコミットメッセージに書く。
 - mermaid / KaTeX を更新したら `scripts/vendor-advisories.sh` で既知の勧告を照合する（Phase 82。
-  照合する版は `crates/yuzu-theme/licenses/` の記録から読むので、vendor スクリプトの後に流す）。
+  照合する版は `crates/setoka-theme/licenses/` の記録から読むので、vendor スクリプトの後に流す）。
   mermaid の版が変わると、束ねたパッケージの版も変わってスクリプト冒頭の `IGNORE`（勧告と
   パッケージ@版の組）が外れる。残った勧告を読み直し、影響しないものだけ理由を書いて足し直す。
   deps.yml が週次で同じ照合をする。

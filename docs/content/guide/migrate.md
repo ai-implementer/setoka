@@ -1,17 +1,17 @@
 ---
 title: 他のツールとの違い
 order: 2
-description: ほかのドキュメントツールから移行するときの、書き慣れた書き方と yuzu での書き方の対応
+description: ほかのドキュメントツールから移行するときの、書き慣れた書き方と setoka での書き方の対応
 ---
 
 # 他のツールとの違い
 
-ほかのドキュメントツールで書いた原稿を yuzu へ移行するときに、書き方が違う所をまとめます。
-yuzu はナビを設定ファイルに書かず、ファイルの置き場所と frontmatter からサイトを組み立てます。
-yuzu が知らない書き方の多くはエラーにならずに文字のまま表示されるので、移したあとは
+ほかのドキュメントツールで書いた原稿を setoka へ移行するときに、書き方が違う所をまとめます。
+setoka はナビを設定ファイルに書かず、ファイルの置き場所と frontmatter からサイトを組み立てます。
+setoka が知らない書き方の多くはエラーにならずに文字のまま表示されるので、移したあとは
 このページの表と見比べてください。
 
-[既存のフォルダで始める](install.md#既存のフォルダで始める)手順で `yuzu.toml` を置いた後に
+[既存のフォルダで始める](install.md#既存のフォルダで始める)手順で `setoka.toml` を置いた後に
 読むことを想定しています。
 
 ## ナビと URL
@@ -24,26 +24,26 @@ yuzu が知らない書き方の多くはエラーにならずに文字のまま
 - ページのタイトルは frontmatter の `title`、無ければ本文の最初の h1、それも無ければ
   ファイル名です。ナビにだけ短い名前を出す設定はありません
 - **トップページは原稿のディレクトリ直下の `index.md`** です。`README.md` は `/README/` の
-  ページになります（トップページが無いと `yuzu build` が警告します）
+  ページになります（トップページが無いと `setoka build` が警告します）
 - **ファイル名がそのまま URL** になります。小文字化や記号の置き換えはせず、frontmatter で
   URL を変える設定もありません。URL を変えるときはファイル名を変え、古い URL は `aliases` で
   新しいページへ転送します（[ページの移動とリダイレクト](writing.md#ページの移動とリダイレクトaliases)）
-- 大文字小文字だけが違う URL（`Guide.md` と `guide/`）は、`yuzu check` が
+- 大文字小文字だけが違う URL（`Guide.md` と `guide/`）は、`setoka check` が
   `route-case-conflict` で知らせます
 
 ## frontmatter と設定ファイル
 
-- 設定ファイルは `yuzu.toml`（TOML）だけです。YAML・JSON・JavaScript の設定ファイルは読みません
-- `yuzu.toml` のキーは `base_url` のような snake\_case、frontmatter のキーは `lintDisable` の
+- 設定ファイルは `setoka.toml`（TOML）だけです。YAML・JSON・JavaScript の設定ファイルは読みません
+- `setoka.toml` のキーは `base_url` のような snake\_case、frontmatter のキーは `lintDisable` の
   ような camelCase です
-- `yuzu.toml` に知らないキーがあると設定エラーになり、ビルドが止まります（終了コード 2）。
-  frontmatter の知らないキーは無視され、`yuzu check` が warning `frontmatter-unknown-key` で
+- `setoka.toml` に知らないキーがあると設定エラーになり、ビルドが止まります（終了コード 2）。
+  frontmatter の知らないキーは無視され、`setoka check` が warning `frontmatter-unknown-key` で
   知らせます
 
-frontmatter で書き慣れたキーと、yuzu のキーの対応です（キーの一覧は
+frontmatter で書き慣れたキーと、setoka のキーの対応です（キーの一覧は
 [frontmatter](writing.md#frontmatter)）:
 
-| 書き慣れたキー | yuzu |
+| 書き慣れたキー | setoka |
 | --- | --- |
 | `sidebar_position`・`weight`・`nav_order` | `order` |
 | `slug`・`permalink` | 無し（ファイル名を変える。古い URL は `aliases`） |
@@ -55,7 +55,7 @@ frontmatter で書き慣れたキーと、yuzu のキーの対応です（キー
 
 ## 記法
 
-| 書き慣れた書き方 | yuzu での書き方 |
+| 書き慣れた書き方 | setoka での書き方 |
 | --- | --- |
 | `::: tip` 〜 `:::` の囲み | `> [!TIP]`（5 種類。[Admonition](writing.md#admonition)） |
 | `??? note` などの折りたたみ | `> [!NOTE]-`（[折りたたみ](writing.md#折りたたみ)） |
@@ -69,7 +69,7 @@ frontmatter で書き慣れたキーと、yuzu のキーの対応です（キー
 
 この表で「無し」の書き方は、エラーにも警告にもならずに書いたまま出力されます。多くは文字の
 まま表示され、MDX のコンポーネント（`<Tabs>` など）は知らない HTML の要素として中身だけが
-表示されます。移したあとは `yuzu preview` でページを開いて確かめてください。
+表示されます。移したあとは `setoka preview` でページを開いて確かめてください。
 
 原稿のディレクトリにある `.md` 以外のファイルは、同伴ファイルとして `dist/` へそのまま
 コピーされます。`.mdx` もページにならずにそのまま公開されるので、`.md` に直すか、
@@ -83,16 +83,16 @@ ignore = ["**/*.mdx"]
 ## リンク
 
 - ページへのリンクは、**原稿のファイルへの相対パスに `.md` を付けて**書きます
-  （`[設定](../reference/config.md)`）。yuzu がページの URL に書き換え、`yuzu check` が
+  （`[設定](../reference/config.md)`）。setoka がページの URL に書き換え、`setoka check` が
   リンク切れを調べます
 - `.md` を付けない相対リンク（`[設定](../reference/config/)`）は書き換えも検査もしません。
   ページは `/guide/writing/` のようなディレクトリの URL で配信されるので、原稿の場所から
   数えた相対パスでは 1 階層ずれることがあります
 - サイトの中を絶対パスで指すときは URL で書きます（`/guide/writing/`）。`base_url` が前に
-  付き、`yuzu check` も調べます。`/guide/writing.md` のように `.md` を付けた絶対パスは
-  ページに解決されず、`yuzu check` がリンク切れにします
+  付き、`setoka check` も調べます。`/guide/writing.md` のように `.md` を付けた絶対パスは
+  ページに解決されず、`setoka check` がリンク切れにします
 - `content/` の外（`../src/main.rs`・リポジトリの `README.md`）を指す相対リンクは、外の
-  ファイルがサイトに出ないので書いたまま残り、`yuzu check` が warning
+  ファイルがサイトに出ないので書いたまま残り、`setoka check` が warning
   `link-outside-content` で知らせます
 
 ## 生 HTML と画像の大きさ
@@ -106,11 +106,11 @@ Markdown の画像の記法には大きさを指定する書き方がありま�
 用意するか、`<img width="…">` を使います。`<img>` の `src` は書いたまま出力されるので、
 ページの URL から数えた相対パスで書きます。`guide/writing.md` の横にある `diagram.png` なら、
 ページの URL は `/guide/writing/` なので `src="../diagram.png"` です（`index.md` のページでは
-`src="diagram.png"`）。この参照は `yuzu check` が調べないので、ページを開いて確かめてください。
+`src="diagram.png"`）。この参照は `setoka check` が調べないので、ページを開いて確かめてください。
 
 ## サイトの見た目
 
-| 書き慣れたもの | yuzu |
+| 書き慣れたもの | setoka |
 | --- | --- |
 | ロゴ・サイト名 | `site.logo`・`site.title` |
 | タブのアイコン（favicon） | `site.favicon`（書かなくても `public/favicon.ico` があれば使います） |
@@ -124,11 +124,11 @@ Markdown の画像の記法には大きさを指定する書き方がありま�
 
 ## 移したあとに確かめること
 
-1. `yuzu check --no-fmt` で、リンク切れ・frontmatter の知らないキー・`content/` の外を
+1. `setoka check --no-fmt` で、リンク切れ・frontmatter の知らないキー・`content/` の外を
    指すリンクを確かめます（整形差分の検査は後回しにできます）
-2. `yuzu build` の警告と最後の行（出したページの数）を確かめます（[品質チェック](quality.md#yuzu-check--統合チェック)）
-3. `yuzu preview` でページを開き、記法の表で「無し」の書き方がそのまま出ていないかを確かめます
-4. 原稿を整形してよくなったら `yuzu fmt` をかけ、CI の `--no-fmt` を外します
+2. `setoka build` の警告と最後の行（出したページの数）を確かめます（[品質チェック](quality.md#setoka-check--統合チェック)）
+3. `setoka preview` でページを開き、記法の表で「無し」の書き方がそのまま出ていないかを確かめます
+4. 原稿を整形してよくなったら `setoka fmt` をかけ、CI の `--no-fmt` を外します
 
 GitHub Pages へ公開するワークフローと、プルリクエストを検査するワークフローの全文は
 [配信とデプロイ](deploy.md#ワークフローの全文)と[品質チェック](quality.md#ci-に組み込む)にあります。

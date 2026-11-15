@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use kabosu::{Date, Datetime, Encode, EncodeError, Encoder, Offset, TableEncoder, Time};
 
-/// yuzu の設定を模した見本（スカラー・Option・配列・ネスト・自由キー）
+/// setoka の設定を模した見本（スカラー・Option・配列・ネスト・自由キー）
 struct Sample {
     title: String,
     description: Option<String>,
@@ -48,7 +48,7 @@ impl Encode for Sample {
 
 fn sample(description: Option<&str>) -> Sample {
     Sample {
-        title: String::from("柚子 \"yuzu\" と\\改行\n"),
+        title: String::from("柚子 \"setoka\" と\\改行\n"),
         description: description.map(String::from),
         port: 5173,
         dark: true,
