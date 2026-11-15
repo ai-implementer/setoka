@@ -237,7 +237,7 @@ content/guide/x.md:12:1: warning[duplicate-h1] 本文に h1 が 2 個以上あ�
 - `summary.skipped` は `check --external-links` で検査できなかった外部 URL の数です
   （到達不能・5xx・429。環境依存の失敗を診断に混ぜないための逃がし先で、
   フラグなしでは常に 0 です）
-- キーは追加されることがありますが、削除・改名はしません
+- キーは追加されることがありますが、削除・改名はしません（[互換性と更新](compatibility.md#約束の対象)）
 
 ### github
 

@@ -276,6 +276,10 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 - **setoka 本体** — 手順と罠は **`release` スキル**に集約（マイナーとパッチで ROADMAP.md の
   書き方が違う・**タグは打った時点の main を切り出す**ので機能コミットをタグの後に
   積まない等）
+- **互換性の約束** — `docs/content/reference/compatibility.md`（v0.21 Phase 95）。設定キー・コマンドと
+  フラグ・`--format json` のキー・診断ルールの名前を消す・改名する変更はマイナー版だけで、
+  `--format json` のキーはマイナー版でも消さない。リリースノートの「非互換と注意」はこのページの
+  対象を見て書く（`release` スキル）
 - **汎用ライブラリ（tankan / mikan / kabosu）** — setoka のリリースと非同期。手順は
   **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須）
   - fuzz.yml は 3 crate の対象（kabosu 3・mikan のシャード・tankan の `render_svg`）を週 1 回実行する

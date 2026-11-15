@@ -19,7 +19,8 @@ description: テーマの上書き・配色・favicon・フッター・ヘッダ
 > `markdown.highlight.enabled` が有効なときだけ生成され、`base.jinja` も
 > `highlight_enabled` で `<link>` を出し分けます。古い `base.jinja` を
 > 上書きしたまま無効化すると、存在しないファイルへの `<link>` が残ります）。
-> 上書きは必要なファイルだけに絞り、更新後は差分を見直してください。
+> 上書きは必要なファイルだけに絞り、更新後は差分を見直してください
+> （[互換性と更新](../reference/compatibility.md#新しい版に上げる手順)）。
 
 色だけ変えたい場合は、設定の CSS 変数上書きが手軽です:
 

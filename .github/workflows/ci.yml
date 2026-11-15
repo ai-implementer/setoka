@@ -388,6 +388,8 @@ jobs:
           grep -q 'id="他のツールとの違い"' docs/dist/guide/migrate/index.html && grep -q 'id="生-html-と画像の大きさ"' docs/dist/guide/migrate/index.html
           grep -q '<figcaption>snippets/deploy.yml</figcaption>' docs/dist/guide/deploy/index.html && grep -q 'id="ワークフローの全文"' docs/dist/guide/deploy/index.html
           grep -q '<figcaption>snippets/pr-check.yml</figcaption>' docs/dist/guide/quality/index.html && grep -q -- '--no-fmt --format github' docs/dist/guide/quality/index.html
+          # v0.21 Phase 95: 互換性の約束と更新の手順のページ
+          grep -q 'id="約束の対象"' docs/dist/reference/compatibility/index.html && grep -q 'id="新しい版に上げる手順"' docs/dist/reference/compatibility/index.html
           # 設定例は TOML で書く（JSON / YAML 風の `markdown.mermaid.backend: "ssr"` や
           # `"abbr": false` はコピーすると設定エラーになる）。原稿・README・雛形・スキルを見る
           if grep -rnE '`[a-z_]+(\.[a-z_]+)+: |`"[a-z_]+": |backend: ["]' docs/content README.md crates/setoka-cli/scaffold/*.md .claude/skills/; then
