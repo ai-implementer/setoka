@@ -40,8 +40,8 @@ Markdown で書いた設計書を、プロダクション品質の静的 HTML �
 
 - **バイナリ** — [GitHub Releases](https://github.com/ai-implementer/setoka/releases/latest)
   から取って PATH の通った場所へ置く（macOS arm64/x64・Linux x64・Windows x64）
-- **cargo-binstall** — `cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli` で
-  上のアーカイブを入れる（crates.io には公開していないので `--git` が要る）
+- **cargo-binstall** — `cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli@=X.Y.Z` で
+  上のアーカイブを入れる（crates.io には公開していないので `--git` が要る。`X.Y.Z` はリリースの版）
 - **ソース** — Rust 1.99 以降で `cargo install`。`vX.Y.Z` はリリースの版（`--tag` を省くと
   リリース前の変更を含む main が入る）
 

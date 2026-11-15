@@ -38,16 +38,19 @@ xattr -d com.apple.quarantine /usr/local/bin/setoka   # setoka を置いた場�
 ### cargo-binstall で入れる
 
 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) があれば、上のアーカイブを
-取って入れられます（コンパイルはしません）:
+取って入れられます（コンパイルはしません）。`X.Y.Z` はリリースの版に置き換えてください:
 
 ```bash
-cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli
+cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli@=X.Y.Z
 ```
 
-- 最新のリリースのアーカイブを入れます
 - crates.io には公開していないので、`--git` で取得元を指定します
-- アーカイブを配っていないプラットフォーム（Linux の arm64 など）では、このリポジトリのソースから
-  ビルドします。第三者がビルドしたバイナリ（quickinstall）は使いません
+- `@=X.Y.Z` の版のリリースのアーカイブを入れます。版を付けないと、リポジトリの main の
+  `Cargo.toml` に書かれた版を使います。ふつうは最新のリリースと同じですが、次の版のリリースの
+  準備中はまだアーカイブが無く、止まることがあります
+- 取得するのはリリースのアーカイブだけです。第三者がビルドしたバイナリ（quickinstall）や、
+  crates.io からのビルドには切り替えません。アーカイブを配っていないプラットフォーム（Linux の
+  arm64 など）では止まるので、下の「ソースからビルドする」を使ってください
 
 ### ソースからビルドする
 

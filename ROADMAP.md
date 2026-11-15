@@ -234,14 +234,18 @@ docs の URL・リポジトリ名をまとめて変える。利用者はユー�
   取得すると quarantine 属性は付かない見込み）。雛形の原稿は機能のカタログ（10-04 見直しの
   「細かな分かりにくさ」）
 - 決定（11-15。ユーザが判断点をすべて推奨案で決めた）
-  - binstall は quickinstall（第三者のビルド）だけを止める（`disabled-strategies = ["quick-install"]`）。
-    アーカイブを配っていないターゲットでは、このリポジトリのソースからビルドする（`cargo install --git` と同じ結果）
+  - binstall は quickinstall（第三者のビルド）を止める。ユーザは「アーカイブが無ければこのリポジトリの
+    ソースからビルドする」という説明で compile を残す案を選んだが、その説明は誤りだった（PR #93 の
+    レビューで判明）。binstall の compile は `cargo install setoka-cli --version …` を crates.io に対して
+    実行し、`--git` を渡さない（dry-run で確認）。今は失敗し、crates.io に同じ名前の crate が出ればそれが
+    入るので、compile も止めた（`disabled-strategies = ["quick-install", "compile"]`）。アーカイブを配って
+    いないターゲットでは binstall は止まり、docs の `cargo install --git … --tag` を案内する
   - 雛形は「案内」と「記法の例」に分ける。トップページは最初の 5 分（起動・書き換え・ページの追加・
     確認・公開）、はじめには書くときの要点（ページの並び・リンクと画像・品質チェック・公開）だけにし、
     機能の一覧は記法の例（`content/guide/examples.md`。要らなければ消せる）に移す
   - Homebrew の tap・インストールスクリプト・署名と公証は入れない。Gatekeeper の説明だけ書く
 - 確かめたこと（11-15）
-  - cargo-binstall 1.21.1 の既定の取得順は crate のメタデータ → quickinstall → ソースからのビルドで、
+  - cargo-binstall 1.21.1 の既定の取得順は crate のメタデータ → quickinstall → compile（crates.io の crate を `cargo install`）で、
     Cargo.toml の `disabled-strategies` で止められる（`cargo binstall --help`）
   - 足したメタデータで binstall が探す URL は `…/releases/download/v0.20.0/setoka-v0.20.0-x86_64-unknown-linux-gnu.tar.gz`
     で、release.yml のアーカイブ名と同じ。名前だけ v0.20.0 の yuzu のアーカイブに差し替えた dry-run で、
@@ -260,6 +264,13 @@ docs の URL・リポジトリ名をまとめて変える。利用者はユー�
   展開したバイナリには `com.apple.quarantine` が付き、最初の実行はダイアログで止められた。`xattr -d
   com.apple.quarantine` の後は実行できた。docs のインストール（アーカイブを置く）と FAQ に、SHA256SUMS で
   照合してから属性を外す手順を書き、ci.yml の docs ゲートと verify スキルに FAQ の節の照合を足した
+- PR #93 のレビュー指摘（11-15）
+  - [P2] `--git` は clone した main の Cargo.toml の版でアーカイブを探し、最新のリリースを選ばない。版を
+    exact pin（`setoka-cli@=X.Y.Z`）で付けるとその版の URL になることを dry-run で確かめ、docs と README の
+    手順を `@=X.Y.Z` 付きにした。版を付けないときの動き（リリースの準備中は止まることがある）も書いた
+  - [P3] `binstall metadata` が Windows の上書きの節の有無しか見ていなかった。Cargo.toml を節ごとに読み、
+    基本の節の 4 つの値と、Windows のターゲットごとの `pkg-fmt = "zip"` を照合するように直した。上書きの
+    節を残して `pkg-fmt` を消す・`tgz` に変える・compile を止めない、のどれでも落ちることを確かめた
 - 工数: 中
 
 ### 97 問い合わせの受け口 ⬜

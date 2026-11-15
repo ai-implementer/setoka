@@ -121,28 +121,43 @@ jobs:
 
       # cargo-binstall のメタデータ（setoka-cli の Cargo.toml。v0.21 Phase 96）が release.yml の
       # アーカイブと合っているか。名前の形（setoka-v<版>-<ターゲット>）・形式（Windows は zip、
-      # ほかは tar.gz）・中の配置（直下に setoka）。setoka の名前のアーカイブはリリースで初めて
-      # できるので、実際に binstall で入れるのはリリース後に確かめる
+      # ほかは tar.gz）・中の配置（直下に setoka）と、取得をアーカイブだけに絞る指定（compile は
+      # crates.io の同じ名前の crate をビルドしに行く）。値は Cargo.toml の節ごとに読む（行があるか
+      # だけを見ると、上書きの節を残して pkg-fmt を消しても通る。PR #93 のレビュー指摘）。
+      # setoka の名前のアーカイブはリリースで初めてできるので、実際に入れるのはリリース後に確かめる
       - name: binstall metadata
         run: |
           status=0
           m=crates/setoka-cli/Cargo.toml
           r=.github/workflows/release.yml
-          need() {
-            if ! grep -qF -- "$2" "$1"; then
-              echo "$1 に次の行がありません（binstall のメタデータと release.yml のアーカイブを合わせる）: $2" >&2
+          # Cargo.toml の [節] の中の「キー = 値」の行（無ければ空）
+          key_in() {
+            awk -v h="[$1]" -v k="$2" '$0 == h { f = 1; next } /^\[/ { f = 0 } f && $1 == k { print }' "$m"
+          }
+          expect() {
+            got="$(key_in "$1" "$2")"
+            if [ "$got" != "$3" ]; then
+              echo "$m の [$1] の $2 が違います（期待: $3 / 実際: ${got:-なし}）" >&2
               status=1
             fi
           }
-          need "$m" 'pkg-url = "{ repo }/releases/download/v{ version }/setoka-v{ version }-{ target }{ archive-suffix }"'
-          need "$m" 'bin-dir = "{ bin }{ binary-ext }"'
-          need "$m" 'pkg-fmt = "tgz"'
-          need "$r" 'NAME="setoka-v$VERSION-'
-          need "$r" 'tar -czf "$NAME.tar.gz" -C stage .'
-          need "$r" '7z a "../$NAME.zip" .'
+          need() {
+            if ! grep -qF -- "$1" "$r"; then
+              echo "$r に次の行がありません（binstall のメタデータとアーカイブを合わせる）: $1" >&2
+              status=1
+            fi
+          }
+          b=package.metadata.binstall
+          expect "$b" pkg-url 'pkg-url = "{ repo }/releases/download/v{ version }/setoka-v{ version }-{ target }{ archive-suffix }"'
+          expect "$b" bin-dir 'bin-dir = "{ bin }{ binary-ext }"'
+          expect "$b" pkg-fmt 'pkg-fmt = "tgz"'
+          expect "$b" disabled-strategies 'disabled-strategies = ["quick-install", "compile"]'
+          need 'NAME="setoka-v$VERSION-'
+          need 'tar -czf "$NAME.tar.gz" -C stage .'
+          need '7z a "../$NAME.zip" .'
           # zip で配る Windows のターゲットには、すべて pkg-fmt = "zip" の上書きが要る
           for t in $(grep -oE '[a-z0-9_]+-pc-windows-msvc' "$r" | sort -u); do
-            need "$m" "[package.metadata.binstall.overrides.$t]"
+            expect "$b.overrides.$t" pkg-fmt 'pkg-fmt = "zip"'
           done
           exit "$status"
 
@@ -418,7 +433,7 @@ jobs:
           # v0.21 Phase 95: 互換性の約束と更新の手順のページ
           grep -q 'id="約束の対象"' docs/dist/reference/compatibility/index.html && grep -q 'id="新しい版に上げる手順"' docs/dist/reference/compatibility/index.html
           # v0.21 Phase 96: インストールの 3 通り（cargo-binstall の節）と、macOS の Gatekeeper の FAQ
-          grep -q 'id="cargo-binstall-で入れる"' docs/dist/guide/install/index.html && grep -q '（quickinstall）は使いません' docs/dist/guide/install/index.html
+          grep -q 'id="cargo-binstall-で入れる"' docs/dist/guide/install/index.html && grep -q '第三者がビルドしたバイナリ（quickinstall）や' docs/dist/guide/install/index.html
           grep -q 'id="macos-で開いていませんと止められる"' docs/dist/guide/faq/index.html
           # 設定例は TOML で書く（JSON / YAML 風の `markdown.mermaid.backend: "ssr"` や
           # `"abbr": false` はコピーすると設定エラーになる）。原稿・README・雛形・スキルを見る
