@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 脆弱性の報告 / Security vulnerability
+    url: https://github.com/ai-implementer/setoka/security/advisories/new
+    about: 公開の issue には書かず、非公開で報告してください（SECURITY.md）
+  - name: ドキュメント / Documentation
+    url: https://ai.implementer.net/setoka/
+    about: 使い方・設定・よくある質問

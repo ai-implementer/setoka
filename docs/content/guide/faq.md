@@ -86,10 +86,14 @@ xattr -d com.apple.quarantine /usr/local/bin/setoka   # setoka を置いた場�
 ## 質問・不具合の報告
 
 質問・不具合の報告・機能の要望は
-[GitHub の Issues](https://github.com/ai-implementer/setoka/issues) で受け付けています。
+[GitHub の Issues](https://github.com/ai-implementer/setoka/issues/new/choose) で受け付けています
+（種類ごとのテンプレートがあります。日本語でも英語でも書けます）。
 不具合の報告には、`setoka --version` の出力・OS・再現する手順（できれば最小の原稿と
 `setoka.toml`）を添えてください。「内部エラーが起きました（setoka の不具合です…）」と
 出たときも、その表示をそのまま貼ってください。
+
+pull request は受け付けていません。直してほしい箇所は issue に書いてください
+（理由は [CONTRIBUTING.md](https://github.com/ai-implementer/setoka/blob/main/CONTRIBUTING.md)）。
 
 セキュリティ上の問題（脆弱性）は、公開の Issues には書かず、
 [SECURITY.md](https://github.com/ai-implementer/setoka/blob/main/SECURITY.md) の手順で

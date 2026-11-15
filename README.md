@@ -95,7 +95,9 @@ cargo fmt --all --check
 
 ## 質問・不具合の報告
 
-質問・不具合の報告・機能の要望は [Issues](https://github.com/ai-implementer/setoka/issues) へ。
+質問・不具合の報告・機能の要望は [Issues](https://github.com/ai-implementer/setoka/issues/new/choose) へ
+（日本語でも英語でも書ける）。pull request は受け付けていない。受けるものと書き方は
+[CONTRIBUTING.md](CONTRIBUTING.md) にある。
 困ったときは [よくある質問とトラブル](https://ai.implementer.net/setoka/guide/faq/) も見てください。
 
 ## 脆弱性の報告

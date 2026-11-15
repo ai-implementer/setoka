@@ -1,0 +1,21 @@
+name: 質問・docs の誤り / Question
+description: 使い方が分からない・docs の説明が足りない・docs が間違っている
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        日本語でも英語でも書けます（Japanese or English）。
+        先に「よくある質問とトラブル」（https://ai.implementer.net/setoka/guide/faq/）も見てください。
+  - type: textarea
+    id: question
+    attributes:
+      label: 質問・気になったこと
+      description: docs の誤りなら、そのページの URL も書いてください
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: setoka の版（分かれば）
+      description: "`setoka --version` の出力"
