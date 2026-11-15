@@ -8,10 +8,51 @@ description: setoka のインストール・最初のサイトの作り方・既
 
 ## インストール
 
+次の 3 通りのどれでも、同じ `setoka` のバイナリが入ります。
+
+### アーカイブを置く
+
 [GitHub Releases](https://github.com/ai-implementer/setoka/releases/latest) から
 お使いのプラットフォームのアーカイブ（macOS arm64 / x64・Linux x64・Windows x64）を
 ダウンロードして展開し、`setoka` を PATH の通った場所へ置きます。
-各リリースには検証用の `SHA256SUMS` も添付されています。
+
+各リリースには `SHA256SUMS` が添付されています。アーカイブと同じフォルダに置いて照合できます
+（`setoka-v0.21.0-aarch64-apple-darwin.tar.gz` は、ダウンロードしたアーカイブの名前に置き換えます）:
+
+```bash
+# macOS
+awk -v f=setoka-v0.21.0-aarch64-apple-darwin.tar.gz '$2 == f' SHA256SUMS | shasum -a 256 -c -
+# Linux
+awk -v f=setoka-v0.21.0-x86_64-unknown-linux-gnu.tar.gz '$2 == f' SHA256SUMS | sha256sum -c -
+```
+
+macOS 向けのバイナリは、Apple の署名と公証を受けていません。ブラウザでダウンロードしたアーカイブから
+取り出すと、最初の実行で Gatekeeper に止められ、「開いていません」のダイアログが出ます（macOS 27.2 で
+確認）。ダイアログはゴミ箱に入れずに閉じ、上の手順で照合したうえで、ダウンロードした印
+（`com.apple.quarantine` 属性）を外してください:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/setoka   # setoka を置いた場所
+```
+
+### cargo-binstall で入れる
+
+[cargo-binstall](https://github.com/cargo-bins/cargo-binstall) があれば、上のアーカイブを
+取って入れられます（コンパイルはしません）。`X.Y.Z` はリリースの版に置き換えてください:
+
+```bash
+cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli@=X.Y.Z
+```
+
+- crates.io には公開していないので、`--git` で取得元を指定します
+- `@=X.Y.Z` の版のリリースのアーカイブを入れます。版を付けないと、リポジトリの main の
+  `Cargo.toml` に書かれた版を使います。ふつうは最新のリリースと同じですが、次の版のリリースの
+  準備中はまだアーカイブが無く、止まることがあります
+- 取得するのはリリースのアーカイブだけです。第三者がビルドしたバイナリ（quickinstall）や、
+  crates.io からのビルドには切り替えません。アーカイブを配っていないプラットフォーム（Linux の
+  arm64 など）では止まるので、下の「ソースからビルドする」を使ってください
+
+### ソースからビルドする
 
 Rust ツールチェイン（1.99 以降）があれば、ソースからもインストールできます。
 `vX.Y.Z` はリリースの版に置き換えてください（`--tag` を省くと、リリース前の
@@ -36,7 +77,8 @@ cd my-docs
     │  ├─ index.md                   # トップページ
     │  └─ guide/
     │     ├─ index.md                # ディレクトリ「ガイド」の表示名と並び順
-    │     └─ getting-started.md
+    │     ├─ getting-started.md      # 書くときに知っておくこと
+    │     └─ examples.md             # 記法と機能の見本（要らなければ消してよい）
     ├─ snippets/                     # 原稿から取り込むサンプル（コードと Markdown 断片）
     ├─ public/                       # 静的ファイル（そのまま配信される）
     │  └─ images/setoka-logo.svg

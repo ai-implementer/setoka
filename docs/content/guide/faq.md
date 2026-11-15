@@ -71,6 +71,18 @@ JavaScript を使えない閲覧環境なら、ビルド時に SVG にする `ba
 作り直します。結果がおかしいと思ったら、`setoka build --force` で最初から作り直して
 ください（`.setoka/` を削除しても同じです。いつ消しても安全です）。
 
+## macOS で「開いていません」と止められる
+
+macOS 向けのバイナリは Apple の署名と公証を受けていないので、ブラウザでダウンロードしたアーカイブから
+取り出すと、最初の実行で Gatekeeper に止められます。リリースの `SHA256SUMS` で照合したうえで、
+ダウンロードした印（`com.apple.quarantine` 属性）を外してください:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/setoka   # setoka を置いた場所
+```
+
+照合の手順は [インストール](install.md#アーカイブを置く) にあります。
+
 ## 質問・不具合の報告
 
 質問・不具合の報告・機能の要望は

@@ -86,7 +86,7 @@ v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者
   | 手元のディレクトリ名と Claude Code のメモリのディレクトリを移す | 94 | 94 のマージ後 |
   | 開発コンテナを作り直す（イメージ・コンテナ・volume の名前が変わる。古いものは消してよい） | 94 | 94 のマージ後 |
   | 各 Phase の判断点を決める | 94〜99 | 着手時 |
-  | macOS でブラウザからダウンロードしたバイナリが Gatekeeper に止められるか確かめる | 96 | 96 の着手時 |
+  | ~~macOS でブラウザからダウンロードしたバイナリが Gatekeeper に止められるか確かめる~~（11-15 に済み。止められる） | 96 | 96 の着手時 |
   | Discussions を有効にするか・ラベルを作る（97 の判断に合わせる） | 97 | 97 のマージ後 |
   | リポジトリの description・topics・homepage を設定する（文案は 98 で用意する） | 98 | 98 のマージ後 |
   | 告知（記事・SNS 等。場所と時期を決める） | 99 | リリース後 |
@@ -222,7 +222,7 @@ docs の URL・リポジトリ名をまとめて変える。利用者はユー�
   - ci.yml の docs ゲートと verify スキルに、ページの 2 つの節の照合を足した
 - 工数: 小
 
-### 96 インストールと最初の 5 分 ⬜
+### 96 インストールと最初の 5 分 ✅
 
 **概要**: 手で置く・ソースから入れるの 2 通りに cargo-binstall を足し、macOS でブラウザから
 ダウンロードしたバイナリの扱いを docs に書く（10-04 見直しの「macOS バイナリが未署名・未公証」の
@@ -233,26 +233,45 @@ docs の URL・リポジトリ名をまとめて変える。利用者はユー�
   ダウンロードしたアーカイブから取り出したバイナリが Gatekeeper に止められるかは**未確認**（curl で
   取得すると quarantine 属性は付かない見込み）。雛形の原稿は機能のカタログ（10-04 見直しの
   「細かな分かりにくさ」）
-- やること
-  - setoka-cli の Cargo.toml に `[package.metadata.binstall]` を足す（release.yml のアセット名
-    `setoka-v{版}-{ターゲット}.tar.gz`、Windows は zip に合わせた `pkg-url`・`bin-dir`・`pkg-fmt`）。
-    docs と README に `cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli` を書き、
-    crates.io に出さない限り `--git` が要ることを書く（94 の後なので、パッケージ名とリポジトリは
-    setoka の名前になる）。アセット名との一致を ci.yml で
-    照合する
-  - macOS の Gatekeeper の扱いを実機で確かめ（ユーザの作業）、止められるなら quarantine 属性を外す
-    手順を `docs/content/guide/install.md` と FAQ に書く。SHA256SUMS で照合する手順も書く
-  - 雛形の原稿を作り直す（判断点）。e2e・docs ゲート・`docs/content/guide/install.md` の説明を合わせる
-- 判断点
-  - binstall の取得方法（**推奨**: GitHub Release のアーカイブだけ。アーカイブが見つからないときに
-    ほかの取得元（第三者のビルドやソースからのビルド）へ切り替えるかどうかと、止める指定の書き方は
-    **未確認**なので着手時に確かめる）
-  - Homebrew の tap とインストールスクリプト（`curl | sh`）を入れるか（**推奨**: 入れない。tap の
-    リポジトリとスクリプトの保守が増える。利用者を観察してから）
-  - 署名・公証をするか（**推奨**: しない。Apple Developer Program の登録と release.yml の秘密情報が
-    要る。説明だけにする）
-  - 雛形の原稿の中身（ページ数と読む順番。機能の紹介は docs サイトへのリンクにする 等）
-- 工数: 中（雛形の作り直しで e2e と docs ゲートが変わる）
+- 決定（11-15。ユーザが判断点をすべて推奨案で決めた）
+  - binstall は quickinstall（第三者のビルド）を止める。ユーザは「アーカイブが無ければこのリポジトリの
+    ソースからビルドする」という説明で compile を残す案を選んだが、その説明は誤りだった（PR #93 の
+    レビューで判明）。binstall の compile は `cargo install setoka-cli --version …` を crates.io に対して
+    実行し、`--git` を渡さない（dry-run で確認）。今は失敗し、crates.io に同じ名前の crate が出ればそれが
+    入るので、compile も止めた（`disabled-strategies = ["quick-install", "compile"]`）。アーカイブを配って
+    いないターゲットでは binstall は止まり、docs の `cargo install --git … --tag` を案内する
+  - 雛形は「案内」と「記法の例」に分ける。トップページは最初の 5 分（起動・書き換え・ページの追加・
+    確認・公開）、はじめには書くときの要点（ページの並び・リンクと画像・品質チェック・公開）だけにし、
+    機能の一覧は記法の例（`content/guide/examples.md`。要らなければ消せる）に移す
+  - Homebrew の tap・インストールスクリプト・署名と公証は入れない。Gatekeeper の説明だけ書く
+- 確かめたこと（11-15）
+  - cargo-binstall 1.21.1 の既定の取得順は crate のメタデータ → quickinstall → compile（crates.io の crate を `cargo install`）で、
+    Cargo.toml の `disabled-strategies` で止められる（`cargo binstall --help`）
+  - 足したメタデータで binstall が探す URL は `…/releases/download/v0.20.0/setoka-v0.20.0-x86_64-unknown-linux-gnu.tar.gz`
+    で、release.yml のアーカイブ名と同じ。名前だけ v0.20.0 の yuzu のアーカイブに差し替えた dry-run で、
+    Linux・Windows（zip）・macOS のどれも展開して `setoka` を置けることを確かめた
+- やったこと
+  - setoka-cli の Cargo.toml に `[package.metadata.binstall]`（`pkg-url`・`bin-dir`・`pkg-fmt`・
+    Windows の zip の上書き・`disabled-strategies`）
+  - ci.yml に `binstall metadata`（アーカイブの名前・形式・中の配置と、Windows のターゲットの上書きを
+    release.yml と照合する）
+  - docs のインストールを 3 通り（アーカイブ・cargo-binstall・ソース）に分け、SHA256SUMS で照合する手順を
+    書いた。README のクイックスタートにも binstall を足した
+  - 雛形を作り直した（トップページ 126 行 → 31 行、はじめに 486 行 → 89 行、記法の例 478 行を新設）。
+    CI の e2e のうち記法の実例を照合していた 5 行の照合先を記法の例のページにした。docs の構成図にも足した
+  - ci.yml の docs ゲートと verify スキルに、インストールの binstall の節の照合を足した
+- Gatekeeper（11-15。ユーザが macOS 27.2.1 の実機で確かめた）: ブラウザで取った v0.20.0 のアーカイブを tar で
+  展開したバイナリには `com.apple.quarantine` が付き、最初の実行はダイアログで止められた。`xattr -d
+  com.apple.quarantine` の後は実行できた。docs のインストール（アーカイブを置く）と FAQ に、SHA256SUMS で
+  照合してから属性を外す手順を書き、ci.yml の docs ゲートと verify スキルに FAQ の節の照合を足した
+- PR #93 のレビュー指摘（11-15）
+  - [P2] `--git` は clone した main の Cargo.toml の版でアーカイブを探し、最新のリリースを選ばない。版を
+    exact pin（`setoka-cli@=X.Y.Z`）で付けるとその版の URL になることを dry-run で確かめ、docs と README の
+    手順を `@=X.Y.Z` 付きにした。版を付けないときの動き（リリースの準備中は止まることがある）も書いた
+  - [P3] `binstall metadata` が Windows の上書きの節の有無しか見ていなかった。Cargo.toml を節ごとに読み、
+    基本の節の 4 つの値と、Windows のターゲットごとの `pkg-fmt = "zip"` を照合するように直した。上書きの
+    節を残して `pkg-fmt` を消す・`tgz` に変える・compile を止めない、のどれでも落ちることを確かめた
+- 工数: 中
 
 ### 97 問い合わせの受け口 ⬜
 

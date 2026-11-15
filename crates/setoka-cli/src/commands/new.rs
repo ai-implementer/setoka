@@ -21,12 +21,17 @@ const FILES: &[(&str, &str)] = &[
         "content/guide/getting-started.md",
         include_str!("../../scaffold/getting-started.md"),
     ),
+    // 記法と機能の見本（要らなければ消せる 1 ページにまとめる。v0.21 Phase 96）
+    (
+        "content/guide/examples.md",
+        include_str!("../../scaffold/examples.md"),
+    ),
     (
         "public/images/setoka-logo.svg",
         include_str!("../../scaffold/setoka-logo.svg"),
     ),
     // content の外にある引用先（`file=` / ```include の実例。
-    // content/index.md から参照する）
+    // content/guide/examples.md から参照する）
     ("snippets/greet.rs", include_str!("../../scaffold/greet.rs")),
     ("snippets/note.md", include_str!("../../scaffold/note.md")),
     (
