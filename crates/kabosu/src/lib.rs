@@ -12,7 +12,7 @@
 //!   テーブルの配列）。公式 toml-test での検証は 0.2 で行う
 //!
 //! ```
-//! let doc = kabosu::Document::parse("title = \"yuzu\"\n[dev]\nport = 5173\n").unwrap();
+//! let doc = kabosu::Document::parse("title = \"setoka\"\n[dev]\nport = 5173\n").unwrap();
 //! let dev = doc.root().get("dev").unwrap().node().as_table().unwrap();
 //! assert_eq!(dev.get("port").unwrap().node().as_integer(), Some(5173));
 //! ```

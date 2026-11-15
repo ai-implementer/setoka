@@ -5,7 +5,7 @@ description: デフォルトテーマへ JS / CSS / テンプレートを追加�
 
 # テーマ資産の追加レシピ
 
-デフォルトテーマは `crates/yuzu-theme/assets/` を rust-embed でバイナリ埋め込み。
+デフォルトテーマは `crates/setoka-theme/assets/` を rust-embed でバイナリ埋め込み。
 プロジェクト側の `theme/` に同じ相対パスを置くとファイル単位で上書きされる。
 
 **配線が 5 箇所に散っていて、抜けても静かに動いてしまう**（必須アセットテストへの登録漏れが起きやすい）。
@@ -31,10 +31,10 @@ description: デフォルトテーマへ JS / CSS / テンプレートを追加�
 
 ### 1. JS を書く
 
-`crates/yuzu-theme/assets/static/js/<name>.js`。**プログレッシブエンハンスメント必須** —
+`crates/setoka-theme/assets/static/js/<name>.js`。**プログレッシブエンハンスメント必須** —
 JS 無効でも表示が壊れないこと。既存の書き方（IIFE・`var`・`try/catch` で storage を握り潰す）に合わせる。
 
-storage を使うならキーは `yuzu-*`。同一オリジンに複数サイトが載る場合に備え、
+storage を使うならキーは `setoka-*`。同一オリジンに複数サイトが載る場合に備え、
 サイト単位の状態は `data-base="{{ base_url | url }}"` で base_url を渡して名前空間を切る。
 
 ### 2. `base.jinja` へ 1 行
@@ -46,12 +46,12 @@ storage を使うならキーは `yuzu-*`。同一オリジンに複数サイト
 - **URL 値には `| url` フィルタ必須**（minijinja がデフォルトで属性中の `/` を
   エスケープするため。`| safe` はエスケープを丸ごと外すので URL 値には使わない —
   CLAUDE.md の「URL 値へ `| safe` を使わない」参照）
-- 条件付きにするなら `{% if %}` で囲み、Rust 側のフラグを `yuzu-render/src/pipeline.rs` で渡す。
+- 条件付きにするなら `{% if %}` で囲み、Rust 側のフラグを `setoka-render/src/pipeline.rs` で渡す。
   base.jinja は `{% endif %}` を次行頭に詰める書き方で改行を制御しているので、その流儀に合わせる
 
 ### 3. 必須アセットテストへ登録（**最も忘れやすい**）
 
-`crates/yuzu-theme/src/lib.rs` の「必須アセットが同梱されている」テストの配列へ追加する。
+`crates/setoka-theme/src/lib.rs` の「必須アセットが同梱されている」テストの配列へ追加する。
 
 > ここが漏れると、埋め込み欠落を検出するガードが空振りする。
 > rust-embed は **debug ではファイルシステムから読む**ため、
@@ -63,7 +63,7 @@ storage を使うならキーは `yuzu-*`。同一オリジンに複数サイト
 body 末尾の script タグ列はスナップショットに逐語で入っているので必ず動く。
 
 ```bash
-INSTA_UPDATE=always cargo test -p yuzu-render
+INSTA_UPDATE=always cargo test -p setoka-render
 ```
 
 対象は `render_snapshot__index_html.snap` / `__guide_html.snap` / `__not_found_html.snap` /
@@ -79,12 +79,12 @@ INSTA_UPDATE=always cargo test -p yuzu-render
           grep -q 'js/details-target.js' dist/guide/writing/index.html
 ```
 
-インライン script なら中身の特徴的な文字列で照合する（`grep -q 'yuzu-sidebar-scroll' dist/index.html`）。
+インライン script なら中身の特徴的な文字列で照合する（`grep -q 'setoka-sidebar-scroll' dist/index.html`）。
 
 ### 6. 実機確認
 
 `run` スキル。**`file://` では fetch も sessionStorage も期待どおりに動かない**ので
-必ず `yuzu preview` / `yuzu dev` 経由。JS 無効時に壊れないことも見る。
+必ず `setoka preview` / `setoka dev` 経由。JS 無効時に壊れないことも見る。
 
 ## CSS を足す場合
 

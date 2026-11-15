@@ -1,0 +1,296 @@
+//! パーサ非依存の公開ドキュメントモデル
+
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+/// frontmatter（YAML、`---` 区切り）で指定できるページメタデータ。
+/// 未知のキーは無視する（後続フェーズで `slug` / `tags` 等を追加予定）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Frontmatter {
+    /// ページタイトル（ナビ表示にも使う）。未指定なら先頭 h1 → ファイル名の順で補う
+    pub title: Option<String>,
+    /// ナビの並び順（昇順）。未指定はファイル名順で最後尾グループ
+    pub order: Option<i64>,
+    /// true ならビルド対象から除外
+    pub draft: bool,
+    /// メタディスクリプション
+    pub description: Option<String>,
+    /// false なら llms.txt / llms-full.txt に収録しない
+    pub llms: bool,
+    /// このページへリダイレクトする旧 URL（route 形式。例 `guide/old-name/`。
+    /// 先頭 `/`・末尾スラッシュ省略は正規化で吸収）。ビルド時に各エイリアスへ
+    /// リダイレクト HTML を生成する。実ページや他エイリアスとの衝突はエラー
+    pub aliases: Vec<String>,
+    /// このページに限り抑制する診断ルール ID（warning ルールのみ有効。
+    /// 一覧は docs の「診断ルール」参照）。未知名・抑制不可名は
+    /// `invalid-lint-suppression`、発火しなかった抑制は `unused-lint-suppression`
+    /// の warning になる
+    #[serde(rename = "lintDisable")]
+    pub lint_disable: Vec<String>,
+    /// false ならこのページに読了時間・文字数を出さない（サイト全体の
+    /// `theme.reading_time` が true のときだけ意味を持つ）
+    #[serde(rename = "readingTime")]
+    pub reading_time: bool,
+    /// false ならこのページの原稿の `.md`（ページ単位 Markdown）を配信せず、コピーボタンも
+    /// 出さない。llms.txt のリンクはページの HTML を指す（サイト全体は `llms.page_md`）
+    #[serde(rename = "pageMd")]
+    pub page_md: bool,
+    /// false ならこのページを検索インデックスに載せない（ページの全節。nav・sitemap・llms には
+    /// 載る。Phase 89。節ごとには外せない = frontmatter の形を最小にする）
+    pub search: bool,
+}
+
+// llms・readingTime・pageMd・search の既定を true にするため derive ではなく手書き
+// （serde のコンテナ #[serde(default)] もこの Default を使う）
+impl Default for Frontmatter {
+    fn default() -> Self {
+        Self {
+            title: None,
+            order: None,
+            draft: false,
+            description: None,
+            llms: true,
+            aliases: Vec::new(),
+            lint_disable: Vec::new(),
+            reading_time: true,
+            page_md: true,
+            search: true,
+        }
+    }
+}
+
+/// 本文の分量（ページメタの読了時間・文字数）。
+/// 数えるのは本文の文章だけ（コードブロック・図・数式・生 HTML・画像の代替テキスト・
+/// frontmatter は数えない）。Markdown 断片は展開した後で数える。
+/// 数え方は `markdown/reading.rs`、数える場所は本文 HTML 化（`RenderedBody::reading`）
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadingStats {
+    /// 空白を除いた文字数
+    pub chars: usize,
+    /// 読了時間の目安（分。切り上げ。文章が無ければ 0）
+    pub minutes: usize,
+}
+
+/// ソース上の位置（1 始まりの行・列）。将来の Linter 診断用に保持する
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceSpan {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+/// 図表キャプションのラベル（相互参照のターゲット）。
+/// `Figure: 説明 {#fig:deps}` から採番と id を確定して収集する
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossrefLabel {
+    /// `{#fig:deps}` の中身（アンカー id と同じ値）
+    pub id: String,
+    /// 種別（図 / 表 / リスト）。参照テキストの自動補完に使う
+    pub kind: crate::markdown::crossref::CaptionKind,
+    /// ページ内の採番（種別ごとに 1 から）
+    pub number: usize,
+    /// キャプション本文
+    pub text: String,
+    /// ソース上の位置（重複ラベルの診断用）
+    pub span: SourceSpan,
+}
+
+/// ページ内 TOC の 1 エントリ（見出し）。
+/// ID は本文 HTML の見出しアンカーと一致することを保証する
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TocEntry {
+    /// 見出しレベル（1〜6）。表示対象の絞り込みは利用側で行う
+    pub level: u8,
+    /// アンカー ID（`<h2 id="...">` と同じ値）
+    pub id: String,
+    /// 見出しのプレーンテキスト
+    pub text: String,
+    /// ソース上の位置
+    pub span: SourceSpan,
+}
+
+/// 検索インデックス用のセクション（h2/h3 境界で分割したプレーンテキスト）
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlainSection {
+    /// 見出しのアンカー ID（本文 HTML の `<h2 id="...">` と同一）。リード文は None
+    pub anchor: Option<String>,
+    /// 見出しのプレーンテキスト。リード文は None
+    pub heading: Option<String>,
+    /// セクション本文。h2/h3 自身の見出しテキストは含まない
+    /// （インデクサが heading フィールドに重みを付けて別計上する）。
+    /// h1・h4〜h6 の見出しテキストは本文として含む（検索対象に残す）
+    pub body: String,
+}
+
+/// 1 つの Markdown ページ
+#[derive(Debug, Clone)]
+pub struct Page {
+    /// ソースファイルの絶対パス
+    pub src: PathBuf,
+    /// `content/` からの相対パス（例: `guide/getting-started.md`）
+    pub rel: PathBuf,
+    /// サイト相対 URL。base path は含まず、`""`（トップ）または
+    /// `"guide/getting-started/"` のように末尾スラッシュ付き
+    pub route: String,
+    pub frontmatter: Frontmatter,
+    /// 解決済みタイトル（frontmatter → 先頭 h1 → ファイル名の優先順）
+    pub title: String,
+    /// ページ内 TOC（h1〜h6 全見出し）
+    pub toc: Vec<TocEntry>,
+    /// 図表キャプションのラベル（相互参照のターゲット。文書順）
+    pub labels: Vec<CrossrefLabel>,
+    /// 図表番号の開始オフセット（種別ごとの先行ページまでの個数）。
+    /// `markdown.crossref.numbering: "site"` のときだけ非ゼロになる
+    pub crossref_offset: crate::markdown::crossref::Numbering,
+    /// Markdown 原文（本文 HTML 化・将来の `setoka fmt` が再パースに使う）
+    pub source: String,
+    /// ビルド時に合成したページの種別（実ページは None）。**実ファイルが無い**ので
+    /// `setoka fmt` / `setoka lint --fix` の書き込み対象から外し、「このページを編集」
+    /// リンクも出さない。リンク検査では**リンク先としてだけ**有効にする。
+    /// 集約（nav・検索索引・sitemap・ページ単位 .md）に載せるかは種別ごとに違うため、
+    /// 呼び出し側は kind を直接見ず `Page::in_*` ヘルパを通す
+    pub generated: Option<GeneratedKind>,
+}
+
+/// ビルド時に合成されるページの種別
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeneratedKind {
+    /// 用語集ページ（`markdown.glossary.page`）
+    Glossary,
+    /// 検索結果ページ（`search.page`）
+    Search,
+}
+
+impl GeneratedKind {
+    /// このページの route を決める設定キー（診断文面用の唯一の定義）
+    pub fn config_key(self) -> &'static str {
+        match self {
+            Self::Glossary => "markdown.glossary.page",
+            Self::Search => "search.page",
+        }
+    }
+
+    /// 診断文面での呼び名（「自動生成される◯◯」に続く名詞）
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Glossary => "用語集ページ",
+            Self::Search => "検索結果ページ",
+        }
+    }
+
+    /// コンテンツ集約（nav・検索索引・sitemap・ページ単位 .md）に載せるか。
+    /// 用語集は読み物なので載せる。検索結果ページは中身が実行時に決まる
+    /// 機能ページなので載せない（JS 前提の空ページを集約に混ぜない）
+    fn in_listings(self) -> bool {
+        match self {
+            Self::Glossary => true,
+            Self::Search => false,
+        }
+    }
+}
+
+impl Page {
+    /// 合成ページか（`page.src` が実在しない）。`setoka fmt` / `lint --fix` の
+    /// 書き込み防止・lint / 診断の除外・`edit_url` 抑止・集計行の分母はこれを見る
+    pub fn is_generated(&self) -> bool {
+        self.generated.is_some()
+    }
+
+    /// サイドバー nav（と、その派生の pager・パンくず）に載せるか
+    pub fn in_nav(&self) -> bool {
+        self.generated.is_none_or(GeneratedKind::in_listings)
+    }
+
+    /// 検索インデックスに載せるか（frontmatter の `search: false` も見る）
+    pub fn in_search_index(&self) -> bool {
+        self.frontmatter.search && self.generated.is_none_or(GeneratedKind::in_listings)
+    }
+
+    /// sitemap.xml に載せるか
+    pub fn in_sitemap(&self) -> bool {
+        self.generated.is_none_or(GeneratedKind::in_listings)
+    }
+
+    /// ページ単位 Markdown（`md_rel_path()`）を出力するか。`site_page_md` はサイト全体の
+    /// 設定 `llms.page_md`（core は設定を知らないので呼び出し側が渡す）。
+    /// `.md` の書き出し・コピーボタン（`data-md-url`）・llms.txt のリンク先の 3 か所が
+    /// これを通る（呼び出し側で frontmatter や設定を直接見ない）
+    pub fn emits_page_md(&self, site_page_md: bool) -> bool {
+        site_page_md
+            && self.frontmatter.page_md
+            && self.generated.is_none_or(GeneratedKind::in_listings)
+    }
+
+    /// 出力ファイルの相対パス（pretty URL: `route + "index.html"`）
+    pub fn output_rel_path(&self) -> String {
+        format!("{}index.html", self.route)
+    }
+
+    /// ページ単位 Markdown の配信相対パス。
+    /// route の末尾スラッシュを落として `.md` を付ける（`guide/intro/` → `guide/intro.md`）。
+    /// ルート（route 空）は `index.md`。HTML と競合しない（`<route>index.html` はディレクトリ内）
+    pub fn md_rel_path(&self) -> String {
+        if self.route.is_empty() {
+            "index.md".to_string()
+        } else {
+            format!("{}.md", self.route.trim_end_matches('/'))
+        }
+    }
+}
+
+/// ナビツリーの 1 ノード（ページ、またはページを束ねるディレクトリ）
+#[derive(Debug, Clone, Serialize)]
+pub struct NavNode {
+    pub title: String,
+    /// リンク先 route。`index.md` を持たないディレクトリは None（ラベルのみ）
+    pub route: Option<String>,
+    /// frontmatter の並び順（ディレクトリは配下 `index.md` の値）
+    pub order: Option<i64>,
+    pub children: Vec<NavNode>,
+}
+
+/// サイト全体のモデル
+#[derive(Debug, Clone)]
+pub struct SiteModel {
+    /// 全ページ（draft 除外済み、走査順＝パスのソート順）
+    pub pages: Vec<Page>,
+    /// ナビツリー（`order` → 名前順でソート済み）
+    pub nav: Vec<NavNode>,
+}
+
+impl SiteModel {
+    /// `content/` からの相対パス（`/` 区切り）→ route の解決。
+    /// 本文中の `.md` 相互リンクの解決に使う
+    pub fn route_for_rel_str(&self, rel: &str) -> Option<&str> {
+        self.pages
+            .iter()
+            .find(|p| crate::urlpath::rel_to_slash(&p.rel) == rel)
+            .map(|p| p.route.as_str())
+    }
+
+    /// 本文 HTML キャッシュの routesKey（[`crate::BuildCache::set_routes_key`] に渡す）。
+    ///
+    /// 入力は、本文 HTML がページ自身の原文以外から受ける影響の全部:
+    /// rel→route の集合（`.md` リンクの解決先）と、各ページの図表番号の開始位置
+    /// （サイト通し番号のとき。先行ページの図表の増減・並び順の変更で変わる。
+    /// 個数だけでは図⇄表の差し替えや `order` の変更を取りこぼす）。
+    /// cli とテストが同じ組み立てを通るよう、ここを唯一の定義にする
+    pub fn routes_key(&self) -> String {
+        let lines: Vec<String> = self
+            .pages
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}\t{}\t{}",
+                    crate::urlpath::rel_to_slash(&p.rel),
+                    p.route,
+                    p.crossref_offset.key()
+                )
+            })
+            .collect();
+        crate::BuildCache::sha256_hex_parts(&[lines.join("\n").as_bytes()])
+    }
+}

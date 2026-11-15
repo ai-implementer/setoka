@@ -1,6 +1,6 @@
-//! yuzu の検索インデックスフォーマットとクエリエンジン。
+//! setoka の検索インデックスフォーマットとクエリエンジン。
 //!
-//! `yuzu-index`（ネイティブのインデクサ・`yuzu search`）と
+//! `setoka-index`（ネイティブのインデクサ・`setoka search`）と
 //! `mikan-wasm`（ブラウザのクエリエンジン）が**この crate の同一コードを共有**する。
 //!
 //! ⚠️ 最重要の整合制約: index 時（ネイティブ）と query 時（wasm）で
@@ -50,7 +50,7 @@ pub const FORMAT_VERSION: u16 = 3;
 /// 未分類の doc を表すグループ id（[`Manifest::doc_groups`] の値）
 pub const UNGROUPED: u16 = u16::MAX;
 
-/// 同梱モデル（`yuzu-index` が有効化する）
+/// 同梱モデル（`setoka-index` が有効化する）
 #[cfg(feature = "builtin-model")]
 pub fn builtin_model_zst() -> &'static [u8] {
     include_bytes!("../assets/model/bccwj-suw_c1.0.model.zst")

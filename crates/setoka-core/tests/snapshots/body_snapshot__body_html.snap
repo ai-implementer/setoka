@@ -1,0 +1,41 @@
+---
+source: crates/setoka-core/tests/body_snapshot.rs
+expression: html
+---
+<h1 id="サンプル">サンプル<a class="anchor" href="#サンプル" aria-label="「サンプル」へのリンク"></a></h1>
+<p>GFM の<strong>表</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>機能</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>build</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><del>検索</del></td>
+<td>Phase 3</td>
+</tr>
+</tbody>
+</table>
+<h2 id="コード">コード<a class="anchor" href="#コード" aria-label="「コード」へのリンク"></a></h2>
+<pre><code class="language-rust">fn main() {
+    println!(&quot;こんにちは setoka&quot;);
+}
+</code></pre>
+<h2 id="図">図<a class="anchor" href="#図" aria-label="「図」へのリンク"></a></h2>
+<pre class="mermaid">sequenceDiagram
+    participant A
+    A->>B: hello
+</pre>
+<h2 id="使い方">使い方<a class="anchor" href="#使い方" aria-label="「使い方」へのリンク"></a></h2>
+<h2 id="使い方-1">使い方<a class="anchor" href="#使い方-1" aria-label="「使い方」へのリンク"></a></h2>
+<ul>
+<li><input type="checkbox" checked="" disabled="" /> タスクリスト</li>
+<li><input type="checkbox" disabled="" /> 未完了</li>
+</ul>
+<p>autolink: <a href="https://example.com">https://example.com</a></p>

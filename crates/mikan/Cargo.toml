@@ -1,7 +1,7 @@
 [package]
 name = "mikan"
-# 検索インデックスフォーマット＋BM25 クエリエンジン。yuzu-* の上位層に依存しない
-# 汎用ライブラリで、monorepo のまま crates.io へ単独公開している（開発は yuzu
+# 検索インデックスフォーマット＋BM25 クエリエンジン。setoka-* の上位層に依存しない
+# 汎用ライブラリで、monorepo のまま crates.io へ単独公開している（開発は setoka
 # ワークスペースで一体・repository は monorepo を指す）。バージョンは workspace と
 # 独立で、変更時にだけ上げて publish する（手順は `publish-crate` スキル）
 description = "Japanese full-text search index format and BM25 query engine, shared by a native indexer and a wasm client (static files, no I/O)"
@@ -31,6 +31,6 @@ insta = { workspace = true }
 
 [features]
 # 同梱モデル（assets/model/*.model.zst）を include_bytes! で埋め込む。
-# yuzu-index（ネイティブ側）だけが有効化する。wasm 側はモデルを fetch するので
+# setoka-index（ネイティブ側）だけが有効化する。wasm 側はモデルを fetch するので
 # 有効化しない（wasm バイナリを肥大させないため）
 builtin-model = []

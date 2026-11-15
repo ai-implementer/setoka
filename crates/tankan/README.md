@@ -4,8 +4,8 @@ Mermaid 互換のダイアグラムテキストを **SVG** に変換する純 Ru
 名前は柑橘のタンカン（桶柑）から。
 
 - **純 Rust・I/O なし・時刻/乱数非依存** — `wasm32-unknown-unknown` でもそのまま動く
-- **特定ツール非依存の汎用設計**（開発は [yuzu](https://github.com/ai-implementer/yuzu)
-  monorepo で行っているが `yuzu-*` に依存しない独立ライブラリ）
+- **特定ツール非依存の汎用設計**（開発は [setoka](https://github.com/ai-implementer/setoka)
+  monorepo で行っているが `setoka-*` に依存しない独立ライブラリ）
 - **フォールバック前提**: 未対応の図種・構文は `Error` で明示し、呼び出し側が
   mermaid.js クライアント描画等へ落とせる（全図種対応を待たずに実戦投入できる）
 

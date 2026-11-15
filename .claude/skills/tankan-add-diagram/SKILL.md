@@ -1,14 +1,14 @@
 ---
 name: tankan-add-diagram
-description: tankan（Mermaid 互換 SSR ライブラリ）に新しい図種のサポートを追加するレシピ。journey 等の図種追加や既存図種の構文拡張のときに使う。tankan 内の実装に加えて yuzu 側（キャッシュ bump・スナップショット・対応表）の追随も含む。
+description: tankan（Mermaid 互換 SSR ライブラリ）に新しい図種のサポートを追加するレシピ。journey 等の図種追加や既存図種の構文拡張のときに使う。tankan 内の実装に加えて setoka 側（キャッシュ bump・スナップショット・対応表）の追随も含む。
 ---
 
 # tankan 図種追加レシピ
 
-tankan は yuzu 非依存の汎用ライブラリ（`crates/tankan`）で、crates.io 公開物でもある。
-yuzu 側は `render_svg` が Err を返すと自動でクライアント描画へフォールバックするため、
+tankan は setoka 非依存の汎用ライブラリ（`crates/tankan`）で、crates.io 公開物でもある。
+setoka 側は `render_svg` が Err を返すと自動でクライアント描画へフォールバックするため、
 **未対応のままでも壊れない**。ただし図種を足すと「今までフォールバックしていたページが
-SSR 成功へ変わる」＝本文 HTML が変わるので、**yuzu 側にも追随作業がある**。
+SSR 成功へ変わる」＝本文 HTML が変わるので、**setoka 側にも追随作業がある**。
 
 ## A. tankan 内（5 箇所）
 
@@ -31,16 +31,16 @@ SSR 成功へ変わる」＝本文 HTML が変わるので、**yuzu 側にも追
 5. **README の対応状況表**: `crates/tankan/README.md` は crates.io ユーザ向けの一次情報。
    CI の `cargo package` は中身の陳腐化を検出できないので手で直す
 
-## B. yuzu 側（忘れると静かに壊れる）
+## B. setoka 側（忘れると静かに壊れる）
 
-1. **`CACHE_FORMAT_VERSION` を上げる**（`crates/yuzu-core/src/cache.rs`）。
+1. **`CACHE_FORMAT_VERSION` を上げる**（`crates/setoka-core/src/cache.rs`）。
    従来フォールバックだったページが SSR 成功へ変わる＝**本文 HTML の意味が変わる**ため。
    doc コメントの履歴にも 1 行足す（前例: `v7: mindmap / timeline の SSR 追加`）。
-   隣の `CACHE_FINGERPRINT` も、yuzu-cli のテスト（`キャッシュの中身が変わったら版を上げる`）が出す値に
+   隣の `CACHE_FINGERPRINT` も、setoka-cli のテスト（`キャッシュの中身が変わったら版を上げる`）が出す値に
    書き直す（試験用のプロジェクトの図が変わらなくても、版と指紋の組がそろっていないと落ちる）
-2. `crates/yuzu-render/src/highlight.rs` と `tests/render_snapshot.rs` の追随
+2. `crates/setoka-render/src/highlight.rs` と `tests/render_snapshot.rs` の追随
    （SSR 対象が増えるとスナップショットが動く）
-3. `README.md` と `CLAUDE.md` の対応図種の列挙、`crates/yuzu-cli/scaffold/`（「9 図種」等の表記）
+3. `README.md` と `CLAUDE.md` の対応図種の列挙、`crates/setoka-cli/scaffold/`（「9 図種」等の表記）
 4. `cargo check -p tankan --target wasm32-unknown-unknown`（CI でも検査される）
 
 ## 共通ヘルパ（`crates/tankan/src/common/`）— 先に読む
@@ -62,7 +62,7 @@ SSR 成功へ変わる」＝本文 HTML が変わるので、**yuzu 側にも追
 - **ユーザ指定色はインライン style 属性で直接埋める**（テーマ非追従が正）。
   `<style>` へ追記する方式は、同一ページに複数 SVG があるとルールが衝突するため不可
 - SVG の well-formed 検証は roxmltree（dev 用テスト）
-- yuzu-* クレートに依存しない（crates.io 単独公開を維持）
+- setoka-* クレートに依存しない（crates.io 単独公開を維持）
 
 ## 参考挙動（mermaid 互換で注意した点）
 

@@ -643,10 +643,10 @@ mod tests {
 
     #[test]
     fn 基本形をパースできる() {
-        let d = parse("title = \"yuzu\"\ncount = 42\nok = true\n");
+        let d = parse("title = \"setoka\"\ncount = 42\nok = true\n");
         let root = d.root();
         assert_eq!(root.len(), 3);
-        assert_eq!(root.get("title").unwrap().node().as_str(), Some("yuzu"));
+        assert_eq!(root.get("title").unwrap().node().as_str(), Some("setoka"));
         assert_eq!(root.get("count").unwrap().node().as_integer(), Some(42));
         assert_eq!(root.get("ok").unwrap().node().as_boolean(), Some(true));
     }

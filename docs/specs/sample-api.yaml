@@ -1,5 +1,5 @@
 # guide/api-spec.md の「file: 参照」デモで使うサンプル仕様。
-# このファイルを編集すると、次の yuzu build で参照ページに必ず反映される
+# このファイルを編集すると、次の setoka build で参照ページに必ず反映される
 # （file: 参照ページはキャッシュ対象外）。
 openapi: 3.0.3
 info:

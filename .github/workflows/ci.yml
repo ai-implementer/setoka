@@ -72,21 +72,35 @@ jobs:
         run: scripts/third-party-licenses.sh check
 
       # 検索 wasm の作り直し忘れ（Phase 89）。下の docs ゲートの検索の照合はネイティブの
-      # yuzu search を通り、上の照合は crate と版の集合しか比べないので、版を上げない mikan の
+      # setoka search を通り、上の照合は crate と版の集合しか比べないので、版を上げない mikan の
       # 変更では wasm が古いままでも通ってしまう。wasm の入力のハッシュと同梱の JS を照合する
       - name: search wasm inputs
         run: scripts/build-search-wasm.sh --check
 
-      # 雛形 deploy.yml（yuzu new が作る）と docs の PR 検証の例（docs/snippets/pr-check.yml）の
+      # v0.21 Phase 94 で名前を setoka へ変えた。旧名が戻っていないか（バイナリの wasm も含めて）と、
+      # 旧名を含むファイル名が無いかを照合する。改名の経緯を書いた ROADMAP.md と、過去の記録の
+      # ROADMAP-history.md だけは除く。パターンは文字クラスで書いて、この行自身に当たらないようにする
+      - name: old name
+        run: |
+          if git grep -n -i 'y[u]zu' -- . ':!ROADMAP.md' ':!ROADMAP-history.md'; then
+            echo "旧名が残っています（v0.21 Phase 94 で setoka へ変えた）" >&2
+            exit 1
+          fi
+          if git ls-files | grep -i 'y[u]zu'; then
+            echo "旧名を含むファイル名があります（v0.21 Phase 94 で setoka へ変えた）" >&2
+            exit 1
+          fi
+
+      # 雛形 deploy.yml（setoka new が作る）と docs の PR 検証の例（docs/snippets/pr-check.yml）の
       # actions は、このリポジトリのワークフローと同じ SHA・版のコメントにする。dependabot は
       # .github/ の外を見ないので、actions の更新 PR で雛形と例だけが古い版に残るのを止める
       # （Phase 82 の後、dependabot の最初の PR で判明）。docs は雛形を docs のルートの外から
       # 取り込めないので写し（docs/snippets/deploy.yml）を置いている = 雛形とバイト一致させ、
-      # PR 検証の例の yuzu のインストールも雛形と同じ手順（コメントを除く）にする（Phase 91）
+      # PR 検証の例の setoka のインストールも雛形と同じ手順（コメントを除く）にする（Phase 91）
       - name: scaffold actions pins
         run: |
           status=0
-          for f in crates/yuzu-cli/scaffold/deploy.yml docs/snippets/pr-check.yml; do
+          for f in crates/setoka-cli/scaffold/deploy.yml docs/snippets/pr-check.yml; do
             while read -r ref; do
               if ! grep -rqF -- "uses: $ref" .github/workflows/; then
                 echo "$f の「$ref」が .github/workflows に無い（同じ SHA・コメントに揃える）" >&2
@@ -94,13 +108,13 @@ jobs:
               fi
             done < <(sed -n 's/^[ -]*uses: //p' "$f")
           done
-          if ! cmp crates/yuzu-cli/scaffold/deploy.yml docs/snippets/deploy.yml; then
-            echo "docs/snippets/deploy.yml が雛形と違う（cp crates/yuzu-cli/scaffold/deploy.yml docs/snippets/deploy.yml）" >&2
+          if ! cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml; then
+            echo "docs/snippets/deploy.yml が雛形と違う（cp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml）" >&2
             status=1
           fi
-          install_step() { sed -n '/- name: yuzu をインストール/,/\.\/yuzu\/yuzu --version/p' "$1" | grep -v '^ *#'; }
-          if ! diff <(install_step crates/yuzu-cli/scaffold/deploy.yml) <(install_step docs/snippets/pr-check.yml); then
-            echo "docs/snippets/pr-check.yml の yuzu のインストールが雛形 deploy.yml と違う" >&2
+          install_step() { sed -n '/- name: setoka をインストール/,/\.\/setoka\/setoka --version/p' "$1" | grep -v '^ *#'; }
+          if ! diff <(install_step crates/setoka-cli/scaffold/deploy.yml) <(install_step docs/snippets/pr-check.yml); then
+            echo "docs/snippets/pr-check.yml の setoka のインストールが雛形 deploy.yml と違う" >&2
             status=1
           fi
           exit "$status"
@@ -166,24 +180,24 @@ jobs:
           rustup target add thumbv7em-none-eabi
           cargo check --locked -p kabosu --target thumbv7em-none-eabi
 
-      # docs/: yuzu 自身のドキュメントサイト（Phase 36）を PR でも検証する。
+      # docs/: setoka 自身のドキュメントサイト（Phase 36）を PR でも検証する。
       # デプロイは docs.yml（リリースのタグの push。Phase 84）だが、壊れた原稿・SSR フォールバックの
       # 混入はマージ前にここで検出する
-      - name: docs site (yuzu check && yuzu build)
+      - name: docs site (setoka check && setoka build)
         # プロジェクトは --root docs で指定する（Phase 75 の dogfooding。cd docs しない）。
         # 出力は docs/dist/ に出る
         run: |
           # 診断は GitHub Actions の注釈で出す（Phase 46）。パスは GITHUB_WORKSPACE からの
           # 相対へ自動で付け替わるので PR の diff 行に紐づく（cwd に依存しない）。
           # 注釈の画面表示は 1 ステップ 10 件までで、残りはログに出る
-          target/debug/yuzu check --root docs --format github
-          target/debug/yuzu build --root docs
+          target/debug/setoka check --root docs --format github
+          target/debug/setoka build --root docs
           test -f docs/dist/index.html
           test -f docs/dist/_search/manifest.json
           # エイリアス（guide/quality の旧 URL）にリダイレクト HTML が生成される
           grep -q 'http-equiv="refresh"' docs/dist/guide/lint/index.html
-          # コンテンツインクルード: yuzu.toml の引用が展開されている
-          grep -q '<figcaption>yuzu.toml:27-47</figcaption>' docs/dist/guide/code-and-math/index.html
+          # コンテンツインクルード: setoka.toml の引用が展開されている
+          grep -q '<figcaption>setoka.toml:27-47</figcaption>' docs/dist/guide/code-and-math/index.html
           # 図表番号: キャプションの採番と参照リンクの自動補完
           grep -q 'id="fig:deps"' docs/dist/development/index.html
           grep -q '<a href="#fig:deps">図 1</a>' docs/dist/development/index.html
@@ -192,7 +206,7 @@ jobs:
           # 折りたたみ内へのアンカージャンプを開く JS が配信される
           grep -q 'js/details-target.js' docs/dist/guide/writing/index.html
           # サイドバーのスクロール位置維持（base.jinja のインライン script）が配信されている
-          grep -q 'yuzu-sidebar-scroll' docs/dist/index.html
+          grep -q 'setoka-sidebar-scroll' docs/dist/index.html
           # タブ / コードグループ（Phase 50）: radio + label のマークアップが出ている
           grep -q 'class="tab-label"' docs/dist/guide/code-and-math/index.html
           # Markdown 断片（Phase 51）: docs/snippets/ の断片が展開された散文で出ている
@@ -218,11 +232,11 @@ jobs:
           grep -q '"docGroups"' docs/dist/_search/manifest.json
           # エンジン側で絞り込めて件数も絞り込み後になる（ブラウザ操作は CI で
           # 検証できないので、同一エンジンを通る CLI で担保する）
-          target/debug/yuzu search --root docs --section 開発者向け "キャッシュ" | grep -q '/development/'
+          target/debug/setoka search --root docs --section 開発者向け "キャッシュ" | grep -q '/development/'
           # Phase 89（リリース判定）: 「設定」で設定のページが上位 3 件に入る。以前は同義語の例を
-          # 書いた節が 1 位で、設定のページは 14 位だった。ネイティブの yuzu search はブラウザと
+          # 書いた節が 1 位で、設定のページは 14 位だった。ネイティブの setoka search はブラウザと
           # 同じエンジンを通る（wasm の作り直し忘れは search wasm inputs の照合が見る）
-          target/debug/yuzu search --root docs --format json --limit 3 "設定" \
+          target/debug/setoka search --root docs --format json --limit 3 "設定" \
             | jq -e 'any(.[]; .url | startswith("reference/config/"))' >/dev/null
           # 絞り込み UI の配線ゲート（機能自体はブラウザ操作なので CI では検証できない。
           # Phase 54 でチップは結果ページ search-page.js へ移動した）
@@ -250,8 +264,8 @@ jobs:
           grep -q 'unused-lint-suppression' docs/dist/reference/rules/index.html
           grep -q 'lintDisable' docs/dist/guide/quality/index.html
           # 行単位の lint 抑制（Phase 59）が原稿に載っている
-          grep -q 'yuzu-lint-disable-next-line' docs/dist/reference/rules/index.html
-          grep -q 'yuzu-lint-disable-next-line' docs/dist/guide/quality/index.html
+          grep -q 'setoka-lint-disable-next-line' docs/dist/reference/rules/index.html
+          grep -q 'setoka-lint-disable-next-line' docs/dist/guide/quality/index.html
           # 全ルールの enable/disable（Phase 60）が原稿に載っている
           grep -q 'プロジェクト全体の無効化' docs/dist/reference/rules/index.html
           grep -q 'プロジェクト全体の無効化' docs/dist/guide/quality/index.html
@@ -261,7 +275,7 @@ jobs:
           grep -q 'search-page-more' docs/dist/_assets/js/search-page.js
           # 検索結果ページ（Phase 54）: 専用ページが生成され、集約からは除外される
           test -f docs/dist/search/index.html
-          grep -q 'id="yuzu-search-page"' docs/dist/search/index.html
+          grep -q 'id="setoka-search-page"' docs/dist/search/index.html
           grep -q 'data-page-size' docs/dist/search/index.html
           # ドロップダウン → 結果ページへの導線（全ページに data-search-page が配られる）
           grep -q 'data-search-page' docs/dist/index.html
@@ -314,7 +328,7 @@ jobs:
           grep -q 'id="共有カードogpと-canonical"' docs/dist/guide/deploy/index.html
           # Phase 77: frontmatter の読み違いのルールと、雛形 deploy.yml の版固定の説明
           grep -q 'frontmatter-unrecognized' docs/dist/reference/rules/index.html
-          grep -q 'yuzu と同じ版に' docs/dist/guide/deploy/index.html
+          grep -q 'setoka と同じ版に' docs/dist/guide/deploy/index.html
           # Phase 78: 見出しのパーマリンク。id は見出し自身に付き、リンクは末尾に
           # aria-label 付き（aria-hidden の付いた旧形式が残っていたら失敗）。
           # CSS は visibility: hidden でなく、フォーカスで # を出す
@@ -342,8 +356,8 @@ jobs:
           test -f docs/dist/guide/appearance/index.html
           test -f docs/dist/guide/faq/index.html
           grep -q 'id="client-と-ssr-の選び方"' docs/dist/guide/diagrams/index.html
-          grep -q 'github.com/ai-implementer/yuzu/issues' docs/dist/index.html
-          grep -q 'github.com/ai-implementer/yuzu/issues' docs/dist/guide/faq/index.html
+          grep -q 'github.com/ai-implementer/setoka/issues' docs/dist/index.html
+          grep -q 'github.com/ai-implementer/setoka/issues' docs/dist/guide/faq/index.html
           # Phase 85: build の報告・check --no-fmt・大文字小文字だけが違う URL・ログの書式・
           # fmt が変える書き方の一覧が原稿に載っている
           grep -q -- '--no-fmt' docs/dist/reference/cli/index.html
@@ -376,7 +390,7 @@ jobs:
           grep -q '<figcaption>snippets/pr-check.yml</figcaption>' docs/dist/guide/quality/index.html && grep -q -- '--no-fmt --format github' docs/dist/guide/quality/index.html
           # 設定例は TOML で書く（JSON / YAML 風の `markdown.mermaid.backend: "ssr"` や
           # `"abbr": false` はコピーすると設定エラーになる）。原稿・README・雛形・スキルを見る
-          if grep -rnE '`[a-z_]+(\.[a-z_]+)+: |`"[a-z_]+": |backend: ["]' docs/content README.md crates/yuzu-cli/scaffold/*.md .claude/skills/; then
+          if grep -rnE '`[a-z_]+(\.[a-z_]+)+: |`"[a-z_]+": |backend: ["]' docs/content README.md crates/setoka-cli/scaffold/*.md .claude/skills/; then
             echo "JSON / YAML 風の設定例が残っている（上記。TOML の書き方に直す）" >&2
             exit 1
           fi
@@ -390,75 +404,75 @@ jobs:
           # Phase 90（リリース判定）: サブパス配信（docs.yml と同じ --base-url）で、favicon の
           # link が base の下を指し、そのファイルが dist にある（以前は link が無く、ブラウザが
           # 探すドメイン直下の /favicon.ico は 404 だった）。docs/dist を作り直すので最後に置く
-          target/debug/yuzu build --root docs --base-url /yuzu/
+          target/debug/setoka build --root docs --base-url /setoka/
           href="$(grep -oE '<link rel="icon" href="[^"]*"' docs/dist/index.html | sed -E 's/.*href="([^"]*)"/\1/')"
           case "$href" in
-            /yuzu/*) ;;
+            /setoka/*) ;;
             *) echo "favicon の href が base の下を指していない: '$href'" >&2; exit 1 ;;
           esac
-          test -f "docs/dist/${href#/yuzu/}"
+          test -f "docs/dist/${href#/setoka/}"
           grep -q '<footer class="site-footer">' docs/dist/index.html
           grep -q 'class="header-links"' docs/dist/index.html
 
       # e2e: サンプルプロジェクト生成 → ビルド → ネイティブ検索（誤字クエリ込み）
-      - name: e2e (yuzu new && yuzu build && yuzu search)
+      - name: e2e (setoka new && setoka build && setoka search)
         run: |
-          ./target/debug/yuzu new "$RUNNER_TEMP/e2e-docs"
+          ./target/debug/setoka new "$RUNNER_TEMP/e2e-docs"
           # Phase 72: --root（グローバルオプション）。cwd がプロジェクト外の状態で
           # 検証する必要があるので、cd より前のここに置く
           #
           # サブコマンドの前後どちらでも効く（clap の global = true）
-          ./target/debug/yuzu --root "$RUNNER_TEMP/e2e-docs" build
-          ./target/debug/yuzu build --root "$RUNNER_TEMP/e2e-docs"
+          ./target/debug/setoka --root "$RUNNER_TEMP/e2e-docs" build
+          ./target/debug/setoka build --root "$RUNNER_TEMP/e2e-docs"
           test -f "$RUNNER_TEMP/e2e-docs/dist/index.html"
-          ./target/debug/yuzu check --root "$RUNNER_TEMP/e2e-docs"
-          # yuzu.toml が無いディレクトリは実行エラー。探索していないので
+          ./target/debug/setoka check --root "$RUNNER_TEMP/e2e-docs"
+          # setoka.toml が無いディレクトリは実行エラー。探索していないので
           # 文言に「上方向」を含めない
           mkdir -p "$RUNNER_TEMP/root-empty"
-          if ./target/debug/yuzu check --root "$RUNNER_TEMP/root-empty" 2> "$RUNNER_TEMP/root-err.txt"; then
-            echo "yuzu.toml の無いディレクトリが成功扱いになった" >&2
+          if ./target/debug/setoka check --root "$RUNNER_TEMP/root-empty" 2> "$RUNNER_TEMP/root-err.txt"; then
+            echo "setoka.toml の無いディレクトリが成功扱いになった" >&2
             exit 1
           fi
-          grep -q 'yuzu.toml がありません' "$RUNNER_TEMP/root-err.txt"
+          grep -q 'setoka.toml がありません' "$RUNNER_TEMP/root-err.txt"
           if grep -q '上方向' "$RUNNER_TEMP/root-err.txt"; then
             echo "探索していないのに探索の文言が出ている" >&2
             exit 1
           fi
-          # 親に yuzu.toml があっても拾わない（上方向探索をしない契約）
+          # 親に setoka.toml があっても拾わない（上方向探索をしない契約）
           mkdir -p "$RUNNER_TEMP/e2e-docs/sub"
-          if ./target/debug/yuzu check --root "$RUNNER_TEMP/e2e-docs/sub"; then
-            echo "--root の指定先を無視して親の yuzu.toml を拾った" >&2
+          if ./target/debug/setoka check --root "$RUNNER_TEMP/e2e-docs/sub"; then
+            echo "--root の指定先を無視して親の setoka.toml を拾った" >&2
             exit 1
           fi
           rmdir "$RUNNER_TEMP/e2e-docs/sub"
           # ルート自身がシンボリックリンクでも通る（Cx で正規化しないと
-          # .yuzu のリンク検査を通る build・dev だけが落ちる）
+          # .setoka のリンク検査を通る build・dev だけが落ちる）
           ln -s "$RUNNER_TEMP/e2e-docs" "$RUNNER_TEMP/root-link"
-          ./target/debug/yuzu build --root "$RUNNER_TEMP/root-link"
+          ./target/debug/setoka build --root "$RUNNER_TEMP/root-link"
           # new は既存プロジェクトを読まない唯一のコマンドなので --root を拒否する
-          if ./target/debug/yuzu new --root "$RUNNER_TEMP/e2e-docs" "$RUNNER_TEMP/root-new"; then
-            echo "yuzu new が --root を受け付けた" >&2
+          if ./target/debug/setoka new --root "$RUNNER_TEMP/e2e-docs" "$RUNNER_TEMP/root-new"; then
+            echo "setoka new が --root を受け付けた" >&2
             exit 1
           fi
           cd "$RUNNER_TEMP/e2e-docs"
           test -f .github/workflows/deploy.yml
-          # Phase 77: deploy.yml の yuzu は yuzu new した版に固定される（版指定なしだと利用者の
+          # Phase 77: deploy.yml の setoka は setoka new した版に固定される（版指定なしだと利用者の
           # サイトが main の最新でビルドされる）。Phase 84 からはその版のリリースのアーカイブを
           # SHA256SUMS で照合して使う（ソースから入れる手順はコメントに同じ版のタグで残す）
-          version=$("$GITHUB_WORKSPACE/target/debug/yuzu" --version | awk '{print $2}')
-          grep -qF "YUZU_VERSION: $version" .github/workflows/deploy.yml
+          version=$("$GITHUB_WORKSPACE/target/debug/setoka" --version | awk '{print $2}')
+          grep -qF "SETOKA_VERSION: $version" .github/workflows/deploy.yml
           grep -qF '| sha256sum -c -' .github/workflows/deploy.yml
-          grep -q -- "--tag v$version yuzu-cli" .github/workflows/deploy.yml
+          grep -q -- "--tag v$version setoka-cli" .github/workflows/deploy.yml
           # Phase 80: 公開先のフル URL を渡す（canonical・共有カード・sitemap が出る）。
           # この run の中に GitHub Actions の式の開始記号（ドル記号と波括弧 2 つ）を書くと
           # Actions が bash より先に評価して空文字に置き換えるので、式を含まない断片で見る
-          grep -qF 'run: yuzu build --base-url "https://' .github/workflows/deploy.yml
+          grep -qF 'run: setoka build --base-url "https://' .github/workflows/deploy.yml
           grep -qF 'steps.pages.outputs.host }}' .github/workflows/deploy.yml
-          if grep -q '__YUZU_VERSION__' .github/workflows/deploy.yml; then
+          if grep -q '__SETOKA_VERSION__' .github/workflows/deploy.yml; then
             echo "deploy.yml に版の印が残っている" >&2
             exit 1
           fi
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           test -f dist/index.html
           test -f dist/guide/getting-started/index.html
           # Phase 84: 雛形の guide/index.md でディレクトリが「ガイド」と表示され、用語集は
@@ -479,8 +493,8 @@ jobs:
           # 消えて llms.txt は HTML を指す。frontmatter の pageMd: false はそのページだけ止める
           test -f dist/index.md
           grep -q 'data-md-url' dist/index.html
-          printf '\n[llms]\npage_md = false\n' >> yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          printf '\n[llms]\npage_md = false\n' >> setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           if find dist -name '*.md' | grep -q .; then
             echo "llms.page_md = false なのに .md が dist に残っている" >&2
             exit 1
@@ -494,71 +508,71 @@ jobs:
             exit 1
           fi
           grep -q '(/guide/getting-started/)' dist/llms.txt
-          sed -i 's/^page_md = false$/page_md = true/' yuzu.toml
+          sed -i 's/^page_md = false$/page_md = true/' setoka.toml
           sed -i '0,/^order: 1$/s//order: 1\npageMd: false/' content/guide/getting-started.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           test -f dist/index.md
           if [ -e dist/guide/getting-started.md ]; then
             echo "pageMd: false のページの .md が出ている" >&2
             exit 1
           fi
           sed -i '/^pageMd: false$/d' content/guide/getting-started.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           test -f dist/guide/getting-started.md
           # PR #42 のレビュー指摘: output.clean = false のサイトで止めてから --force
           # （出力マニフェストも消える）でビルドしても、止めた .md を dist に残さない
-          sed -i 's/^clean = true$/clean = false/' yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          sed -i 's/^clean = true$/clean = false/' setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           test -f dist/index.md
-          sed -i 's/^page_md = true$/page_md = false/' yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build --force
+          sed -i 's/^page_md = true$/page_md = false/' setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" build --force
           if find dist -name '*.md' | grep -q .; then
             echo "clean = false で --force した後も止めた .md が dist に残っている" >&2
             exit 1
           fi
-          sed -i 's/^page_md = false$/page_md = true/; s/^clean = false$/clean = true/' yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          sed -i 's/^page_md = false$/page_md = true/; s/^clean = false$/clean = true/' setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           test -f dist/index.md
           # scaffold は検索結果ページ（search.page）を有効にして配る（Phase 54）
           test -f dist/search/index.html
           # --base-url は設定より優先して配信パスを差し替える（deploy.yml が使う契約）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build --base-url /docs/
+          "$GITHUB_WORKSPACE/target/debug/setoka" build --base-url /docs/
           grep -q '/docs/_assets/' dist/index.html
           # Phase 76: 共有カード。site.image をパスで指定しても base がパスだけなら
           # og:image は出ず、フル URL なら canonical / og:url / og:image が絶対 URL で出る
-          sed -i 's|^title = "My Docs"$|title = "My Docs"\nimage = "/images/yuzu-logo.svg"|' yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build --base-url /docs/
+          sed -i 's|^title = "My Docs"$|title = "My Docs"\nimage = "/images/setoka-logo.svg"|' setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" build --base-url /docs/
           if grep -q 'og:image' dist/index.html; then
             echo "base_url がパスだけなのに og:image が出た" >&2
             exit 1
           fi
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build --base-url https://example.com/docs/
+          "$GITHUB_WORKSPACE/target/debug/setoka" build --base-url https://example.com/docs/
           grep -q '<link rel="canonical" href="https://example.com/docs/guide/getting-started/">' dist/guide/getting-started/index.html
           grep -q '<meta property="og:url" content="https://example.com/docs/guide/getting-started/">' dist/guide/getting-started/index.html
-          grep -q '<meta property="og:image" content="https://example.com/docs/images/yuzu-logo.svg">' dist/index.html
+          grep -q '<meta property="og:image" content="https://example.com/docs/images/setoka-logo.svg">' dist/index.html
           # og:description はページの description が無ければ site.description へ落ちる（404 で見る）
-          grep -q '<meta property="og:description" content="yuzu で生成するドキュメントサイト">' dist/404.html
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search "はじめに" | grep "はじめに"
+          grep -q '<meta property="og:description" content="setoka で生成するドキュメントサイト">' dist/404.html
+          "$GITHUB_WORKSPACE/target/debug/setoka" search "はじめに" | grep "はじめに"
           # タイポトレランスの実ヒット確認（Phase 21: 出力の有無だけでは日本語 typo の
           # 不具合を見逃した反省から、ヒット内容まで検証する）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search "ダーくモード" | grep -q "ダークモード"
+          "$GITHUB_WORKSPACE/target/debug/setoka" search "ダーくモード" | grep -q "ダークモード"
           # フレーズ検索（Phase 31）: 隣接一致でヒットし、逆順は 0 件
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search '"ライブリロード"' | grep -q "ライブリロード"
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search '"リロードライブ"' | grep -q "一致するページはありませんでした"
+          "$GITHUB_WORKSPACE/target/debug/setoka" search '"ライブリロード"' | grep -q "ライブリロード"
+          "$GITHUB_WORKSPACE/target/debug/setoka" search '"リロードライブ"' | grep -q "一致するページはありませんでした"
           # Phase 73: -q は進捗ログ（info 以下）を黙らせ、RUST_LOG より優先する
           # （scaffold に警告は無いので stderr が空になる）
-          RUST_LOG=debug "$GITHUB_WORKSPACE/target/debug/yuzu" build --force -q 2> "$RUNNER_TEMP/quiet.err"
+          RUST_LOG=debug "$GITHUB_WORKSPACE/target/debug/setoka" build --force -q 2> "$RUNNER_TEMP/quiet.err"
           test ! -s "$RUNNER_TEMP/quiet.err"
           # -v は debug ログ（ページ出力など）を出す。grep -q は最初の一致で読み手を閉じるので
           # 「stderr が先に閉じても（EPIPE）ビルドが完走する」の検査も兼ねる
           # （tracing-subscriber の log_internal_errors 既定 true が書き込み失敗時に eprintln! で
           # panic していた。--force は dist を作り直すので、落ちると _search が消えたまま残る）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build --force -v 2>&1 | grep -q 'DEBUG'
+          "$GITHUB_WORKSPACE/target/debug/setoka" build --force -v 2>&1 | grep -q 'DEBUG'
           test "${PIPESTATUS[0]}" -eq 0
           test -f dist/_search/manifest.json
           # Phase 77: Linux（inotify）は開いた・読んだだけのイベントも届ける。何も編集せずに
           # build --watch を数秒動かして、再ビルドが起きないこと（以前は止まらなかった）
-          timeout 6 "$GITHUB_WORKSPACE/target/debug/yuzu" build --watch --port 5199 > "$RUNNER_TEMP/watch.log" 2>&1 || true
+          timeout 6 "$GITHUB_WORKSPACE/target/debug/setoka" build --watch --port 5199 > "$RUNNER_TEMP/watch.log" 2>&1 || true
           grep -q '監視中' "$RUNNER_TEMP/watch.log"
           if grep -q '変更を検知' "$RUNNER_TEMP/watch.log"; then
             echo "何も編集していないのに再ビルドした" >&2
@@ -569,10 +583,10 @@ jobs:
           # 先頭の区切り線で始まる正常な文書は誤検出しない
           printf -- '---\ntitle: 閉じ忘れ\n\n本文\n' > content/unclosed.md
           printf -- '---\n\n# 区切り線で始まる\n\n本文\n' > content/hr-first.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build 2> "$RUNNER_TEMP/fm-build.err"
+          "$GITHUB_WORKSPACE/target/debug/setoka" build 2> "$RUNNER_TEMP/fm-build.err"
           grep -q '閉じの `---` がありません' "$RUNNER_TEMP/fm-build.err"
           set +e
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json > "$RUNNER_TEMP/fm-check.json" 2>/dev/null
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format json > "$RUNNER_TEMP/fm-check.json" 2>/dev/null
           status=$?
           set -e
           test "$status" -eq 1
@@ -588,7 +602,7 @@ jobs:
           printf -- '---\n\ntitle: a\norder: "最初"\ndraft: yes\n---\n\n# a\n' > content/fm-a.md
           printf -- '---\naliases: old/\n---\n\n# b\n' > content/fm-b.md
           set +e
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build 2> "$RUNNER_TEMP/fm-type.err"
+          "$GITHUB_WORKSPACE/target/debug/setoka" build 2> "$RUNNER_TEMP/fm-type.err"
           status=$?
           set -e
           test "$status" -eq 2
@@ -602,40 +616,40 @@ jobs:
           # パース後の検証（Cli::parse_validated）が弾く。両順序を見る
           for qv in "build -q -v" "-q build -v" "-v build -q"; do
             # shellcheck disable=SC2086
-            if "$GITHUB_WORKSPACE/target/debug/yuzu" $qv 2>/dev/null; then
-              echo "-q と -v の同時指定が通った: yuzu $qv" >&2
+            if "$GITHUB_WORKSPACE/target/debug/setoka" $qv 2>/dev/null; then
+              echo "-q と -v の同時指定が通った: setoka $qv" >&2
               exit 1
             fi
           done
           # search --format json は結果の JSON 配列だけを標準出力へ出す。
           # --json は旧表記として同じ出力で、--format との同時指定は矛盾エラー
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search --format json "はじめに" | head -1 | grep -q '^\[$'
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search --json "はじめに" | head -1 | grep -q '^\[$'
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" search --json --format json "はじめに" 2>/dev/null; then
+          "$GITHUB_WORKSPACE/target/debug/setoka" search --format json "はじめに" | head -1 | grep -q '^\[$'
+          "$GITHUB_WORKSPACE/target/debug/setoka" search --json "はじめに" | head -1 | grep -q '^\[$'
+          if "$GITHUB_WORKSPACE/target/debug/setoka" search --json --format json "はじめに" 2>/dev/null; then
             echo "search --json と --format の同時指定が通った" >&2
             exit 1
           fi
           # Phase 74: シェル補完。clap の定義から実行時に生成する（同梱しない）ので、
           # 全シェルで出力でき、グローバル引数（--quiet）が候補に入ることを見る
           for sh in bash zsh fish powershell elvish; do
-            "$GITHUB_WORKSPACE/target/debug/yuzu" completions "$sh" | grep -q 'quiet'
+            "$GITHUB_WORKSPACE/target/debug/setoka" completions "$sh" | grep -q 'quiet'
           done
           # bash / zsh の補完スクリプトは構文が通る（zsh はランナーに無ければ飛ばす）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" completions bash > "$RUNNER_TEMP/yuzu.bash"
-          bash -n "$RUNNER_TEMP/yuzu.bash"
+          "$GITHUB_WORKSPACE/target/debug/setoka" completions bash > "$RUNNER_TEMP/setoka.bash"
+          bash -n "$RUNNER_TEMP/setoka.bash"
           if command -v zsh >/dev/null; then
-            "$GITHUB_WORKSPACE/target/debug/yuzu" completions zsh > "$RUNNER_TEMP/_yuzu"
-            zsh -n "$RUNNER_TEMP/_yuzu"
+            "$GITHUB_WORKSPACE/target/debug/setoka" completions zsh > "$RUNNER_TEMP/_setoka"
+            zsh -n "$RUNNER_TEMP/_setoka"
           fi
           # プロジェクトを読まないので --root は拒否する（new と同じ規律）
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" completions bash --root . >/dev/null 2>&1; then
-            echo "yuzu completions が --root を受け付けた" >&2
+          if "$GITHUB_WORKSPACE/target/debug/setoka" completions bash --root . >/dev/null 2>&1; then
+            echo "setoka completions が --root を受け付けた" >&2
             exit 1
           fi
           # Phase 6: fmt/lint/check（正常系 = 0、違反注入で = 1 の終了コード契約）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" fmt --check
-          "$GITHUB_WORKSPACE/target/debug/yuzu" lint
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check
+          "$GITHUB_WORKSPACE/target/debug/setoka" fmt --check
+          "$GITHUB_WORKSPACE/target/debug/setoka" lint
+          "$GITHUB_WORKSPACE/target/debug/setoka" check
           # Phase 49: scaffold に v0.8〜v0.9 機能の「動く実例」が入っている
           # （エイリアスのリダイレクト HTML と、file= で引用したソースのキャプション）
           test -f dist/guide/intro/index.html
@@ -648,7 +662,7 @@ jobs:
           # Phase 53: 定義リストが描画される
           grep -q '<dl>' dist/index.html
           # Phase 53: 未知のセクション名は実行エラー（終了コード 2）
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" search --section 存在しない "はじめに"; then
+          if "$GITHUB_WORKSPACE/target/debug/setoka" search --section 存在しない "はじめに"; then
             echo "存在しないセクションの絞り込みが成功扱いになった" >&2
             exit 1
           fi
@@ -659,74 +673,74 @@ jobs:
           mkdir -p specs
           printf 'openapi: 3.0.3\ninfo:\n  title: E2E API v1\n  version: 1.0.0\npaths: {}\n' > specs/api.yaml
           printf -- '---\ntitle: API\n---\n\n# API\n\n```openapi\nfile: specs/api.yaml\n```\n' > content/api.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           grep -q 'E2E API v1' dist/api/index.html
           printf 'openapi: 3.0.3\ninfo:\n  title: E2E API v2\n  version: 1.0.0\npaths: {}\n' > specs/api.yaml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           grep -q 'E2E API v2' dist/api/index.html
           # content 同伴アセット: ページ横の画像が dist へコピーされ src が解決される
           printf 'PNG-E2E' > content/guide/pic.png
           printf -- '\n![図](pic.png)\n' >> content/guide/getting-started.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           test -f dist/guide/pic.png
           grep -q 'src="/guide/pic.png"' dist/guide/getting-started/index.html
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check
+          "$GITHUB_WORKSPACE/target/debug/setoka" check
           # Phase 47: API 仕様の file: 参照を check が検証する（描画はエラーボックスで
           # 継続するため、公開前に気づける場所はここだけ）
           mv specs/api.yaml specs/api.yaml.bak
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" check; then
+          if "$GITHUB_WORKSPACE/target/debug/setoka" check; then
             echo "check が仕様ファイルの不在を検出しなかった" >&2
             exit 1
           fi
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json 2>/dev/null \
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format json 2>/dev/null \
             | grep -q '"rule": "spec-error"'
           mv specs/api.yaml.bak specs/api.yaml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check
-          # yuzu.toml のキーのタイポは設定エラーで止まる（exit 2。v0.14 で JSONC の
+          "$GITHUB_WORKSPACE/target/debug/setoka" check
+          # setoka.toml のキーのタイポは設定エラーで止まる（exit 2。v0.14 で JSONC の
           # config-unknown-key 警告から変更。位置と対応キー一覧を stderr に出し、
           # --format json でも標準出力には何も書かない）
-          cp yuzu.toml yuzu.toml.bak
-          printf '[markdwon]\ngfm = true\n' > yuzu.toml
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json \
+          cp setoka.toml setoka.toml.bak
+          printf '[markdwon]\ngfm = true\n' > setoka.toml
+          if "$GITHUB_WORKSPACE/target/debug/setoka" check --format json \
                > "$RUNNER_TEMP/typo.out" 2> "$RUNNER_TEMP/typo.err"; then
-            echo "check が yuzu.toml の未知キーを検出しなかった" >&2
+            echo "check が setoka.toml の未知キーを検出しなかった" >&2
             exit 1
           fi
-          grep -q 'yuzu.toml:1:2: 未知のキー `markdwon`' "$RUNNER_TEMP/typo.err"
+          grep -q 'setoka.toml:1:2: 未知のキー `markdwon`' "$RUNNER_TEMP/typo.err"
           grep -q 'markdown' "$RUNNER_TEMP/typo.err"   # 正しい綴りが対応キー一覧に出る
           test ! -s "$RUNNER_TEMP/typo.out"
           # 旧形式（camelCase）のキーも同じく設定エラー（互換読み込みは作らない）
-          printf '[site]\nbaseUrl = "/docs/"\n' > yuzu.toml
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" build 2> "$RUNNER_TEMP/camel.err"; then
+          printf '[site]\nbaseUrl = "/docs/"\n' > setoka.toml
+          if "$GITHUB_WORKSPACE/target/debug/setoka" build 2> "$RUNNER_TEMP/camel.err"; then
             echo "build が旧形式のキーを受理した" >&2
             exit 1
           fi
           grep -q 'base_url' "$RUNNER_TEMP/camel.err"
-          mv yuzu.toml.bak yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check
+          mv setoka.toml.bak setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" check
           # Phase 48: コンテンツインクルードの参照先だけを編集しても検索索引が追随する
           # （検索 tf のキャッシュがページ source ハッシュだけで判定していた回帰ガード。
           # --force を付けずにインクリメンタルで検証することが要点）
-          cp yuzu.toml yuzu.toml.bak
-          printf '[search]\nindex_code = true\n' > yuzu.toml
+          cp setoka.toml setoka.toml.bak
+          printf '[search]\nindex_code = true\n' > setoka.toml
           mkdir -p snippets
           printf 'fn alphaSymbol() {}\n' > snippets/demo.rs
           printf -- '---\ntitle: 引用\n---\n\n# 引用\n\n```rust file="snippets/demo.rs"\n```\n' > content/inc.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search alphaSymbol | grep -q "引用"
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" search alphaSymbol | grep -q "引用"
           printf 'fn betaSymbol() {}\n' > snippets/demo.rs
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search betaSymbol | grep -q "引用"
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search alphaSymbol \
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" search betaSymbol | grep -q "引用"
+          "$GITHUB_WORKSPACE/target/debug/setoka" search alphaSymbol \
             | grep -q "一致するページはありませんでした"
           rm content/inc.md
-          mv yuzu.toml.bak yuzu.toml
+          mv setoka.toml.bak setoka.toml
           # Phase 49: fmt --diff は unified diff を出し、--check を含意する
           # （書き換えない・差分ありで終了コード 1）。出力がそのまま当てられる
           # パッチであることが実質の契約なので patch -p1 まで通す
           printf -- '---\ntitle: 未整形\n---\n\n#   見出し\n\n*  項目\n' > content/unformatted.md
           before=$(sha256sum content/unformatted.md)
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" fmt --diff > "$RUNNER_TEMP/fmt.diff"; then
+          if "$GITHUB_WORKSPACE/target/debug/setoka" fmt --diff > "$RUNNER_TEMP/fmt.diff"; then
             echo "fmt --diff が整形差分を検出しなかった" >&2
             exit 1
           fi
@@ -735,45 +749,45 @@ jobs:
           grep -q '^+++ b/content/unformatted.md$' "$RUNNER_TEMP/fmt.diff"
           grep -q '^@@ ' "$RUNNER_TEMP/fmt.diff"
           patch -p1 < "$RUNNER_TEMP/fmt.diff"
-          "$GITHUB_WORKSPACE/target/debug/yuzu" fmt --check
+          "$GITHUB_WORKSPACE/target/debug/setoka" fmt --check
           rm content/unformatted.md
           # Phase 49: 下流が先に閉じても panic しない（SIGPIPE）。
           # **パイプバッファ（64KB）を超える出力でないと EPIPE 自体が起きない**ので、
           # 先に大きいページを作る（この前置きが無いとゲートが空振りする）
           printf -- '---\ntitle: 大きなページ\n---\n\n# 大きなページ\n\n' > content/big.md
           for i in $(seq 1 5000); do printf 'SIGPIPE 検証用の段落 %s です。\n\n' "$i"; done >> content/big.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" llms --full 2> "$RUNNER_TEMP/sigpipe.err" | head -c 1 > /dev/null
+          "$GITHUB_WORKSPACE/target/debug/setoka" llms --full 2> "$RUNNER_TEMP/sigpipe.err" | head -c 1 > /dev/null
           test "${PIPESTATUS[0]}" -eq 0
           # `! grep` は set -e の対象外（POSIX の否定パイプライン）なので if で明示する
           if grep -qiE 'broken pipe|panicked' "$RUNNER_TEMP/sigpipe.err"; then
             echo "llms --full | head で panic した" >&2
             exit 1
           fi
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
-          "$GITHUB_WORKSPACE/target/debug/yuzu" search 段落 --limit 5000 2> "$RUNNER_TEMP/sigpipe2.err" | head -c 1 > /dev/null
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" search 段落 --limit 5000 2> "$RUNNER_TEMP/sigpipe2.err" | head -c 1 > /dev/null
           test "${PIPESTATUS[0]}" -eq 0
           if grep -qiE 'broken pipe|panicked' "$RUNNER_TEMP/sigpipe2.err"; then
             echo "search | head で panic した" >&2
             exit 1
           fi
           rm content/big.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" build
+          "$GITHUB_WORKSPACE/target/debug/setoka" build
           echo '[壊れリンク](missing.md)' >> content/index.md
-          if "$GITHUB_WORKSPACE/target/debug/yuzu" check; then
+          if "$GITHUB_WORKSPACE/target/debug/setoka" check; then
             echo "check が壊れリンクを検出しなかった" >&2
             exit 1
           fi
           # Phase 46: 機械可読出力（壊れリンクが残っている = 診断が出る状態で検証する）
           # json は単一オブジェクトで、標準出力に他の行を一切混ぜない
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json > "$RUNNER_TEMP/diag.json" || true
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format json > "$RUNNER_TEMP/diag.json" || true
           head -1 "$RUNNER_TEMP/diag.json" | grep -q '^{$'
           grep -q '"rule": "broken-link"' "$RUNNER_TEMP/diag.json"
           grep -q '"summary"' "$RUNNER_TEMP/diag.json"
           # github は注釈行を出す（GITHUB_WORKSPACE 外なのでプロジェクトルート相対）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format github \
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format github \
             | grep -q '^::error file=content/index.md,line='
           # GITHUB_WORKSPACE 配下なら、その相対へ付け替わる
-          GITHUB_WORKSPACE="$RUNNER_TEMP" "$GITHUB_WORKSPACE/target/debug/yuzu" check --format github \
+          GITHUB_WORKSPACE="$RUNNER_TEMP" "$GITHUB_WORKSPACE/target/debug/setoka" check --format github \
             | grep -q '^::error file=e2e-docs/content/index.md,'
           # --root で指定し cwd がプロジェクト外でも同じ付け替えになる
           # （Phase 75: docs.yml / docs-links.yml がリポジトリルートから --root docs で実行する前提）。
@@ -781,11 +795,11 @@ jobs:
           # （後続の処理には影響しない）。--root は相対で渡し、正規化も兼ねて見る
           (
             cd "$RUNNER_TEMP"
-            GITHUB_WORKSPACE="$RUNNER_TEMP" "$GITHUB_WORKSPACE/target/debug/yuzu" check --root e2e-docs --format github \
+            GITHUB_WORKSPACE="$RUNNER_TEMP" "$GITHUB_WORKSPACE/target/debug/setoka" check --root e2e-docs --format github \
               | grep -q '^::error file=e2e-docs/content/index.md,'
           )
           # lint --fix と json を併用しても標準出力が JSON のまま（進捗は stderr へ）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" lint --fix --format json 2>/dev/null \
+          "$GITHUB_WORKSPACE/target/debug/setoka" lint --fix --format json 2>/dev/null \
             | head -1 | grep -q '^{$'
           # Phase 65: preview はシンボリックリンクを辿らない（実バイナリ経由の e2e）。
           # dist 内のリンクとリンク先ファイルを置き、404 かつ内容が漏れないことを見る
@@ -793,7 +807,7 @@ jobs:
           echo '<html>secret</html>' > "$RUNNER_TEMP/outside/secret.html"
           ln -s "$RUNNER_TEMP/outside" dist/link
           ln -s "$RUNNER_TEMP/outside/secret.html" dist/leaf.html
-          "$GITHUB_WORKSPACE/target/debug/yuzu" preview --port 48124 >/dev/null 2>&1 &
+          "$GITHUB_WORKSPACE/target/debug/setoka" preview --port 48124 >/dev/null 2>&1 &
           GUARD_PID=$!
           for _ in $(seq 1 50); do curl -sf -o /dev/null http://127.0.0.1:48124/ && break; sleep 0.2; done
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:48124/link/secret.html)" = 404
@@ -814,12 +828,12 @@ jobs:
           rm dist/link dist/leaf.html
           # Phase 66: 外部リンク検査（opt-in）。ネットワークへは出ず、自分の preview を
           # 相手にして「4xx → warning・到達不能 → skipped・既定の check は触れない」を検証する
-          "$GITHUB_WORKSPACE/target/debug/yuzu" preview --port 48123 >/dev/null 2>&1 &
+          "$GITHUB_WORKSPACE/target/debug/setoka" preview --port 48123 >/dev/null 2>&1 &
           PREVIEW_PID=$!
           for _ in $(seq 1 50); do curl -sf -o /dev/null http://127.0.0.1:48123/ && break; sleep 0.2; done
           # down2 は抑制コメント付きの到達不能 URL = 判定できない出現箇所への抑制は unused にしない
-          printf '\n[ok](http://127.0.0.1:48123/)\n\n[missing](http://127.0.0.1:48123/no-such-file)\n\n[down](http://127.0.0.1:1/)\n\n<!-- yuzu-lint-disable-next-line external-link-broken -->\n[down2](http://127.0.0.1:1/x)\n' >> content/index.md
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --external-links --format json > "$RUNNER_TEMP/extlink.json" || true
+          printf '\n[ok](http://127.0.0.1:48123/)\n\n[missing](http://127.0.0.1:48123/no-such-file)\n\n[down](http://127.0.0.1:1/)\n\n<!-- setoka-lint-disable-next-line external-link-broken -->\n[down2](http://127.0.0.1:1/x)\n' >> content/index.md
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --external-links --format json > "$RUNNER_TEMP/extlink.json" || true
           kill "$PREVIEW_PID"
           grep -q '"rule": "external-link-broken"' "$RUNNER_TEMP/extlink.json"
           grep -q 'no-such-file' "$RUNNER_TEMP/extlink.json"
@@ -829,7 +843,7 @@ jobs:
             exit 1
           fi
           # 既定の check は外部リンクに触れない（診断なし・skipped 0）
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json > "$RUNNER_TEMP/diag2.json" || true
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format json > "$RUNNER_TEMP/diag2.json" || true
           if grep -q 'external-link-broken' "$RUNNER_TEMP/diag2.json"; then
             echo "既定の check が外部リンクを検査した" >&2
             exit 1
@@ -840,11 +854,11 @@ jobs:
           # 警告を出す数少ない経路で、混ざると JSON のパースが壊れる
           mkdir -p "$RUNNER_TEMP/shared-docs"
           printf -- '---\ntitle: 共有原稿\n---\n\n# 共有原稿\n' > "$RUNNER_TEMP/shared-docs/index.md"
-          printf '[input]\ndir = "../shared-docs"\n' > yuzu.toml
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json 2> "$RUNNER_TEMP/outside.err" \
+          printf '[input]\ndir = "../shared-docs"\n' > setoka.toml
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format json 2> "$RUNNER_TEMP/outside.err" \
             | head -1 | grep -q '^{$'
           grep -q 'config-path-outside-root\|プロジェクトルート配下ではありません' "$RUNNER_TEMP/outside.err"
-          "$GITHUB_WORKSPACE/target/debug/yuzu" check --format json 2>/dev/null \
+          "$GITHUB_WORKSPACE/target/debug/setoka" check --format json 2>/dev/null \
             | grep -q '"rule": "config-path-outside-root"'
 
       # Phase 85: build が壊れたページを黙って出さない（件数の 1 行・原稿 0 件の警告）・
@@ -852,21 +866,21 @@ jobs:
       # 上の e2e のプロジェクトは最後に設定を書き換えているので、別のプロジェクトで見る
       - name: e2e (build の報告とログ)
         run: |
-          yuzu="$GITHUB_WORKSPACE/target/debug/yuzu"
-          "$yuzu" new "$RUNNER_TEMP/report"
+          setoka="$GITHUB_WORKSPACE/target/debug/setoka"
+          "$setoka" new "$RUNNER_TEMP/report"
           cd "$RUNNER_TEMP/report"
           # リンク切れ・画像切れは build の最後に 1 行で知らせ、終了コードは 0 のまま。
           # 2 回目の build（本文キャッシュに当たる）でも黙らない。必ず出す 404.html と
           # 出している llms.txt へのリンクは数えない（10-12 レビューの R1）
           printf '# 素のページ\n\n[壊れ](missing.md)\n\n![無い](nai.png)\n\n[404](/404.html)\n\n[llms](/llms.txt)\n' > content/plain.md
           for _ in 1 2; do
-            "$yuzu" build 2> "$RUNNER_TEMP/report.err"
+            "$setoka" build 2> "$RUNNER_TEMP/report.err"
             grep -q 'リンク切れ 2 件があります' "$RUNNER_TEMP/report.err"
           done
           rm content/plain.md
           # ログ: パイプ先には色コードを出さず、1 回で終わる build は行頭に時刻を出さない。
           # キャッシュの内訳は -v のときだけ。壊れたページが無ければ件数の行も出さない
-          "$yuzu" build 2> "$RUNNER_TEMP/plain.err"
+          "$setoka" build 2> "$RUNNER_TEMP/plain.err"
           if grep -q $'\e' "$RUNNER_TEMP/plain.err"; then
             echo "パイプ先のログに色コードが出た" >&2
             exit 1
@@ -879,17 +893,17 @@ jobs:
             echo "既定の build にキャッシュの内訳か件数の行が出た" >&2
             exit 1
           fi
-          "$yuzu" build -v 2>&1 | grep -q 'インクリメンタルビルド'
+          "$setoka" build -v 2>&1 | grep -q 'インクリメンタルビルド'
           # 大文字小文字だけが違う URL は build を止めずに警告し、check は warning で報告する
           printf '# 大文字\n' > content/Guide.md
-          "$yuzu" build 2> "$RUNNER_TEMP/case.err"
+          "$setoka" build 2> "$RUNNER_TEMP/case.err"
           grep -q '大文字小文字だけが違います' "$RUNNER_TEMP/case.err"
-          "$yuzu" check --format json 2>/dev/null | grep -q '"rule": "route-case-conflict"'
+          "$setoka" check --format json 2>/dev/null | grep -q '"rule": "route-case-conflict"'
           # 警告の出るページ（guide/index.md）を lintDisable で抑制したら、check と同じく build も
           # 黙る（10-12 レビューの R2。build は lint.rules だけを見ていた）
           cp content/guide/index.md "$RUNNER_TEMP/guide-index.md"
           sed -i '1a lintDisable: [route-case-conflict]' content/guide/index.md
-          "$yuzu" build 2> "$RUNNER_TEMP/case-suppressed.err"
+          "$setoka" build 2> "$RUNNER_TEMP/case-suppressed.err"
           if grep -q '大文字小文字だけが違います' "$RUNNER_TEMP/case-suppressed.err"; then
             echo "lintDisable で抑制したのに build が警告した" >&2
             exit 1
@@ -899,23 +913,23 @@ jobs:
           # check --no-fmt は整形差分だけを外す。fmt はパーミッションを引き継ぎ、一時ファイルを残さない
           printf '# 整形前\n\n* a\n' > content/unformatted.md
           chmod 600 content/unformatted.md
-          if "$yuzu" check; then
+          if "$setoka" check; then
             echo "check が整形差分を検出しなかった" >&2
             exit 1
           fi
-          "$yuzu" check --no-fmt
-          "$yuzu" fmt
+          "$setoka" check --no-fmt
+          "$setoka" fmt
           test "$(stat -c '%a' content/unformatted.md)" = 600
-          if ls -a content | grep -q 'yuzu-tmp'; then
+          if ls -a content | grep -q 'setoka-tmp'; then
             echo "fmt の一時ファイルが残った" >&2
             exit 1
           fi
-          "$yuzu" check
+          "$setoka" check
           # 原稿が 0 件の build は成功のまま警告し、ルート直下の .md も知らせる
           mkdir -p "$RUNNER_TEMP/empty-project"
-          printf '' > "$RUNNER_TEMP/empty-project/yuzu.toml"
+          printf '' > "$RUNNER_TEMP/empty-project/setoka.toml"
           printf '# ルートの原稿\n' > "$RUNNER_TEMP/empty-project/notes.md"
-          "$yuzu" build --root "$RUNNER_TEMP/empty-project" 2> "$RUNNER_TEMP/empty.err"
+          "$setoka" build --root "$RUNNER_TEMP/empty-project" 2> "$RUNNER_TEMP/empty.err"
           grep -q '原稿のディレクトリ `content`（input.dir）がありません' "$RUNNER_TEMP/empty.err"
           grep -q 'プロジェクトルート直下に .md が 1 件あります' "$RUNNER_TEMP/empty.err"
           # Phase 91: 原稿がすべて draft なら件数と理由を添える。トップページが無ければ理由
@@ -923,29 +937,29 @@ jobs:
           # 警告する。最後に何を出したかの 1 行（判定の組み合わせは build の単体テスト）
           mkdir -p "$RUNNER_TEMP/empty-project/content"
           printf -- '---\ndraft: true\n---\n\n# 下書き\n' > "$RUNNER_TEMP/empty-project/content/wip.md"
-          "$yuzu" build --root "$RUNNER_TEMP/empty-project" 2> "$RUNNER_TEMP/drafts.err"
+          "$setoka" build --root "$RUNNER_TEMP/empty-project" 2> "$RUNNER_TEMP/drafts.err"
           grep -q '.md が 1 件ありますが、draft が 1 件' "$RUNNER_TEMP/drafts.err"
           printf '# リポジトリの説明\n' > "$RUNNER_TEMP/empty-project/content/README.md"
-          "$yuzu" build --root "$RUNNER_TEMP/empty-project" 2> "$RUNNER_TEMP/readme.err"
+          "$setoka" build --root "$RUNNER_TEMP/empty-project" 2> "$RUNNER_TEMP/readme.err"
           grep -q 'トップページがありません' "$RUNNER_TEMP/readme.err"
           grep -q '`content/README.md` は `/README/` のページになります' "$RUNNER_TEMP/readme.err"
           grep -q '出力: ページ 1（原稿 1）' "$RUNNER_TEMP/readme.err"
           mkdir -p public && printf '<html>app</html>\n' > public/index.html
-          "$yuzu" build 2> "$RUNNER_TEMP/overwrite.err"
+          "$setoka" build 2> "$RUNNER_TEMP/overwrite.err"
           grep -q 'index.html ← public/index.html' "$RUNNER_TEMP/overwrite.err"
           rm public/index.html
           # 設定値と引数は入口で検証し、黙って捨てない（10-12 レビューの R3。どれも終了コード 2）:
           # build の --port は --watch が必要・--host は IP アドレスだけ・合成ページの route の
           # 不正値は位置付きの設定エラー（以前は検索結果ページを出さずに build も check も 0）
-          "$yuzu" build --port 9999 2>/dev/null && status=0 || status=$?
+          "$setoka" build --port 9999 2>/dev/null && status=0 || status=$?
           test "$status" -eq 2
-          "$yuzu" preview --host localhost 2>/dev/null && status=0 || status=$?
+          "$setoka" preview --host localhost 2>/dev/null && status=0 || status=$?
           test "$status" -eq 2
           mkdir -p "$RUNNER_TEMP/bad-config"
-          printf '[search]\npage = "../search"\n' > "$RUNNER_TEMP/bad-config/yuzu.toml"
-          "$yuzu" check --root "$RUNNER_TEMP/bad-config" 2> "$RUNNER_TEMP/bad-config.err" && status=0 || status=$?
+          printf '[search]\npage = "../search"\n' > "$RUNNER_TEMP/bad-config/setoka.toml"
+          "$setoka" check --root "$RUNNER_TEMP/bad-config" 2> "$RUNNER_TEMP/bad-config.err" && status=0 || status=$?
           test "$status" -eq 2
-          grep -q 'yuzu.toml:2:1: `search.page` の値 `../search` は使えません' "$RUNNER_TEMP/bad-config.err"
+          grep -q 'setoka.toml:2:1: `search.page` の値 `../search` は使えません' "$RUNNER_TEMP/bad-config.err"
 
   # Windows と macOS の cargo test（Phase 87）。配布している 4 ターゲットのうち、Linux 以外は
   # release.yml で --version を確かめるだけだった。静的検査・docs・e2e は check ジョブ（ubuntu）

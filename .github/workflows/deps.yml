@@ -23,7 +23,7 @@ on:
       - "crates/*/Cargo.toml"
       - "deny.toml"
       - "licenses/**"
-      - "crates/yuzu-theme/licenses/**"
+      - "crates/setoka-theme/licenses/**"
       - "scripts/third-party-licenses.sh"
       - "scripts/vendor-advisories.sh"
       - ".github/workflows/deps.yml"

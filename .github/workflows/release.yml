@@ -1,4 +1,4 @@
-# yuzu-cli のリリースバイナリをビルドし GitHub Release へ添付する（Phase 37）。
+# setoka-cli のリリースバイナリをビルドし GitHub Release へ添付する（Phase 37）。
 # v* タグ push で 4 プラットフォームをビルドし、draft Release に集約 →
 # SHA256SUMS 添付後に公開する。アーカイブには第三者ライセンスの通知
 # （THIRD-PARTY-LICENSES。licenses ジョブが生成。Phase 81）も入れる。テストは回さない（main の CI を信頼し、
@@ -70,13 +70,13 @@ jobs:
             echo "## インストール"
             echo ""
             echo "Assets からお使いのプラットフォームのアーカイブをダウンロードして展開し、"
-            echo "\`yuzu\` を PATH の通った場所へ置いてください。"
+            echo "\`setoka\` を PATH の通った場所へ置いてください。"
             echo "検証は \`sha256sum -c SHA256SUMS\`（macOS は \`shasum -a 256 -c SHA256SUMS\`）。"
             echo ""
             echo "Rust 1.99 以降ならソースからもインストールできます:"
             echo ""
             echo '```bash'
-            echo "cargo install --locked --git https://github.com/$GITHUB_REPOSITORY --tag $GITHUB_REF_NAME yuzu-cli"
+            echo "cargo install --locked --git https://github.com/$GITHUB_REPOSITORY --tag $GITHUB_REF_NAME setoka-cli"
             echo '```'
             if [ -n "$PREV" ]; then
               echo ""
@@ -84,7 +84,7 @@ jobs:
             fi
           } > "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
-            --title "yuzu $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+            --title "setoka $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
 
   # 第三者ライセンスの通知（THIRD-PARTY-LICENSES）を 1 回だけ作り、各アーカイブへ配る。
   # 配布する 4 ターゲットの依存の和集合を cargo-about で数えるので、どのランナーでも同じ
@@ -158,14 +158,14 @@ jobs:
 
       - name: build
         # release ビルド必須（debug はテーマを rust-embed で埋め込まずファイルシステムから読む）
-        run: cargo build --release --locked -p yuzu-cli --target ${{ matrix.target }}
+        run: cargo build --release --locked -p setoka-cli --target ${{ matrix.target }}
 
       - name: smoke（バイナリのバージョンが Cargo.toml と一致すること）
         run: |
           VERSION="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
-          BIN="target/${{ matrix.target }}/release/yuzu"
+          BIN="target/${{ matrix.target }}/release/setoka"
           case "${{ matrix.target }}" in *windows*) BIN="$BIN.exe" ;; esac
-          test "$("$BIN" --version)" = "yuzu $VERSION"
+          test "$("$BIN" --version)" = "setoka $VERSION"
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -176,7 +176,7 @@ jobs:
         id: archive
         run: |
           VERSION="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
-          NAME="yuzu-v$VERSION-${{ matrix.target }}"
+          NAME="setoka-v$VERSION-${{ matrix.target }}"
           mkdir stage
           cp README.md LICENSE-MIT LICENSE-APACHE stage/
           # バイナリに入っている第三者のソフトウェアのライセンス表記（licenses ジョブが生成）
@@ -184,12 +184,12 @@ jobs:
           test -s stage/THIRD-PARTY-LICENSES
           case "${{ matrix.target }}" in
             *windows*)
-              cp "target/${{ matrix.target }}/release/yuzu.exe" stage/
+              cp "target/${{ matrix.target }}/release/setoka.exe" stage/
               (cd stage && 7z a "../$NAME.zip" .)
               echo "asset=$NAME.zip" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              cp "target/${{ matrix.target }}/release/yuzu" stage/
+              cp "target/${{ matrix.target }}/release/setoka" stage/
               tar -czf "$NAME.tar.gz" -C stage .
               echo "asset=$NAME.tar.gz" >> "$GITHUB_OUTPUT"
               ;;
@@ -213,7 +213,7 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/assets"
           cd "$RUNNER_TEMP/assets"
-          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern 'yuzu-*'
-          sha256sum yuzu-* > SHA256SUMS
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern 'setoka-*'
+          sha256sum setoka-* > SHA256SUMS
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" SHA256SUMS --clobber
           gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

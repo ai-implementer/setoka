@@ -224,7 +224,7 @@ fn 手書きケースの_round_trip() {
     let mut map: BTreeMap<String, Rand> = BTreeMap::new();
     map.insert(
         "title".into(),
-        Rand::Str("柚子 \"yuzu\" \\ 改行\nタブ\t".into()),
+        Rand::Str("柚子 \"setoka\" \\ 改行\nタブ\t".into()),
     );
     map.insert("count".into(), Rand::Int(i64::MIN));
     map.insert("max".into(), Rand::Int(i64::MAX));

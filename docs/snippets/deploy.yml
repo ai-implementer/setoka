@@ -1,4 +1,4 @@
-# GitHub Pages へのデプロイ（yuzu build → Pages artifact）。
+# GitHub Pages へのデプロイ（setoka build → Pages artifact）。
 # 事前準備: リポジトリの Settings > Pages > Source を「GitHub Actions」にする。
 # actions はフルコミット SHA でピン留めする（タグの書き換えによる改ざんを防ぐ）。
 # 更新時は SHA とコメントのバージョンを揃えること
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    # yuzu のリリースは x86_64 の Linux 向けを使う（arm の runner に替えるとアーカイブが無い）
+    # setoka のリリースは x86_64 の Linux 向けを使う（arm の runner に替えるとアーカイブが無い）
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -29,31 +29,31 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: yuzu をインストール
-        # `yuzu new` を実行した yuzu と同じ版のリリースを取得し、リリースに添付された
+      - name: setoka をインストール
+        # `setoka new` を実行した setoka と同じ版のリリースを取得し、リリースに添付された
         # SHA256SUMS で照合してから使う（main の最新は未リリースの非互換を含みうるので
-        # 版を固定している）。版を上げるときは YUZU_VERSION を書き換える。
+        # 版を固定している）。版を上げるときは SETOKA_VERSION を書き換える。
         # ソースからビルドして入れる場合は、この run の代わりに Rust を入れて次を実行する:
-        #   cargo install --locked --git https://github.com/ai-implementer/yuzu --tag v__YUZU_VERSION__ yuzu-cli
+        #   cargo install --locked --git https://github.com/ai-implementer/setoka --tag v__SETOKA_VERSION__ setoka-cli
         env:
-          YUZU_VERSION: __YUZU_VERSION__
+          SETOKA_VERSION: __SETOKA_VERSION__
         run: |
-          base="https://github.com/ai-implementer/yuzu/releases/download/v${YUZU_VERSION}"
-          archive="yuzu-v${YUZU_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/ai-implementer/setoka/releases/download/v${SETOKA_VERSION}"
+          archive="setoka-v${SETOKA_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
           cd "$RUNNER_TEMP"
           curl -fsSL --proto '=https' --proto-redir '=https' -O "$base/$archive" -O "$base/SHA256SUMS"
           awk -v f="$archive" '$2 == f' SHA256SUMS | sha256sum -c -
-          mkdir yuzu
-          tar -xzf "$archive" -C yuzu
-          echo "$RUNNER_TEMP/yuzu" >> "$GITHUB_PATH"
-          ./yuzu/yuzu --version
+          mkdir setoka
+          tar -xzf "$archive" -C setoka
+          echo "$RUNNER_TEMP/setoka" >> "$GITHUB_PATH"
+          ./setoka/setoka --version
 
       - name: Pages の設定を取得
         id: pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: ビルド
-        # 公開先のフル URL を渡す（--base-url は yuzu.toml の base_url 設定より優先される）。
+        # 公開先のフル URL を渡す（--base-url は setoka.toml の base_url 設定より優先される）。
         # フル URL だと canonical・共有カード（og:url / site.image の og:image）・
         # sitemap.xml が出て、llms.txt のリンクも絶対 URL になる。
         # base_path は user/org pages なら空・project pages なら /<リポジトリ名>。
@@ -61,9 +61,9 @@ jobs:
         # 使わず、スキームを https に固定して host + base_path から組み立てる。
         # 既存リポジトリのサブディレクトリ（例: docs/）に生成した場合は、このファイルを
         # リポジトリルートの .github/workflows/ へ移し、--root でプロジェクトを指定する:
-        #   run: yuzu build --root docs --base-url "https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/"
+        #   run: setoka build --root docs --base-url "https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/"
         #   （下の upload-pages-artifact の path も docs/dist にする）
-        run: yuzu build --base-url "https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/"
+        run: setoka build --base-url "https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/"
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

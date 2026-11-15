@@ -1,0 +1,31 @@
+[package]
+name = "setoka-render"
+description = "setoka のサイトモデル → HTML レンダリング（minijinja テーマ・syntect・base path 解決）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# crates.io へは公開しない（配布は GitHub Release のバイナリ + cargo install --git。将来構想は ROADMAP「今後の候補」）
+publish = false
+
+[dependencies]
+setoka-config = { workspace = true }
+setoka-core = { workspace = true }
+setoka-theme = { workspace = true }
+tankan = { workspace = true }
+minijinja = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+# OpenAPI / JSON Schema の SSR（YAML/JSON → Value 走査 → HTML）用
+serde_json = { workspace = true, features = ["preserve_order"] }
+syntect = { workspace = true }
+thiserror = { workspace = true }
+two-face = { workspace = true }
+tracing = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }

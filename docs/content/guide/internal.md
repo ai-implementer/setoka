@@ -6,14 +6,14 @@ description: 公開範囲の注意（dist に出るもの・止め方）と、Gi
 
 # 社内で公開する
 
-yuzu が出力する `dist/` は静的ファイルだけです。置いた場所の公開範囲が、そのまま
+setoka が出力する `dist/` は静的ファイルだけです。置いた場所の公開範囲が、そのまま
 サイトの公開範囲になります。社内だけに見せたいときは、アクセスの制限（社内ネットワーク
-だけに限る・認証を掛ける）を Web サーバの側で行ってください。yuzu 自身はページ単位の
+だけに限る・認証を掛ける）を Web サーバの側で行ってください。setoka 自身はページ単位の
 認証を持ちません。
 
 > [!WARNING]
 > GitHub Pages は、リポジトリを非公開にしてもサイトはインターネットに公開されます
-> （GitHub Enterprise Cloud の非公開の Pages を除く）。`yuzu new` が作る
+> （GitHub Enterprise Cloud の非公開の Pages を除く）。`setoka new` が作る
 > `deploy.yml` は GitHub Pages へ公開するものなので、社内の設計書では使う前に
 > 公開範囲を確かめてください。
 
@@ -40,7 +40,7 @@ yuzu が出力する `dist/` は静的ファイルだけです。置いた場所
 
 ### 第三者のソフトウェアのライセンス表記
 
-`dist/` には、yuzu がサイトに同梱して配るソフトウェアのライセンス表記が出ます。サイトを
+`dist/` には、setoka がサイトに同梱して配るソフトウェアのライセンス表記が出ます。サイトを
 公開すると、これらのソフトウェアを再配布することになるので、それぞれのライセンス（MIT など）が
 求める表記として出力しています。消さずに、ほかのファイルと一緒に置いてください。
 
@@ -49,7 +49,7 @@ yuzu が出力する `dist/` は静的ファイルだけです。置いた場所
 | `_assets/vendor/THIRD-PARTY-LICENSES.txt` | 図をブラウザで描く mermaid.min.js（中に束ねている npm パッケージを含む）と、数式を描く KaTeX（フォントを含む）。図をビルド時に SVG にする設定でも、描けない図のために同梱しています |
 | `_search/THIRD-PARTY-LICENSES.txt` | 全文検索の `search_bg.wasm` に入っているライブラリと、日本語の分かち書きのモデル（`model.zst`）。`search.enabled = false` のサイトには出ません |
 
-yuzu 本体（`yuzu` の実行ファイル）に入っているソフトウェアのライセンス表記は、配布している
+setoka 本体（`setoka` の実行ファイル）に入っているソフトウェアのライセンス表記は、配布している
 アーカイブの `THIRD-PARTY-LICENSES` にあります。こちらはサイトには出ません。
 
 公開したくないメモは原稿に書かないのが確実です。とくに HTML コメント（`<!-- … -->`）は
@@ -58,12 +58,12 @@ yuzu 本体（`yuzu` の実行ファイル）に入っているソフトウェ�
 
 ## Web サーバに置く
 
-`yuzu build` の後、`dist/` の中身を Web サーバの公開ディレクトリへコピーします。
+`setoka build` の後、`dist/` の中身を Web サーバの公開ディレクトリへコピーします。
 ページは `guide/` のようなディレクトリ形式の URL で、実体は `guide/index.html` です。
 Web サーバ側では次の 2 つを設定してください。
 
 - ディレクトリへの要求に `index.html` を返す
-- 存在しないパスに `404.html` を返す（yuzu が生成します）
+- 存在しないパスに `404.html` を返す（setoka が生成します）
 
 検索の wasm（`_search/search_bg.wasm`）は `application/wasm` で配ってください。
 違う型で返すと、ブラウザのコンソールに警告が出て読み込みが少し遅くなります
@@ -71,9 +71,9 @@ Web サーバ側では次の 2 つを設定してください。
 
 テキストファイル（`llms.txt`・原稿の `.md`・`THIRD-PARTY-LICENSES.txt`）は UTF-8 です。
 文字コードを付けずに `text/plain` などで返すと、ブラウザで開いたときに日本語が化けるので、
-`charset=utf-8` を付けて配ってください。GitHub Pages と `yuzu preview` / `yuzu dev` は
+`charset=utf-8` を付けて配ってください。GitHub Pages と `setoka preview` / `setoka dev` は
 付けて返します。HTML には付けないでください。HTTP の指定はページ内の `<meta charset>` より
-優先されるので、`public/` に置いた別の文字コードの HTML が化けます（yuzu が出す HTML は
+優先されるので、`public/` に置いた別の文字コードの HTML が化けます（setoka が出す HTML は
 `<meta charset="utf-8">` 付きなので、指定が無くても化けません）。
 
 ### nginx
@@ -112,7 +112,7 @@ server {
 
 ### GitLab Pages
 
-GitLab Pages は CI が成果物として渡した `public/` を配ります。yuzu の `public/`
+GitLab Pages は CI が成果物として渡した `public/` を配ります。setoka の `public/`
 （静的ファイルの置き場）は build のときに `dist/` へコピー済みなので、build の後で
 入れ替えます。
 
@@ -121,16 +121,16 @@ GitLab Pages は CI が成果物として渡した `public/` を配ります。y
 pages:
   image: debian:stable-slim
   variables:
-    YUZU_VERSION: "X.Y.Z"
+    SETOKA_VERSION: "X.Y.Z"
   script:
     - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl
-    - base="https://github.com/ai-implementer/yuzu/releases/download/v$YUZU_VERSION"
-    - archive="yuzu-v$YUZU_VERSION-x86_64-unknown-linux-gnu.tar.gz"
-    - mkdir -p /tmp/yuzu && cd /tmp/yuzu
+    - base="https://github.com/ai-implementer/setoka/releases/download/v$SETOKA_VERSION"
+    - archive="setoka-v$SETOKA_VERSION-x86_64-unknown-linux-gnu.tar.gz"
+    - mkdir -p /tmp/setoka && cd /tmp/setoka
     - curl -fsSL --proto '=https' -O "$base/$archive" -O "$base/SHA256SUMS"
     - awk -v f="$archive" '$2 == f' SHA256SUMS | sha256sum -c -
     - tar -xzf "$archive" && cd "$CI_PROJECT_DIR"
-    - /tmp/yuzu/yuzu build --base-url "$CI_PAGES_URL/"
+    - /tmp/setoka/setoka build --base-url "$CI_PAGES_URL/"
     - rm -rf public && mv dist public
   artifacts:
     paths:
@@ -139,14 +139,14 @@ pages:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
 
-`X.Y.Z` は使う yuzu の版に置き換えてください。リリースのアーカイブ（Linux x64 向け）を
+`X.Y.Z` は使う setoka の版に置き換えてください。リリースのアーカイブ（Linux x64 向け）を
 `SHA256SUMS` で照合してから使います。公開範囲はプロジェクトの
 Settings の Pages の設定（アクセス制御）で決まります。
 
 ### Amazon S3
 
 ```bash
-yuzu build
+setoka build
 aws s3 sync dist/ s3://my-docs-bucket/ --delete
 ```
 
@@ -170,7 +170,7 @@ Functions など）が別に要ります。アクセスの制限は、バケッ�
 
 ## dev / preview は手元での確認用
 
-`yuzu dev` と `yuzu preview` は手元で確かめるためのサーバです。社内への公開には使わず、
+`setoka dev` と `setoka preview` は手元で確かめるためのサーバです。社内への公開には使わず、
 `dist/` を上のような Web サーバに置いてください。どちらも `localhost`・IP アドレス・
 設定の `dev.allowed_hosts` 以外の Host からの要求を断ります（DNS リバインディングで
 外部のサイトから読まれないための検査。[設定リファレンス](../reference/config.md#build--dev)）。

@@ -1,6 +1,6 @@
 ---
 name: add-markdown-feature
-description: 新しい Markdown 記法・本文レンダリング機能を yuzu へ追加するレシピ（コンテンツインクルード・図表相互参照・折りたたみ等と同型）。キャッシュ無効化・fmt 温存・lint/check・docs ゲートまでの配線漏れを防ぐ。yuzu.toml への設定キー追加も含む。
+description: 新しい Markdown 記法・本文レンダリング機能を setoka へ追加するレシピ（コンテンツインクルード・図表相互参照・折りたたみ等と同型）。キャッシュ無効化・fmt 温存・lint/check・docs ゲートまでの配線漏れを防ぐ。setoka.toml への設定キー追加も含む。
 ---
 
 # Markdown 記法・本文レンダリング機能の追加レシピ
@@ -11,9 +11,9 @@ Phase 39（コードブロック表示メタ）/ 40（エイリアス）/ 42（�
 
 ## 手順
 
-### 1. 解釈の実装（yuzu-core）
+### 1. 解釈の実装（setoka-core）
 
-`crates/yuzu-core/src/markdown/<機能>.rs` を新設し、`markdown/mod.rs` の `mod` 宣言と
+`crates/setoka-core/src/markdown/<機能>.rs` を新設し、`markdown/mod.rs` の `mod` 宣言と
 本文パイプラインへ接続する。**comrak を触ってよいのは `markdown/` の中だけ**（公開 API は comrak 非依存）。
 
 フェンス情報文字列の拡張なら新モジュールではなく `markdown/fence.rs` を拡張する
@@ -22,27 +22,27 @@ Phase 39（コードブロック表示メタ）/ 40（エイリアス）/ 42（�
 ### 2. `CACHE_FORMAT_VERSION` を上げる（**忘れやすい**）
 
 本文 HTML・検索 tf・llms 正規化 md のいずれかの**生成結果が変わるなら必須**。
-`crates/yuzu-core/src/cache.rs` の定数を +1 し、doc コメントの履歴に 1 行足す。
-隣の `CACHE_FINGERPRINT` も、yuzu-cli のテスト（`キャッシュの中身が変わったら版を上げる`）が
+`crates/setoka-core/src/cache.rs` の定数を +1 し、doc コメントの履歴に 1 行足す。
+隣の `CACHE_FINGERPRINT` も、setoka-cli のテスト（`キャッシュの中身が変わったら版を上げる`）が
 失敗時に出す (新しい版, 指紋) に書き直す。このテストは記法を一通り使う試験用のプロジェクトの
 キャッシュの中身を照合するので、上げ忘れると CI で落ちる（v0.20 Phase 93）。新しい記法は
 テストの試験用のプロジェクト（`FINGERPRINT_PROJECT`）にも足すと、次からその記法の変更も検出できる
 
 > Phase 44（Admonition → `<details>`）はこれを忘れて後追いで v13 を計上した。
 > envKey に `CARGO_PKG_VERSION` が入るのでリリースを跨げば救済されるが、
-> **開発中は `.yuzu/cache/` が古い HTML を返し続ける**。
+> **開発中は `.setoka/cache/` が古い HTML を返し続ける**。
 
 ### 3. クロスページ依存があれば routesKey へ
 
-先行ページの状態で後続ページの出力が変わる機能は、`crates/yuzu-core/src/model.rs` の
+先行ページの状態で後続ページの出力が変わる機能は、`crates/setoka-core/src/model.rs` の
 `SiteModel::routes_key`（routesKey の唯一の定義）に入力を足して本文キャッシュを
 無効化する。前例は `[markdown.crossref]` の `numbering = "site"` のときの各ページの採番開始位置
 （`crossref_offset`）。個数だけでは並び順の変更や種別の差し替えを取りこぼす。
 
-### 4. `yuzu fmt` の温存を確認
+### 4. `setoka fmt` の温存を確認
 
 不変条件は「format_commonmark の正規形・frontmatter はバイト温存・冪等・差分なしなら書かない」。
-新記法が comrak のエスケープで壊れるなら `markdown/mod.rs` の `restore_yuzu_syntax` に
+新記法が comrak のエスケープで壊れるなら `markdown/mod.rs` の `restore_setoka_syntax` に
 **対象を絞って**復元処理を足す（`{#fig:x}` の行末ラベルと Admonition マーカーが前例。
 一般の `#` エスケープは触らない）。
 
@@ -64,16 +64,16 @@ llms.txt では原文のまま（fmt 正規形との一致を保つため）。
 ### 7. スナップショット
 
 ```bash
-INSTA_UPDATE=always cargo test -p yuzu-core    # body_snapshot.rs にケースを足してから
+INSTA_UPDATE=always cargo test -p setoka-core    # body_snapshot.rs にケースを足してから
 ```
 
-本文 HTML が変わるなら `crates/yuzu-render/tests/snapshots/` の 3 件も動く。
+本文 HTML が変わるなら `crates/setoka-render/tests/snapshots/` の 3 件も動く。
 差分は必ず目視してから承認する（`cargo insta` が無い環境では上記で直接更新される）。
 
 ### 8. 配布物への反映
 
-- `crates/yuzu-cli/scaffold/`（`index.md` / `getting-started.md`）に実例
-- `docs/content/guide/*.md` に説明を書く（**dogfooding**。表記は長音符なし・`yuzu fmt` の正規形）
+- `crates/setoka-cli/scaffold/`（`index.md` / `getting-started.md`）に実例
+- `docs/content/guide/*.md` に説明を書く（**dogfooding**。表記は長音符なし・`setoka fmt` の正規形）
 - `ROADMAP.md` の Phase 行（README は入口専用なので触らない）
 
 ### 9. ci.yml へ grep ゲートを 1 行（**毎回やる**）
@@ -86,16 +86,16 @@ Phase 42〜45 すべてが実施している:
           grep -q 'id="fig:deps"' dist/development/index.html
 ```
 
-## `yuzu.toml` に設定キーを足す場合（5 手）
+## `setoka.toml` に設定キーを足す場合（5 手）
 
-1. `crates/yuzu-config/src/schema.rs` に snake_case のフィールド＋既定値
-2. `crates/yuzu-config/src/codec.rs` の `table_codec!` に `"キー名" => フィールド` を 1 行
+1. `crates/setoka-config/src/schema.rs` に snake_case のフィールド＋既定値
+2. `crates/setoka-config/src/codec.rs` の `table_codec!` に `"キー名" => フィールド` を 1 行
    （Decode / Encode の両方に効く。**忘れると未知キー = 設定エラー**になり、キーを書いても読めない）
-3. 消費側（yuzu-core / yuzu-render / yuzu-index）へ配線
-4. `crates/yuzu-cli/scaffold/yuzu.toml` にコメント付きで追記
+3. 消費側（setoka-core / setoka-render / setoka-index）へ配線
+4. `crates/setoka-cli/scaffold/setoka.toml` にコメント付きで追記
 5. `docs/content/reference/config.md` の**全キー例と該当セクションの表の 2 箇所**
 
-frontmatter のキーを足す場合は `crates/yuzu-core/src/frontmatter.rs` の `KNOWN_KEYS` にも足す
+frontmatter のキーを足す場合は `crates/setoka-core/src/frontmatter.rs` の `KNOWN_KEYS` にも足す
 （忘れても構造体との乖離検知テストが落ちるので気づける）。
 
 ## 罠
@@ -107,7 +107,7 @@ frontmatter のキーを足す場合は `crates/yuzu-core/src/frontmatter.rs` �
 - **doc コメント内でフェンスを入れ子にすると doctest がコンパイルされて失敗する**（インデント記法も同様）。散文で書く
 - **アンカー採番は extract_meta / HTML 化 / extract_plain_sections の 3 経路とも全見出しを文書順に** Anchorizer へ通す。片方で飛ばすと id がずれる
 - `comrak_options_keep_footnotes` は fmt / normalize / linkcheck 専用。HTML レンダと extract_meta に使うと壊れる
-- **`docs/yuzu.toml` の 25-45 行目**（`[markdown]` ブロック）はインクルードの `lines=` で引用されている。この範囲を動かすと docs の原稿と ci.yml のゲートが同時に壊れる
+- **`docs/setoka.toml` の 25-45 行目**（`[markdown]` ブロック）はインクルードの `lines=` で引用されている。この範囲を動かすと docs の原稿と ci.yml のゲートが同時に壊れる
 
 ## 仕上げ
 

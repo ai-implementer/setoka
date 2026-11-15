@@ -13,7 +13,7 @@ description: テーマの上書き・配色・favicon・フッター・ヘッダ
 （テンプレート・CSS・JS のどれでも）。
 
 > [!IMPORTANT]
-> 上書きしたファイルは、yuzu を更新したときに**デフォルトテーマ側の変更へ追随する
+> 上書きしたファイルは、setoka を更新したときに**デフォルトテーマ側の変更へ追随する
 > 責任が利用者側にあります**。テンプレートに渡す変数・生成するアセット・JS が
 > 期待する DOM は、版ごとに変わることがあります（例: `syntect.css` は
 > `markdown.highlight.enabled` が有効なときだけ生成され、`base.jinja` も
@@ -48,7 +48,7 @@ url = "https://github.com/example/docs"
 
 - `favicon` を書かなくても、`public/favicon.ico` を置けばそれを使います。ブラウザが
   自分で探すのはドメイン直下の `/favicon.ico` だけなので、`base_url = "/docs/"` の
-  ようなサブパス配信では、yuzu が `base_url` の下を指す `<link rel="icon">` を出します
+  ようなサブパス配信では、setoka が `base_url` の下を指す `<link rel="icon">` を出します
 - フッターの文言は印刷・PDF にも残ります（「社外秘」などの表示に使えます）
 - ヘッダーのリンクは、狭い画面ではナビを開いたときの一番下に出ます
 

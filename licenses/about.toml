@@ -1,7 +1,7 @@
 # cargo-about の設定（第三者ライセンスの一覧を作る。scripts/third-party-licenses.sh が使う）
 #
 # 対象は 2 つ:
-#   - バイナリ（yuzu-cli のネイティブの通常依存）→ リリースのアーカイブの THIRD-PARTY-LICENSES
+#   - バイナリ（setoka-cli のネイティブの通常依存）→ リリースのアーカイブの THIRD-PARTY-LICENSES
 #   - 検索 wasm（mikan-wasm の wasm32 向けの通常依存）→ dist の _search/THIRD-PARTY-LICENSES.txt
 # ターゲットは呼び出し側が --target で渡す（バイナリは配布する 4 つ、wasm は wasm32）。
 
@@ -26,7 +26,7 @@ accepted = [
 # 配布物に入らない依存は数えない
 ignore-build-dependencies = true
 ignore-dev-dependencies = true
-# yuzu 自身の crate（publish = false）は第三者ではない
+# setoka 自身の crate（publish = false）は第三者ではない
 private = { ignore = true }
 
 # --- crate にライセンスのファイルはあるのに、cargo-about が本文を認識できないもの ---

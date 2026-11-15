@@ -1,13 +1,13 @@
 # ロードマップ
 
-yuzu の開発計画（今の版の Phase・候補）と、これまでの版の 1 行の要約。**このファイルが Phase 状態の正**
+setoka の開発計画（今の版の Phase・候補）と、これまでの版の 1 行の要約。**このファイルが Phase 状態の正**
 （README には現在の版と概要だけを置く）。リリース済みの版の内訳と、レビュー・見直しの記録（中身と
 判断の経緯）は [ROADMAP-history.md](ROADMAP-history.md)。レビュー・見直しの未着手の項目は、下の
 「レビューからの持ち越し（未着手）」で状態を管理する。
 
 ## 現在: v0.21（Phase 94〜99）
 
-**v0.20.0 まで公開済み**。kabosu 0.2.1 / tankan 0.2.2 / mikan 0.3.0 は crates.io で公開済み（yuzu の
+**v0.20.0 まで公開済み**。kabosu 0.2.1 / tankan 0.2.2 / mikan 0.3.0 は crates.io で公開済み（setoka の
 リリースとは非同期。v0.20 の修正を 11-14 に公開。手順は `publish-crate` スキル）。v0.20 の計画と
 各 Phase の記録は ROADMAP-history.md の「完了済み: v0.20（Phase 87〜93）の内訳」。
 
@@ -21,8 +21,7 @@ yuzu の開発計画（今の版の Phase・候補）と、これまでの版の
 v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者を得る準備をする。先に名前を setoka へ
 変え、互換性の約束・インストールの経路・問い合わせの受け口を用意してから、README と比較の
 ページで見つけてもらう。利用者や star の数はリリース後にしか測れないので判定に入れず、測る手順と
-基準値を判定にする。95 以降の節のコマンド名・パスは今の名前（yuzu）で書いた。94 の後は setoka と
-読み替える。
+基準値を判定にする。
 
 以下は策定の詳細。
 
@@ -33,18 +32,18 @@ v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者
     公開物の詳細な JSON・PR 検証 CI の生成）が 3 つ止まっている
   - 名前が他のプロジェクトと重なる件（10-07 見直しの F7）は、URL・crate 名・雛形に名前が増えるほど
     変えにくくなる。外部の利用者が 0 人の今がいちばん安く変えられる
-- ゴール: 名前が setoka に変わり、docs のドメインの保有者・更新日が記録されている。0.x の間の互換性の約束と
+- ゴール: 名前が setoka に変わっている。0.x の間の互換性の約束と
   版ごとの更新の手順が docs にある。cargo-binstall で入れられ、macOS でダウンロードしたバイナリの
-  扱いが docs にある。`yuzu new` の雛形が最初の 5 分の案内になっている。CONTRIBUTING と issue の
+  扱いが docs にある。`setoka new` の雛形が最初の 5 分の案内になっている。CONTRIBUTING と issue の
   テンプレートがあり、issue で受けるものと PR を受け付けないことが書いてある。README の冒頭で何のための
   ツールかが分かり、他のツール
   との比較と選び方のページがある。リリースごとに利用の数を記録する手順がある
 - 変わるもの: 94 で名前に関わるものすべて（crate 名・バイナリ名・設定ファイル名・キャッシュの
   ディレクトリ・環境変数・Release のアーカイブ名・docs の URL・リポジトリ名。利用者には非互換）。
   95 以降は docs・README・リポジトリ直下の文書（CONTRIBUTING・`.github/ISSUE_TEMPLATE/`）・
-  CLI の Cargo.toml（binstall のメタデータ）・雛形（`yuzu new` の原稿。e2e と docs ゲートの grep が
-  変わる）・release スキル。MSRV は据え置く。`CACHE_FORMAT_VERSION` はキャッシュの中身に名前が
-  入っていれば 94 で上がる（キャッシュの指紋のテストが知らせる）。検索の `FORMAT_VERSION` は据え置く見込み
+  CLI の Cargo.toml（binstall のメタデータ）・雛形（`setoka new` の原稿。e2e と docs ゲートの grep が
+  変わる）・release スキル。MSRV は据え置く。`CACHE_FORMAT_VERSION` は 94 で 34 に上げた（試験用の
+  原稿の文言が変わったため）。検索の `FORMAT_VERSION` は据え置く見込み
 - Phase は「94 名前を setoka に変える → 95 互換性の約束と更新の手順 → 96 インストールと最初の 5 分 →
   97 問い合わせの受け口 → 98 見つけてもらう → 99 dogfooding と利用の記録」の順
   - 94 を先頭にするのは、95 以降の docs・README・binstall のメタデータ・雛形がすべて新しい名前を
@@ -61,19 +60,18 @@ v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者
   v0.21 のリリース後に利用者を観察してから判断する（前提の「互換性の方針」は 95 で用意する）
 - **リリース判定**（すべて満たしたらリリースする。どれもタグの前に確かめられる）
   - 名前が setoka に変わっている（crate 名・バイナリ名・設定ファイル名・キャッシュのディレクトリ・
-    環境変数・Release のアーカイブ名・docs の URL・リポジトリ名）。旧名が例外の一覧の外に残っていない
-    ことを ci.yml で照合する。setoka の商標の確認の結果と、docs のドメインの保有者・更新日が記録されて
-    いる（94）
-  - docs に互換性の約束と更新の手順（yuzu から setoka への移行を含む）のページがあり、release スキルの
-    リリースノートの手順がそのページを指している（95）
+    環境変数・Release のアーカイブ名・docs の URL・リポジトリ名）。旧名が ROADMAP.md・ROADMAP-history.md
+    の外に残っていないことを ci.yml で照合し、setoka の商標の確認の結果が記録されている（94）
+  - docs に互換性の約束と更新の手順のページがあり、release スキルのリリースノートの手順がそのページを
+    指している（95）
   - binstall のメタデータのアーカイブ名・バイナリの置き場が release.yml の名前と一致することを ci.yml で
     照合する（96。改名でアーカイブ名が変わり、setoka の名前のアーカイブは v0.21.0 のリリースで初めて
     できるので、binstall で実際に入れるのはリリース後に 99 で確かめる）
-  - 作り直した雛形で、既存の e2e（`yuzu new` → build → check）が通る（96）
+  - 作り直した雛形で、既存の e2e（`setoka new` → build → check）が通る（96）
   - CONTRIBUTING と issue のテンプレートがあり、PR を受け付けないことが書かれ、README と FAQ の
     「質問・不具合の報告」から辿れる（97）
   - README と比較のページの要点を ci.yml の docs ゲートで照合する（98）
-  - ソースで入れた今のブランチの yuzu で、作り直した雛形から build・check・preview まで通る（99 の
+  - ソースで入れた今のブランチの setoka で、作り直した雛形から build・check・preview まで通る（99 の
     タグの前の確認。binstall とアーカイブで v0.21.0 を通すのはリリース後）
   - release スキルに利用の数を記録する手順があり、v0.20.0 の基準値が ROADMAP に記録されている（99。
     基準値は 11-28 に測るので、タグはそれより後になる）
@@ -83,11 +81,10 @@ v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者
 
   | 作業 | Phase | 時期 |
   | --- | --- | --- |
-  | setoka の商標を確かめる（J-PlatPat 等。せとかは品種の名前でもある） | 94 | 94 の着手前 |
-  | docs のドメイン（`ai.implementer.net`）の保有者と更新日を確かめる | 94 | 94 の着手時 |
-  | GitHub のリポジトリ名を setoka に変える | 94 | 94 の PR のマージの前（順序は着手時に決める） |
-  | 旧 URL の転送ページを置く（置くと決めた場合。org の Pages のリポジトリ） | 94 | 94 のマージ後 |
-  | 手元のディレクトリ名と Claude Code のメモリのディレクトリを移す（変えると決めた場合） | 94 | 94 のマージ後 |
+  | ~~setoka の商標を確かめる~~（11-15 に済み。登録なし） | 94 | 94 の着手前 |
+  | ~~GitHub のリポジトリ名を setoka に変える~~（11-15 に済み） | 94 | 94 の着手時 |
+  | 手元のディレクトリ名と Claude Code のメモリのディレクトリを移す | 94 | 94 のマージ後 |
+  | 開発コンテナを作り直す（イメージ・コンテナ・volume の名前が変わる。古いものは消してよい） | 94 | 94 のマージ後 |
   | 各 Phase の判断点を決める | 94〜99 | 着手時 |
   | macOS でブラウザからダウンロードしたバイナリが Gatekeeper に止められるか確かめる | 96 | 96 の着手時 |
   | Discussions を有効にするか・ラベルを作る（97 の判断に合わせる） | 97 | 97 のマージ後 |
@@ -127,12 +124,12 @@ v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者
   名前を出した比較と選び方（Phase 91 → 98）・Admonition のラベル（Phase 90 → 候補の i18n）・CLI の e2e を
   Windows で実行する（Phase 87 → その他の候補）
 
-### 94 名前を setoka に変える ⬜
+### 94 名前を setoka に変える ✅
 
 **概要**: 名前を yuzu から setoka（せとか）へ変える（10-07 見直しの F7。11-15 にユーザが決めた）。
 crate 名・バイナリ名・設定ファイル名・キャッシュのディレクトリ・環境変数・Release のアーカイブ名・
-docs の URL・リポジトリ名をまとめて変え、docs のドメインの管理も記録する（F8）。主な判断点は旧 URL と
-旧ファイル名の扱い。
+docs の URL・リポジトリ名をまとめて変える。利用者はユーザだけなので、旧 URL の転送や旧名の
+ファイルの互換の読み込みは作らない。
 
 - 決めた理由（11-15）
   - crates.io の `yuzu` は言語モデルを使う別の CLI（バイナリ名も `yuzu`）で、`cargo install yuzu` が
@@ -150,35 +147,50 @@ docs の URL・リポジトリ名をまとめて変え、docs のドメインの
   docs の URL `https://ai.implementer.net/yuzu/`・リポジトリ `ai-implementer/yuzu`。docs の URL の
   ドメインは org の `ai-implementer.github.io` リポジトリの CNAME で決まる（10-07 に確認）が、
   保有者と更新期限の記録は無い
-- やること
-  - コード: crate 名とディレクトリ（`crates/yuzu-*` → `crates/setoka-*`）・バイナリ名・設定ファイル名・
-    キャッシュと出力の識別子・環境変数・テーマの保存キー・CLI の文言を変える。mikan・tankan・kabosu の
-    README と docs の yuzu への言及も直す（crates.io の分は次の publish で変わる）
-  - 配布: release.yml のアーカイブ名・雛形 deploy.yml と `docs/snippets/` の写し・dependabot・
-    deny.toml・ライセンスの記録
-  - 文書: README・docs・CLAUDE.md・スキル・ROADMAP（ROADMAP-history.md の過去の記録とリリースノートは
-    書き換えない）
-  - GitHub のリポジトリ名を変える（ユーザの作業）。github.com の旧 URL（clone・Release のダウンロード）
-    は GitHub が転送する見込み（**未確認**。変えた後に確かめる）
-  - docs の URL を `/setoka/` にし、ドメインの保有者・更新日と、URL を変えるときの方針を記録する
-  - 旧名が残っていないことを ci.yml の grep で照合する（例外の一覧: ROADMAP-history.md・移行の手順・
-    旧名を知らせるエラー文言 等）
-- 判断点
-  - 旧 URL `https://ai.implementer.net/yuzu/` の扱い（**推奨**: 転送のページを置く。GitHub Pages は
-    リポジトリ名を変えると旧パスを転送しない見込み（**未確認**）なので、org の Pages のリポジトリに
-    `yuzu/` の転送ページを置くか、404 のままにするか）
-  - 旧名のファイルの扱い（**推奨**: 互換の読み込みは作らない。外部の利用者は 0 人。`yuzu.toml` しか
-    無いときは「`setoka.toml` に名前を変えてください」と知らせて止める。`.yuzu/` は消してよいと案内する。
-    移行の手順は 95 のページに書く）
-  - crates.io の `setoka` を取るか（**推奨**: v0.21 では取らない。中身の無い名前の確保は crates.io が
-    避けるよう求めている。本体の公開は 7 crate を出すか 1 つにまとめる必要がある = 候補「yuzu 本体の
-    crates.io 公開」。ほかの人に取られる危険は残る）
-  - 手元のディレクトリ名（`…/ai-implementer/yuzu`）を変えるか（Claude Code のメモリはディレクトリの
-    パスごとに分かれるので、変えるならメモリのディレクトリも移す。ユーザの作業）
-  - ドメインの記録の置き場（公開してよい内容か。release スキルか運用の文書。`docs/design/` は
-    git 管理外なので公開物から参照しない）
-  - PR の分け方（**推奨**: 1 つの PR。途中の状態で CI と docs ゲートを通すのが難しい）
-- 工数: 大（ほかの Phase の前に単独で行う）
+- 決定（11-15。ユーザが決めた）
+  - 商標: J-PlatPat で setoka の登録は無かった（ユーザが確認）
+  - 利用者はユーザだけなので、改名に伴う他の人への手当てはしない: 旧 URL `/yuzu/` の転送ページは
+    置かない / 旧名の設定ファイルの互換の読み込みも、見つけたときの案内も作らない（手元の原稿は
+    ユーザが名前を変える）/ 95 の互換性のページに改名の移行手順は書かない（リリースノートに 1 行）/
+    ドメインの保有者・更新日の記録（10-07 見直しの F8）は v0.21 では扱わない（候補に戻した）
+  - crates.io の `setoka` は v0.21 では取らない（中身の無い名前の確保は crates.io が避けるよう
+    求めている。本体の公開は候補「setoka 本体の crates.io 公開」）
+  - GitHub のリポジトリ名は着手時にユーザが変える。手元のディレクトリ名とメモリの移動、開発コンテナの
+    作り直しはマージ後にユーザが行う（上の「ユーザの作業」）
+  - PR は 1 つ
+- やったこと
+  - ファイルの移動: `crates/yuzu-*` → `crates/setoka-*`（7 つ）・`docs/setoka.toml`・ロゴ
+    （`setoka-logo.svg`）・雛形の `setoka.toml`・テストの試験用プロジェクトの `setoka.toml`
+  - 置き換え: 追跡しているテキストのファイルの yuzu / Yuzu / YUZU を setoka / Setoka / SETOKA に
+    （crate 名・`setoka_core` 等の識別子・バイナリ名・`setoka.toml`・`.setoka/`・dist の `__setoka/`・
+    テーマの保存キー・`SETOKA_VERSION`・開発コンテナの `SETOKA_CONTAINER_*`・Release のアーカイブ名・
+    URL・文書・テスト名）。ROADMAP-history.md は書き換えない
+  - 旧名そのものについて書いた文は手で直した（CLAUDE.md と `publish-crate` スキルの「名前が
+    別プロジェクトに取得済み」、mikan の旧名 `…-index-format` の注記）
+  - 検索 wasm を作り直した（`scripts/build-search-wasm.sh` がハッシュする自身の中のパスが変わるため）。
+    mikan-wasm の公開クラスは名前に依らない `MikanSearch` にした。OPFS のキャッシュのディレクトリ名も
+    `setoka-search` に変わる。エクスポートの名前が全部変わるので、ブラウザのキャッシュに古い
+    `search_bg.wasm` が残ると新しい `search.js` と合わない（CLAUDE.md「検索インデックスと wasm」の注意）。
+    利用者はユーザだけなので受け入れた
+  - `CACHE_FORMAT_VERSION` を 34 に上げた。生成の規則は同じで、キャッシュの指紋が変わったのは試験用の
+    プロジェクトの原稿のコードブロックの文言が変わったため（原稿の文言だけを戻すと指紋が前の値に戻る
+    ことを確かめた）
+  - ci.yml に旧名の照合（`old name`）を足した。ROADMAP.md と ROADMAP-history.md の外で旧名が出る・
+    旧名を含むファイル名があると落ちる。verify スキルにも写した
+- 確かめたこと（11-15）
+  - リポジトリ名の変更の後、github.com の旧 URL（リポジトリ・Release のダウンロード）は新しい名前へ
+    301 で転送される。Pages の `/yuzu/` は 404、`/setoka/` は 200（中身は v0.21.0 で出し直すまで
+    `/yuzu/` を前提にした v0.20 の docs）
+  - Cargo.lock の差分は 7 crate の改名だけ（crate と版の集合を照合）。テーマの vendor の第三者
+    ライセンスの通知は、作り直した結果と置き換えた結果が同じ
+- 共有カードの画像（`docs/public/images/og.png`）の作り直し: 前の画像には「yuzu」の文字が絵として
+  入っていた（grep では見つからない）。前回（Phase 80）と同じく SVG を手で描き、文字を setoka にした。
+  元の SVG は今回から `docs/images-src/og.svg` に置く（前回は残さなかった。content・public の外なので
+  dist には出ない）。PNG への書き出しは使い捨ての resvg 0.50.0（ユーザの許可を得て入れた）
+- 確かめたこと（11-15。ユーザ）: ブラウザで、検索の結果が出る・配色の選択が再読み込み後も残る・サイドバーの
+  位置が残る・`setoka dev` のライブリロード。検索 wasm の公開クラス名と保存キーが変わったので、ネイティブの
+  `setoka search` では確かめられない部分
+- 工数: 大
 
 ### 95 互換性の約束と更新の手順 ⬜
 
@@ -194,8 +206,8 @@ docs の URL・リポジトリ名をまとめて変え、docs のドメインの
     「非互換と注意」に必ず書く・キャッシュの形式が変わると初回は全ページを作り直す 等
   - 約束の対象の一覧: 設定キー・CLI の引数と終了コード・`check --format json` の出力形式・出力の URL・
     テーマの上書きの単位（ファイル）・検索の索引と wasm の組
-  - 非互換のうち、今の利用者に要るものの手順（v0.21 の改名 = バイナリの入れ替え・`yuzu.toml` →
-    `setoka.toml`・`.yuzu/` の削除・deploy.yml の書き換え / v0.14 の TOML 化 / v0.20 の frontmatter）
+  - 非互換のうち、今の利用者に要るものの手順（v0.14 の TOML 化・v0.20 の frontmatter。v0.21 の改名は
+    リリースノートに 1 行だけ書く = 94 の決定）
   - release スキルの手順に、このページの更新を足す
 - 判断点: CHANGELOG.md を置くか（**推奨**: 置かない。リリースノートと docs のページで足り、4 か所目の
   要約を作らない。置くなら release.yml でリリースノートから作る）/ `--format json` の出力形式を約束の対象に
@@ -207,7 +219,7 @@ docs の URL・リポジトリ名をまとめて変え、docs のドメインの
 
 **概要**: 手で置く・ソースから入れるの 2 通りに cargo-binstall を足し、macOS でブラウザから
 ダウンロードしたバイナリの扱いを docs に書く（10-04 見直しの「macOS バイナリが未署名・未公証」の
-説明だけ）。`yuzu new` の雛形の原稿を、機能の一覧から最初の 5 分の案内に作り直す（v0.20 Phase 91 から
+説明だけ）。`setoka new` の雛形の原稿を、機能の一覧から最初の 5 分の案内に作り直す（v0.20 Phase 91 から
 移した）。
 
 - 現状: 上の「現状の確認」の「入れ方」。macOS のバイナリは未署名・未公証で、ブラウザで
@@ -215,8 +227,8 @@ docs の URL・リポジトリ名をまとめて変え、docs のドメインの
   取得すると quarantine 属性は付かない見込み）。雛形の原稿は機能のカタログ（10-04 見直しの
   「細かな分かりにくさ」）
 - やること
-  - yuzu-cli の Cargo.toml に `[package.metadata.binstall]` を足す（release.yml のアセット名
-    `yuzu-v{版}-{ターゲット}.tar.gz`、Windows は zip に合わせた `pkg-url`・`bin-dir`・`pkg-fmt`）。
+  - setoka-cli の Cargo.toml に `[package.metadata.binstall]` を足す（release.yml のアセット名
+    `setoka-v{版}-{ターゲット}.tar.gz`、Windows は zip に合わせた `pkg-url`・`bin-dir`・`pkg-fmt`）。
     docs と README に `cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli` を書き、
     crates.io に出さない限り `--git` が要ることを書く（94 の後なので、パッケージ名とリポジトリは
     setoka の名前になる）。アセット名との一致を ci.yml で
@@ -250,7 +262,7 @@ CONTRIBUTING.md と issue のテンプレート（不具合・要望）を置き
   - CONTRIBUTING.md: issue で受けるもの（不具合・要望・docs の誤り）・issue の書き方・PR を受け付けない
     こと（1 人で保守できる範囲に収めるため。直してほしい箇所は issue に書いてもらう）・脆弱性は
     `SECURITY.md` へ
-  - issue のテンプレート: 不具合（`yuzu --version`・OS・再現の手順と最小の原稿）/ 要望 / 質問の
+  - issue のテンプレート: 不具合（`setoka --version`・OS・再現の手順と最小の原稿）/ 要望 / 質問の
     行き先（Discussions か issue か）
   - 届いた PR の扱い: 閉じて issue へ案内する文面を決める。PR の作成そのものを止められるかは
     **未確認**（GitHub の設定を着手時に確かめる。止められなければ PR のテンプレートの冒頭に書く）
@@ -288,7 +300,7 @@ CONTRIBUTING.md と issue のテンプレート（不具合・要望）を置き
 
 ### 99 dogfooding と利用の記録 ⬜
 
-**概要**: 初めての人の手順（README → インストール → `yuzu new` → build → deploy）を、何も入って
+**概要**: 初めての人の手順（README → インストール → `setoka new` → build → deploy）を、何も入って
 いない環境で通して確かめる。リリースごとに利用の数を記録する手順を release スキルに足し、v0.20.0 の
 基準値を記録する（10-07 見直しの F1）。
 
@@ -300,7 +312,7 @@ CONTRIBUTING.md と issue のテンプレート（不具合・要望）を置き
     - タグの前: ソース（`cargo install --git … --branch main`）で入れて、作り直した雛形から build・
       check・preview まで通す
     - リリース後: binstall と Release のアーカイブで v0.21.0 を入れて、雛形から通す（setoka の名前の
-      アーカイブは v0.21.0 で初めてできる）。github.com の旧 URL からの転送も確かめる。止まった所は
+      アーカイブは v0.21.0 で初めてできる）。止まった所は
       パッチ版で直す
   - release スキルに、リリースの 14 日後に記録する手順を足す（各アーカイブのダウンロード数から
     release.yml の取得分 1 回を引いた数・14 日の閲覧数と閲覧者数・star・issue）
@@ -349,18 +361,18 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
 決めずに前提だけを書く意見）。前提は、init は `input.dir = "."` の扱い、JSON は互換性の方針
 （v0.21 Phase 95）。v0.21 のリリース後に観察してから判断する。
 
-- **既存 Markdown 向けの非破壊 `init`** — 原稿のディレクトリを指定し、最小の yuzu.toml だけを
+- **既存 Markdown 向けの非破壊 `init`** — 原稿のディレクトリを指定し、最小の setoka.toml だけを
   作る（既存の設定があれば止まる。原稿の移動・変換・公開はしない）
-  - 今あるもの: 手順は `guide/install.md` の「既存のフォルダで始める」にあり、空の yuzu.toml に
+  - 今あるもの: 手順は `guide/install.md` の「既存のフォルダで始める」にあり、空の setoka.toml に
     `input.dir` を書けば build できる（10-14 に確認）。自動にできるのは手順の最初の 2 つだけで、
     deploy.yml は渡らない。リポジトリ直下の原稿は `input.dir = "."` が設定エラーなので救えない
   - 戻せない決定: サブコマンドの名前と引数。直下の原稿を扱うなら、先に `input.dir = "."` の
-    扱い（dist・.yuzu・public・theme・README 類を走査から外す設計）を決める必要がある
+    扱い（dist・.setoka・public・theme・README 類を走査から外す設計）を決める必要がある
 - **公開物の詳細な JSON**（出力ファイルと、どの原稿・設定から出たか）— 人向けの 1 行の要約は
   v0.20 Phase 91 に入れた。JSON は `check --format json` と並ぶ戻せない契約になり、出力ごとの
-  由来は出力マニフェスト（`yuzu-core/src/output.rs`）に無いので新しく記録する必要がある。
+  由来は出力マニフェスト（`setoka-core/src/output.rs`）に無いので新しく記録する必要がある。
   互換性の方針（v0.21 Phase 95）の後
-- **PR 検証 CI の雛形の生成** — docs の例は v0.20 Phase 91 に入れた。`yuzu new` で生成するのは、
+- **PR 検証 CI の雛形の生成** — docs の例は v0.20 Phase 91 に入れた。`setoka new` で生成するのは、
   既存の workflow を上書きしない作りと明示の選択が要るので、観察の後
 
 ### その他の候補
@@ -381,11 +393,11 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
   - 0.7 の形式のモデルは vaporetto 本体の v0.7.0 のリリースに添付されている（`bccwj-suw_c1.0.tar.xz` も
     ある）。`scripts/vendor-vaporetto-model.sh` の取得元（今は vaporetto-models）と SHA-256 を差し替える
   - 上流のリリースノートでは、BCCWJ だけのモデルは 0.5.0 のものを `convert_bincode_model` で新しい
-    形式へ変換したもの。分かち書きは変わらない見込みだが `yuzu search` で確かめ、変わるなら
+    形式へ変換したもの。分かち書きは変わらない見込みだが `setoka search` で確かめ、変わるなら
     `CACHE_FORMAT_VERSION` を上げる
   - vaporetto と vaporetto_rules は同じ版にする（片方だけだと 0.6 と 0.7 が両方入る）
 - **CLI の e2e を Windows でも実行する**（v0.20 Phase 87 から移した）— Windows・macOS は
-  `cargo test` だけで、ci.yml の e2e（`yuzu new` → build → check）は ubuntu だけ
+  `cargo test` だけで、ci.yml の e2e（`setoka new` → build → check）は ubuntu だけ
 - **i18n** — テーマ UI 文字列の多言語化（v0.21 の対象の読者は当面日本語だけ。英語に変える可能性は
   ある = 11-15 にユーザが決めた。Phase 98）
   - Admonition のラベル（NOTE・TIP 等の見出しの文言）もここで扱う（v0.20 Phase 90 から移した）
@@ -398,17 +410,17 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
     （`search-ui.js` は 470 行）
   - 最小案: `theme.strings` の部分上書き辞書（`theme.css_vars` / `glossary.terms` と
     同型）。既定を日本語のまま据え置けばスナップショットは動かない
-  - 線引きが要る: apispec の文言は**描画のエラーボックスと `yuzu check` の診断で共有**
+  - 線引きが要る: apispec の文言は**描画のエラーボックスと `setoka check` の診断で共有**
     しているので、翻訳すると `--format json` の出力も言語で変わる
 - **ドキュメントバージョニング** — 要否含め保留中
 - **VS Code 拡張** — wasm プレビュー
-  - 前提: `yuzu-core` / `yuzu-render` が 9 ファイルで `std::fs` に依存しており
+  - 前提: `setoka-core` / `setoka-render` が 9 ファイルで `std::fs` に依存しており
     I/O 抽象化が要る
-- **yuzu 本体の crates.io 公開** — 汎用ライブラリ層は tankan・mikan まで公開済み
+- **setoka 本体の crates.io 公開** — 汎用ライブラリ層は tankan・mikan まで公開済み
   - 障害: 名前 `yuzu`・`yuzu-core` が別プロジェクトに取得済み
   - 単一パッケージ化するか名称を再検討する必要がある（Phase 37 の決定事項）
   - 11-15: v0.21 Phase 94 で setoka へ改名すると決めた。crates.io の `setoka` は 11-15 の時点で空き。
-    名前の問題は無くなるが、7 crate を出すか 1 つにまとめるかは残る（94 の判断点では v0.21 では取らない推奨）
+    名前の問題は無くなるが、7 crate を出すか 1 つにまとめるかは残る（v0.21 では取らないと決めた = 94）
 
 ### レビューからの持ち越し（未着手）
 
@@ -438,7 +450,7 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
   - ⬜ **F3 レビューの記録が GitHub に残らない**（工数: 小）
   - ⬜ **F5 性能と、リリース後の不具合件数の推移を測っていない**（工数: 小〜中）
   - ⬜ **F6 文書と CI のゲートを二重・三重に管理している**（工数: 小〜中）
-  - ~~**F8 docs の URL が独自ドメインと org 側のリポジトリに依存し、雛形に焼き込まれている**~~ → v0.21 Phase 94
+  - ⬜ **F8 docs の URL が独自ドメインと org 側のリポジトリに依存し、雛形に焼き込まれている**（工数: 小。v0.21 Phase 94 で URL は `/setoka/` に変えたが、利用者がユーザだけなので保有者・更新日の記録は扱わなかった）
 - 10-12 レビュー（R6・R7・R8・R10）と v0.10.1 レビュー（中身ごと写したもの）
 
 - ⬜ **R6 render_body_html（292 行）のノード生成と、記法ごとの組み替え**（工数: 中）
@@ -466,8 +478,8 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
   - `build_once` から、テストの無い同義語の合成と丸め（IndexParams の組み立て）を純関数で出す
   - cli の run 関数（check・lint・search・dev・llms）にテストが 0 件。`lint --fix` の収束ループを
     `fmt.rs` のように純関数に出してテストする
-  - `yuzu_config::load` の保護対象の配列（`resolve.rs:84-89`）とエラー文言の match が別で、
-    `_ =>` が `.yuzu` の文言になっている。文言を配列に入れる
+  - `setoka_config::load` の保護対象の配列（`resolve.rs:84-89`）とエラー文言の match が別で、
+    `_ =>` が `.setoka` の文言になっている。文言を配列に入れる
   - tankan: 前置き行（`%%{..}%%`・frontmatter・コメント）を飛ばす処理が 11 か所、SVG のルート要素が
     9 か所にコピーされ、frontmatter の `title:` の扱いが 4 通りに分かれた（引用符を外すのは packet
     だけ）。図種を足すたびにコピーが増える

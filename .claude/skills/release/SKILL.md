@@ -1,9 +1,9 @@
 ---
 name: release
-description: yuzu の新バージョンをリリースする（ROADMAP.md 更新 → バンプコミット → push → CI green → 注釈付きタグ → GitHub Release 公開）。マイナー / パッチの違いと release.yml の検証条件を含む。バージョンを上げるときに使う。
+description: setoka の新バージョンをリリースする（ROADMAP.md 更新 → バンプコミット → push → CI green → 注釈付きタグ → GitHub Release 公開）。マイナー / パッチの違いと release.yml の検証条件を含む。バージョンを上げるときに使う。
 ---
 
-# yuzu リリース手順
+# setoka リリース手順
 
 `.github/workflows/release.yml` が **タグ push をトリガ**に 4 プラットフォームのバイナリを
 ビルドし、draft Release へ集約して SHA256SUMS を添付してから公開する。
@@ -72,7 +72,7 @@ gh run list --workflow deps.yml --limit 1   # success になるまで待つ
 
 ```bash
 git tag -a vX.Y.Z -F - <<'EOF'
-yuzu vX.Y.Z — <日本語概要>
+setoka vX.Y.Z — <日本語概要>
 
 - **<Phase 名>** — <何が変わったか。判断の根拠まで書く>
 - **<Phase 名>** — <同上>
@@ -80,7 +80,7 @@ EOF
 git push origin vX.Y.Z
 ```
 
-- **注釈付き（`-a`）必須**。1 行目は既存のタグにそろえて `yuzu vX.Y.Z — <概要>`（em dash）
+- **注釈付き（`-a`）必須**。1 行目は既存のタグにそろえて `setoka vX.Y.Z — <概要>`（em dash）
 - **2 行目以降がそのままリリース本文の「## 変更内容」になる**（release.yml が
   `git tag -l --format='%(contents:body)'` で取り出す）。**空にすると節ごと消える** —
   リリースが「インストール」の節だけになる
@@ -114,4 +114,4 @@ git push origin vX.Y.Z
 
 ## crates.io（tankan / mikan / kabosu）は非同期
 
-yuzu のリリースとは切り離して、変更が溜まったときだけ行う。手順は `publish-crate` スキル。
+setoka のリリースとは切り離して、変更が溜まったときだけ行う。手順は `publish-crate` スキル。

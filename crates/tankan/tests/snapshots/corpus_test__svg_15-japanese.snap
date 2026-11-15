@@ -33,7 +33,7 @@ expression: svg
 <line class="tk-lifeline" x1="325" y1="53.5" x2="325" y2="282"/>
 <line class="tk-lifeline" x1="527" y1="53.5" x2="527" y2="282"/>
 <line class="tk-msg" x1="125" y1="99" x2="325" y2="99" marker-end="url(#tk-head)"/>
-<text class="tk-msg-text" x="225" y="89" text-anchor="middle">yuzu build --watch</text>
+<text class="tk-msg-text" x="225" y="89" text-anchor="middle">setoka build --watch</text>
 <line class="tk-msg" x1="325" y1="150" x2="527" y2="150" stroke-dasharray="3,3" marker-end="url(#tk-head)"/>
 <text class="tk-msg-text" x="426" y="140" text-anchor="middle">静的 HTML（自動リロード）</text>
 <line class="tk-msg" x1="125" y1="200.5" x2="325" y2="200.5" marker-end="url(#tk-head)"/>
@@ -50,11 +50,11 @@ expression: svg
 </g>
 <g class="tk-actor">
 <rect class="tk-actor-box" x="250" y="10" width="150" height="43.5" rx="3"/>
-<text class="tk-actor-label" x="325" y="34" text-anchor="middle">yuzu</text>
+<text class="tk-actor-label" x="325" y="34" text-anchor="middle">setoka</text>
 </g>
 <g class="tk-actor">
 <rect class="tk-actor-box" x="250" y="282" width="150" height="43.5" rx="3"/>
-<text class="tk-actor-label" x="325" y="306" text-anchor="middle">yuzu</text>
+<text class="tk-actor-label" x="325" y="306" text-anchor="middle">setoka</text>
 </g>
 <g class="tk-actor">
 <rect class="tk-actor-box" x="452" y="10" width="150" height="43.5" rx="3"/>

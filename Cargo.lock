@@ -1482,6 +1482,115 @@ dependencies = [
 ]
 
 [[package]]
+name = "setoka-cli"
+version = "0.20.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "open",
+ "rayon",
+ "serde",
+ "serde_json",
+ "setoka-config",
+ "setoka-core",
+ "setoka-index",
+ "setoka-render",
+ "setoka-server",
+ "similar 3.2.1",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "setoka-config"
+version = "0.20.0"
+dependencies = [
+ "kabosu",
+ "tempfile",
+]
+
+[[package]]
+name = "setoka-core"
+version = "0.20.0"
+dependencies = [
+ "comrak",
+ "globset",
+ "insta",
+ "same-file",
+ "saphyr",
+ "saphyr-parser",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
+name = "setoka-index"
+version = "0.20.0"
+dependencies = [
+ "fst",
+ "mikan",
+ "rayon",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "setoka-core",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "setoka-render"
+version = "0.20.0"
+dependencies = [
+ "insta",
+ "minijinja",
+ "rayon",
+ "serde",
+ "serde_json",
+ "setoka-config",
+ "setoka-core",
+ "setoka-theme",
+ "syntect",
+ "tankan",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "two-face",
+ "walkdir",
+]
+
+[[package]]
+name = "setoka-server"
+version = "0.20.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "notify",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
+name = "setoka-theme"
+version = "0.20.0"
+dependencies = [
+ "rust-embed",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2178,115 +2287,6 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
-
-[[package]]
-name = "yuzu-cli"
-version = "0.20.0"
-dependencies = [
- "anyhow",
- "clap",
- "clap_complete",
- "open",
- "rayon",
- "serde",
- "serde_json",
- "similar 3.2.1",
- "tempfile",
- "tracing",
- "tracing-subscriber",
- "yuzu-config",
- "yuzu-core",
- "yuzu-index",
- "yuzu-render",
- "yuzu-server",
-]
-
-[[package]]
-name = "yuzu-config"
-version = "0.20.0"
-dependencies = [
- "kabosu",
- "tempfile",
-]
-
-[[package]]
-name = "yuzu-core"
-version = "0.20.0"
-dependencies = [
- "comrak",
- "globset",
- "insta",
- "same-file",
- "saphyr",
- "saphyr-parser",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "tracing",
- "walkdir",
-]
-
-[[package]]
-name = "yuzu-index"
-version = "0.20.0"
-dependencies = [
- "fst",
- "mikan",
- "rayon",
- "rust-embed",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "tracing",
- "yuzu-core",
-]
-
-[[package]]
-name = "yuzu-render"
-version = "0.20.0"
-dependencies = [
- "insta",
- "minijinja",
- "rayon",
- "serde",
- "serde_json",
- "syntect",
- "tankan",
- "tempfile",
- "thiserror",
- "tracing",
- "two-face",
- "walkdir",
- "yuzu-config",
- "yuzu-core",
- "yuzu-theme",
-]
-
-[[package]]
-name = "yuzu-server"
-version = "0.20.0"
-dependencies = [
- "axum",
- "futures-util",
- "notify",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-tungstenite 0.30.0",
- "tower-http",
- "tracing",
-]
-
-[[package]]
-name = "yuzu-theme"
-version = "0.20.0"
-dependencies = [
- "rust-embed",
-]
 
 [[package]]
 name = "zerocopy"

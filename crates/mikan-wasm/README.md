@@ -1,8 +1,8 @@
 # mikan-wasm
 
-yuzu のクライアント検索クエリエンジン（`wasm32-unknown-unknown` の wasm-bindgen ラッパ）。
+setoka のクライアント検索クエリエンジン（`wasm32-unknown-unknown` の wasm-bindgen ラッパ）。
 **ロジックは持たない**薄い層で、エンジン本体・トークナイザ・フォーマットはすべて
-[`mikan`](../mikan) にあり、ネイティブの `yuzu search` と
+[`mikan`](../mikan) にあり、ネイティブの `setoka search` と
 同一コードを共有する（トークナイザ整合の保証。README「検索まわりの実装メモ」参照）。
 
 crates.io には公開しない（`cargo add` する Rust ライブラリではなく、wasm 成果物を
@@ -12,7 +12,7 @@ crates.io には公開しない（`cargo add` する Rust ライブラリでは�
 
 `js/search-client.js` / `js/opfs-cache.js` は、この wasm ラッパを **フェッチ ＋ OPFS
 キャッシュ ＋ wasm 起動**込みでブラウザから呼び出すための手書きの対になる実装。
-DOM やテーマの知識は一切持たない（yuzu-theme の `search-ui.js` はこれを import して
+DOM やテーマの知識は一切持たない（setoka-theme の `search-ui.js` はこれを import して
 使うだけの UI 層に純化されている）:
 
 - **`search-client.js`**: `createSearchClient({ searchBase })` が
@@ -26,7 +26,7 @@ DOM やテーマの知識は一切持たない（yuzu-theme の `search-ui.js` �
   そのページセッションでは恒久的に無効化し、呼び出し側は透過的にフェッチのみへ縮退する
 
 `scripts/build-search-wasm.sh` が `search.js`/`search_bg.wasm`（wasm-bindgen 生成物）と
-一緒にこの2ファイルを `crates/yuzu-index/assets/search/`（`dist/_search/` へ rust-embed
+一緒にこの2ファイルを `crates/setoka-index/assets/search/`（`dist/_search/` へ rust-embed
 経由でコピーされる vendor 先）へコピーする。
 
 ## 使い方（JS 側）

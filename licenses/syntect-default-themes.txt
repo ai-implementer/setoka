@@ -1,6 +1,6 @@
 syntect（5.3）が同梱する既定のテーマと構文定義
 
-yuzu はコードハイライトの CSS（syntect.css）を syntect の既定テーマ（ThemeSet::load_defaults）
+setoka はコードハイライトの CSS（syntect.css）を syntect の既定テーマ（ThemeSet::load_defaults）
 から作る。既定は InspiredGitHub（ライト）と base16-ocean.dark（ダーク）で、設定
 highlight.theme_light / theme_dark で既定テーマの中から選べる。syntect の既定テーマは
 InspiredGitHub・Solarized（dark / light）・base16（ocean・eighties・mocha）。

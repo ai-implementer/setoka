@@ -6,7 +6,7 @@ description: base_url・GitHub Pages・404 ページ・git 連携メタ・sitema
 
 # 配信とデプロイ
 
-`yuzu build` の出力（`dist/`）は純粋な静的サイトです。Web サーバや CDN に
+`setoka build` の出力（`dist/`）は純粋な静的サイトです。Web サーバや CDN に
 そのまま置けます。
 
 ## サブパス配信（`base_url`）
@@ -23,15 +23,15 @@ base_url = "/docs/"
 CI から注入する場合はコマンドラインの `--base-url` が設定より優先されます:
 
 ```bash
-yuzu build --base-url /docs/
-yuzu build --base-url "https://example.com/docs/"  # フル URL も可
+setoka build --base-url /docs/
+setoka build --base-url "https://example.com/docs/"  # フル URL も可
 ```
 
 フル URL を渡すと llms.txt のリンクが絶対 URL になります。
 
 ## GitHub Pages
 
-`yuzu new` が生成する `.github/workflows/deploy.yml` を push するだけで、
+`setoka new` が生成する `.github/workflows/deploy.yml` を push するだけで、
 GitHub Pages への自動デプロイが動きます。必要な操作はリポジトリの
 **Settings \> Pages \> Source を「GitHub Actions」にする**ことだけです。
 
@@ -39,16 +39,16 @@ GitHub Pages のサイトは、リポジトリを非公開にしてもインタ�
 社内だけに見せる設計書は、[社内で公開する](internal.md)を読んでから置き場所を決めてください。
 
 ワークフローは `actions/configure-pages` が返すホスト名と base path から公開先の
-フル URL（`https://<ホスト名>/<リポジトリ名>/`）を組み立てて `yuzu build --base-url`
+フル URL（`https://<ホスト名>/<リポジトリ名>/`）を組み立てて `setoka build --base-url`
 へ渡します。そのため project pages のサブパスも設定なしで正しく配信され、
 [canonical と共有カード](#共有カードogpと-canonical)・[sitemap.xml](#sitemapxml) も
 自動で出ます。
 
-ワークフローが使う yuzu は、`yuzu new` を実行した yuzu と同じ版に固定されています。
+ワークフローが使う setoka は、`setoka new` を実行した setoka と同じ版に固定されています。
 その版のリリースから Linux x64 向けのアーカイブをダウンロードし、リリースに添付された
 `SHA256SUMS` で照合してから使います（Rust のインストールやコンパイルは行いません）。
 版を固定するのは、リリース前の変更がデプロイに混ざらないためです。新しい版に上げる
-ときは、ワークフローの `YUZU_VERSION` を書き換えてください。ソースからビルドして
+ときは、ワークフローの `SETOKA_VERSION` を書き換えてください。ソースからビルドして
 入れる手順も、ワークフローのコメントにあります。
 
 ワークフローは `main` への push で動きます。既定のブランチが別の名前なら、
@@ -56,8 +56,8 @@ GitHub Pages のサイトは、リポジトリを非公開にしてもインタ�
 
 ### ワークフローの全文
 
-`yuzu new` が作る `.github/workflows/deploy.yml` の中身です。[既存のフォルダで始めた](install.md#既存のフォルダで始める)
-ときなど、`yuzu new` を使わなかった場合は、これをリポジトリの `.github/workflows/deploy.yml` に
+`setoka new` が作る `.github/workflows/deploy.yml` の中身です。[既存のフォルダで始めた](install.md#既存のフォルダで始める)
+ときなど、`setoka new` を使わなかった場合は、これをリポジトリの `.github/workflows/deploy.yml` に
 置きます。
 
 ```yaml file="snippets/deploy.yml"
@@ -65,8 +65,8 @@ GitHub Pages のサイトは、リポジトリを非公開にしてもインタ�
 
 置くときに次を書き換えます:
 
-- `__YUZU_VERSION__` をすべて、`yuzu --version` が表示する版の番号（`v` は付けない）にします。
-  `yuzu new` はここを自分の版で埋めます
+- `__SETOKA_VERSION__` をすべて、`setoka --version` が表示する版の番号（`v` は付けない）にします。
+  `setoka new` はここを自分の版で埋めます
 - プロジェクトがリポジトリのサブディレクトリ（例: `docs/`）にあるなら、ビルドの `run` に
   `--root docs` を付け、`upload-pages-artifact` の `path` を `docs/dist` にします。
   書き換えた後の行は、ワークフローの「ビルド」のコメントにあります
@@ -77,16 +77,16 @@ GitHub Pages のサイトは、リポジトリを非公開にしてもインタ�
 
 > [!NOTE]
 > このサイト自身も GitHub Pages で公開しています。リポジトリの
-> [.github/workflows/docs.yml](https://github.com/ai-implementer/yuzu/blob/main/.github/workflows/docs.yml)
-> が、リリースのタグを打つたびにそのタグの yuzu をビルドし、`yuzu check` を通してから
-> `yuzu build --base-url` で `docs/dist` を生成して Pages へ配置します。そのため、
+> [.github/workflows/docs.yml](https://github.com/ai-implementer/setoka/blob/main/.github/workflows/docs.yml)
+> が、リリースのタグを打つたびにそのタグの setoka をビルドし、`setoka check` を通してから
+> `setoka build --base-url` で `docs/dist` を生成して Pages へ配置します。そのため、
 > このサイトの説明は最新のリリースの動作に合っています。
 
 ## 404 ページ
 
 ビルド時に `404.html` を自動生成します（テーマ統合・検索ボックスと
 サイドバー付き。GitHub Pages はこのファイルを自動で使います）。
-`public/404.html` を置けばそちらが優先されます。`yuzu preview` / `yuzu dev`
+`public/404.html` を置けばそちらが優先されます。`setoka preview` / `setoka dev`
 も存在しないパスへ同じ 404 ページを 404 ステータスで返します。
 
 ## git 連携メタ
@@ -143,7 +143,7 @@ image = "/images/og.png"   # 1200×630 前後の PNG / JPEG を public/images/ �
 ロゴとは別に PNG / JPEG を用意してください。`og:locale` は `site.lang` が
 地域付き（`"ja-JP"`）のときだけ出ます（`"ja"` から地域は推測しません）。
 
-canonical は相対 URL も規格上は許されていますが、yuzu は絶対 URL のときだけ出す方針です
+canonical は相対 URL も規格上は許されていますが、setoka は絶対 URL のときだけ出す方針です
 （ホストが分からない状態の canonical は同一性の宣言として弱く、`og:url` とも揃わないため）。
 
 ## 静的ファイルの配信

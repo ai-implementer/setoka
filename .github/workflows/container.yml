@@ -23,15 +23,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: build
-        run: docker build -t yuzu-dev -f .devcontainer/Dockerfile .devcontainer
+        run: docker build -t setoka-dev -f .devcontainer/Dockerfile .devcontainer
 
       # ツール一式が期待どおり入っているか（.devcontainer/README.md の不変条件に対応）
       - name: verify toolchain
         run: |
-          docker run --rm yuzu-dev bash -lc '
+          docker run --rm setoka-dev bash -lc '
             set -eux
             test "$(whoami)" = vscode
-            test "$(pwd)" = /workspaces/yuzu
+            test "$(pwd)" = /workspaces/setoka
             test "$CARGO_TARGET_DIR" = /cargo-target
             rustc -V
             cargo fmt --version
@@ -43,7 +43,7 @@ jobs:
       # post-create.sh の冪等性（コンテナ内で 2 回実行しても失敗しない）
       - name: post-create idempotency
         run: |
-          docker run --rm -v "$PWD:/workspaces/yuzu" yuzu-dev bash -lc '
+          docker run --rm -v "$PWD:/workspaces/setoka" setoka-dev bash -lc '
             bash .devcontainer/post-create.sh
             bash .devcontainer/post-create.sh
           '

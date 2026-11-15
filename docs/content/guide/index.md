@@ -1,16 +1,16 @@
 ---
 title: ガイド
 order: 2
-description: yuzu の使い方。インストールから執筆・公開まで
+description: setoka の使い方。インストールから執筆・公開まで
 ---
 
 # ガイド
 
-yuzu の使い方を、インストールから執筆・公開の順に説明します。初めての方は
+setoka の使い方を、インストールから執筆・公開の順に説明します。初めての方は
 [インストールと最初のサイト](install.md)から読んでください。
 
-- [インストールと最初のサイト](install.md) — インストール・`yuzu new`・既存のフォルダで始める方法
-- [他のツールとの違い](migrate.md) — ほかのツールで書き慣れた書き方と、yuzu での書き方の対応
+- [インストールと最初のサイト](install.md) — インストール・`setoka new`・既存のフォルダで始める方法
+- [他のツールとの違い](migrate.md) — ほかのツールで書き慣れた書き方と、setoka での書き方の対応
 - [執筆の基本](writing.md) — ページ・ナビ・frontmatter・Admonition・画像
 - [コードと数式](code-and-math.md) — ハイライトと KaTeX
 - [図（Mermaid）](diagrams.md) — ブラウザで描くかビルド時に SVG にするかの選び方と図の例

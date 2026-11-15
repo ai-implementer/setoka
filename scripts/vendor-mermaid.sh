@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # mermaid.min.js をテーマの vendor ディレクトリへ取得し、ライセンス文を組む。
 # 更新するときは MERMAID_VERSION と MERMAID_ARCHIVE_SHA256 を**セットで**書き換えて実行し、
-# crates/yuzu-theme/assets/static/vendor/README.md の記録も更新すること
+# crates/setoka-theme/assets/static/vendor/README.md の記録も更新すること
 # （新しい sha256 はこのスクリプトの不一致エラーが実測値を表示する）。
 #
 # mermaid.min.js は約 70 の npm パッケージ（d3・dagre・cytoscape・DOMPurify 等）を束ねた
 # ものだが、mermaid のパッケージには束ねた側のライセンス文が入っていない。npm の tarball に
 # 同梱の source map（dist/mermaid.min.js.map）の sources から束ねたパッケージ名と版を取り出し、
-# 各パッケージの tarball の LICENSE を集めて crates/yuzu-theme/licenses/mermaid.txt を書く。
+# 各パッケージの tarball の LICENSE を集めて crates/setoka-theme/licenses/mermaid.txt を書く。
 # 最後に scripts/third-party-licenses.sh vendor が dist 用の通知
 # （static/vendor/THIRD-PARTY-LICENSES.txt）を組み直す。
 #
@@ -23,8 +23,8 @@ MERMAID_VERSION="${MERMAID_VERSION:-11.17.2}"
 # **展開する前**にアーカイブ自体を照合する（KaTeX と同じ）
 MERMAID_ARCHIVE_SHA256="${MERMAID_ARCHIVE_SHA256:-6ad2f42c3fc26bbf9e45cbb6d11898972573ea52b33a5f4ff51952899f950ffd}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$ROOT/crates/yuzu-theme/assets/static/vendor/mermaid.min.js"
-NOTICE="$ROOT/crates/yuzu-theme/licenses/mermaid.txt"
+DEST="$ROOT/crates/setoka-theme/assets/static/vendor/mermaid.min.js"
+NOTICE="$ROOT/crates/setoka-theme/licenses/mermaid.txt"
 TMP="$(mktemp -d)"
 # 差し替えは DEST の隣（同一ファイルシステム）への cp ＋ mv で行う。
 # DEST へ直接 cp すると中断時に部分ファイルが残る

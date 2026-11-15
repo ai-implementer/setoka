@@ -4,9 +4,9 @@ Pagefind 型（ビルド時にインデックスを静的ファイルへ焼き�
 検索する方式）の日本語全文検索インデックスフォーマットと、その読み書きロジック
 （BM25 クエリエンジン）。名前は柑橘のミカン（蜜柑）から。
 
-ネイティブのインデクサ（`yuzu search`）とブラウザのクエリエンジン（wasm）が、この
-crate の**同一コード**を共有する。開発は [yuzu](https://github.com/ai-implementer/yuzu)
-monorepo で行っているが、mikan 自体は `yuzu-*` に依存しない独立ライブラリ。
+ネイティブのインデクサ（`setoka search`）とブラウザのクエリエンジン（wasm）が、この
+crate の**同一コード**を共有する。開発は [setoka](https://github.com/ai-implementer/setoka)
+monorepo で行っているが、mikan 自体は `setoka-*` に依存しない独立ライブラリ。
 
 ## インストール
 
@@ -16,7 +16,7 @@ cargo add mikan
 
 ## 特徴
 
-- **`yuzu-*` の上位層（テンプレート・設定・サイトモデル）に依存しない**独立ライブラリ
+- **`setoka-*` の上位層（テンプレート・設定・サイトモデル）に依存しない**独立ライブラリ
 - ただし **フォーマット非依存ではない**: このクレートは自前のワイヤフォーマット
   （`manifest.json` / `terms.fst` / `index/NNNN.bin` シャード / `fragment/*.json`）の
   読み書き実装であり、Pagefind の JS クライアントが Pagefind 独自フォーマットに
@@ -71,7 +71,7 @@ let opts = BuildOptions {
 
 let built = build(&docs, &opts)?;
 // built.manifest / built.terms_fst / built.shards / built.fragments を
-// dist/_search/ 一式として書き出すのは呼び出し側（yuzu-index::builder）の責務
+// dist/_search/ 一式として書き出すのは呼び出し側（setoka-index::builder）の責務
 ```
 
 `built.manifest.content_hash` は空文字で返る。この値（ブラウザ側 OPFS キャッシュの
@@ -96,7 +96,7 @@ let out = engine.search_with_options("検索", &opts);
 ```
 
 ブラウザから使う場合の wasm-bindgen ラッパと、フェッチ・OPFS キャッシュ・wasm 起動を
-まとめた手書き JS クライアント（`search-client.js` / `opfs-cache.js`）は、yuzu の
+まとめた手書き JS クライアント（`search-client.js` / `opfs-cache.js`）は、setoka の
 `mikan-wasm` crate（`crates/mikan-wasm/`）にある。
 
 ## ライセンス

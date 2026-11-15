@@ -42,7 +42,7 @@ done < <(git ls-files -- \
 
 # ユーザスキル（~/.claude/skills。リポジトリには無い）
 USER_SKILLS=" apple-container "
-# 利用者のプロジェクトに作られるパス（`yuzu new` の雛形の出力先。このリポジトリのパスではない）
+# 利用者のプロジェクトに作られるパス（`setoka new` の雛形の出力先。このリポジトリのパスではない）
 USER_PROJECT_PATHS=" .github/workflows/deploy.yml "
 
 missing=0

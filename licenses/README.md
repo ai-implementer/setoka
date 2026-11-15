@@ -1,6 +1,6 @@
 # 第三者ライセンスの通知の材料
 
-yuzu が配るもの（リリースのアーカイブ・利用者のサイトの dist）に入れる、第三者の
+setoka が配るもの（リリースのアーカイブ・利用者のサイトの dist）に入れる、第三者の
 ソフトウェアのライセンス表記（THIRD-PARTY-LICENSES）を組み立てるための設定と記録。
 組み立ては `scripts/third-party-licenses.sh` が行う（Phase 81）。
 
@@ -15,8 +15,8 @@ yuzu が配るもの（リリースのアーカイブ・利用者のサイトの
 
 | 通知 | 置き場 | 作るもの | コミット |
 | --- | --- | --- | --- |
-| テーマの vendor 資産（mermaid と束ねたパッケージ・KaTeX） | `crates/yuzu-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt`（dist の `_assets/vendor/`） | `scripts/vendor-mermaid.sh`・`scripts/vendor-katex.sh`（材料は `crates/yuzu-theme/licenses/`） | する |
-| 検索 wasm の依存 crate と分かち書きモデル | `crates/yuzu-index/assets/search/THIRD-PARTY-LICENSES.txt`（dist の `_search/`） | `scripts/build-search-wasm.sh`（文だけなら `third-party-licenses.sh wasm`） | する |
+| テーマの vendor 資産（mermaid と束ねたパッケージ・KaTeX） | `crates/setoka-theme/assets/static/vendor/THIRD-PARTY-LICENSES.txt`（dist の `_assets/vendor/`） | `scripts/vendor-mermaid.sh`・`scripts/vendor-katex.sh`（材料は `crates/setoka-theme/licenses/`） | する |
+| 検索 wasm の依存 crate と分かち書きモデル | `crates/setoka-index/assets/search/THIRD-PARTY-LICENSES.txt`（dist の `_search/`） | `scripts/build-search-wasm.sh`（文だけなら `third-party-licenses.sh wasm`） | する |
 | バイナリ（依存 crate ＋ 上の 2 つ ＋ two-face ＋ syntect） | リリースのアーカイブの `THIRD-PARTY-LICENSES` | release.yml の `licenses` ジョブ（`third-party-licenses.sh binary`） | しない |
 
 dist 用の 2 枚はバイナリに埋め込むのでコミットする（build の既定経路にネットワーク I/O を

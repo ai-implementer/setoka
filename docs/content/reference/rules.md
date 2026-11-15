@@ -1,7 +1,7 @@
 ---
 title: 診断ルール
 order: 3
-description: yuzu lint / yuzu check が報告する全ルールの一覧
+description: setoka lint / setoka check が報告する全ルールの一覧
 lintDisable:
   - fullwidth-alphanumeric
   - halfwidth-kana
@@ -11,18 +11,18 @@ lintDisable:
 
 # 診断ルール
 
-`yuzu lint` と `yuzu check` の出力に出る `warning[duplicate-h1]` の角かっこ（`[]`）の中身が、
+`setoka lint` と `setoka check` の出力に出る `warning[duplicate-h1]` の角かっこ（`[]`）の中身が、
 このページのルール ID です。
 
 ```text
 content/guide/x.md:12:1: warning[duplicate-h1] 本文に h1 が 2 個以上あります
 ```
 
-`yuzu lint` のルールは `yuzu check` にすべて含まれます（check はこれにリンク検査・
+`setoka lint` のルールは `setoka check` にすべて含まれます（check はこれにリンク検査・
 エイリアス検証・整形差分を足したものです）。機械可読な出力については
 [CLI コマンド](cli.md)の「診断の出力形式」を参照してください。
 
-## yuzu lint のルール
+## setoka lint のルール
 
 深刻度は `frontmatter-unrecognized` を除いてすべて warning です。「無効化可」のルールは
 [`lint.rules`](#プロジェクト全体の無効化lintrules) の `false` で
@@ -49,25 +49,25 @@ content/guide/x.md:12:1: warning[duplicate-h1] 本文に h1 が 2 個以上あ�
 `katakana-choon` の「条件付き」は、長音符ゆれを**多数派の表記へ寄せる**ため、
 同数で並んだときは正解を決められず報告だけになる、という意味です。
 
-`config-` で始まるルールは、ページではなく `yuzu.toml` を指します
+`config-` で始まるルールは、ページではなく `setoka.toml` を指します
 （パスはプロジェクトルート相対で出ます）。なお設定のキーのタイポ・型違い・
 重複は診断ではなく**設定エラー**（終了コード 2）で、どのコマンドでも
 読み込み時に止まります（[設定](config.md)参照）。
 
 `frontmatter-unrecognized` は、frontmatter のつもりの記述が本文として表示される
 （または本文が frontmatter として読まれて消える）壊れた出力を知らせる error です。
-抑制はできず、`yuzu build` でも警告が出ます。次の 3 つを報告します。
+抑制はできず、`setoka build` でも警告が出ます。次の 3 つを報告します。
 
 - 閉じの `---` が無い。1 行目が `---` で 2 行目が `title:` のような
   「英字のキーとコロン」の形のときだけ報告します。先頭の `---` は区切り線としても
   正しい書き方なので、2 行目が空行や見出しの文書は対象外です。区切り線のつもりで
   2 行目にキーの形の行を書いた場合は、`---` の次に空行を入れてください
-- `+++` で囲んだ TOML 形式。yuzu の frontmatter は `---` で囲んだ YAML だけです
+- `+++` で囲んだ TOML 形式。setoka の frontmatter は `---` で囲んだ YAML だけです
 - 先頭の区切り線から次の `---` までが frontmatter として読まれている
   （中身が YAML のマッピングとして読めないとき。見出しや箇条書きだけの区間など）。
   文書の先頭の区切り線は `***` で書いてください
 
-どの場合も `yuzu fmt` はそのページを書き換えません（整形すると `---` が区切り線の
+どの場合も `setoka fmt` はそのページを書き換えません（整形すると `---` が区切り線の
 `-----` に変わり、frontmatter だった痕跡が消えるため）。
 
 `code-block-meta` はフェンス情報文字列の問題をまとめて報告します
@@ -76,7 +76,7 @@ content/guide/x.md:12:1: warning[duplicate-h1] 本文に h1 が 2 個以上あ�
 コード行数を超える行ハイライト、特別描画される言語への表示メタ指定）。
 記法は[コードと数式](../guide/code-and-math.md)を参照してください。
 
-## yuzu check が追加するルール
+## setoka check が追加するルール
 
 深刻度は `external-link-broken`・`link-outside-content`・`route-case-conflict` を除いてすべて error で、常時有効・
 `--fix` では直せません。
@@ -85,29 +85,29 @@ content/guide/x.md:12:1: warning[duplicate-h1] 本文に h1 が 2 個以上あ�
 | --- | --- |
 | `broken-link` | 内部リンクの切れ（外部 URL は既定では検査しません）。ビルドの生成物（`/404.html`・`/llms.txt`・`/sitemap.xml`・`/_search/` など）へのリンクは、今の設定で出力するものだけを有効にします（`llms.enabled = false` なら `/llms.txt` は切れ。`public/` に同じパスのファイルがあれば有効） |
 | `external-link-broken` | `check --external-links` を付けたときだけ。外部リンク（`http` / `https`）が HTTP 4xx を返した。warning で、`lintDisable`・行コメント・`lint.rules` で抑制できます。DNS 失敗・タイムアウト・5xx・429 は診断にせず「スキップ N 件」（`summary.skipped`）に数えます |
-| `link-outside-content` | 相対リンクの `..` が `content/`（`input.dir`）より上へ出る（`docs/content/index.md` から `../README.md`・`../../src/main.rs` を指すなど）。`content/` の外のファイルはサイトに出ないので、リンクは書いたまま残します。warning で、`yuzu build` も件数を知らせます。既存の原稿を持ち込んですぐには直せないときは、`lintDisable`・行コメント・`lint.rules` で抑制できます（抑制しなければ、ほかの warning と同じく check は終了コード 1）。直すにはフル URL（GitHub のファイルの URL など）で書くか、ファイルを `content/` の下へ移します |
+| `link-outside-content` | 相対リンクの `..` が `content/`（`input.dir`）より上へ出る（`docs/content/index.md` から `../README.md`・`../../src/main.rs` を指すなど）。`content/` の外のファイルはサイトに出ないので、リンクは書いたまま残します。warning で、`setoka build` も件数を知らせます。既存の原稿を持ち込んですぐには直せないときは、`lintDisable`・行コメント・`lint.rules` で抑制できます（抑制しなければ、ほかの warning と同じく check は終了コード 1）。直すにはフル URL（GitHub のファイルの URL など）で書くか、ファイルを `content/` の下へ移します |
 | `broken-anchor` | 見出し・図表ラベルへのアンカーの切れ |
 | `alias-invalid` | frontmatter `aliases` の値が URL として解釈できない（`#` `?` を含む・出力パスに使えない文字を含む等） |
 | `alias-conflict` | エイリアスが実ページや他のエイリアスと衝突する |
 | `route-conflict` | 2 つ以上のページが同じ URL になる（`x.md` と `x/index.md`）。自動生成されるページ（[用語集](../guide/writing.md#用語集と略語)・[検索結果ページ](../guide/search.md#検索結果ページ)）との衝突もここで報告します |
-| `route-case-conflict` | 大文字小文字だけが違う URL（`Guide.md` と `guide/index.md`、エイリアスとの組も）。大文字小文字を区別しないファイルシステム（macOS・Windows の既定）では出力が同じ場所になり、片方のページが失われます。区別する環境では別の URL として動くので warning で、`yuzu build` も止めずに警告します。`lintDisable`・行コメント・`lint.rules` で抑制できます |
+| `route-case-conflict` | 大文字小文字だけが違う URL（`Guide.md` と `guide/index.md`、エイリアスとの組も）。大文字小文字を区別しないファイルシステム（macOS・Windows の既定）では出力が同じ場所になり、片方のページが失われます。区別する環境では別の URL として動くので warning で、`setoka build` も止めずに警告します。`lintDisable`・行コメント・`lint.rules` で抑制できます |
 | `unsafe-page-path` | ファイル名（または `markdown.glossary.page` / `search.page`）に出力パスとして使えない文字（`\` と制御文字）。`#` `?` `%` 空白・日本語は URL 化のときにパーセントエンコードされるので対象外です。設定由来の `markdown.glossary.page` / `search.page` と `aliases` は、どの OS でビルドしても同じ出力パスを作るため、Windows で使えない `< > : " \| ? *` も全 OS で拒否します |
 | `include-error` | コンテンツインクルード（`file=`）の参照先が読めない・範囲外。Markdown 断片（\`\`\`include）の散文違反（見出し・キャプション行・脚注・frontmatter・`file=` の入れ子）もここで報告 |
 | `spec-error` | `openapi` / `jsonschema` の `file:` 参照が読めない・仕様が壊れている・未対応バージョン・`$ref` 先が解決できない |
-| `fmt` | 整形差分がある（`yuzu fmt` で修正、`yuzu fmt --diff` で内容を確認できます） |
+| `fmt` | 整形差分がある（`setoka fmt` で修正、`setoka fmt --diff` で内容を確認できます） |
 
 `spec-error` だけは警告版の `spec-warning` もあります（参照ファイル数の上限超過など、
 書き間違いではなく描画が注記へ縮退するだけのもの）。warning なので
 `lintDisable` の抑制と `lint.rules` の無効化の対象です。
 
-`route-conflict` と `unsafe-page-path` は `yuzu build` も中断します。どちらも
+`route-conflict` と `unsafe-page-path` は `setoka build` も中断します。どちらも
 「書き出してしまうと気づけない」問題です。前者は生成物のどこかに非決定な出力が
 残り、後者は書き出しの途中で入出力エラーになります。
 
 > [!NOTE]
 > API 仕様の描画は失敗してもビルドを止めません（執筆中に止まらないよう、
 > エラーボックスや注記にして継続します）。そのため**公開前に気づける場所は
-> `yuzu check` だけ**です。とくに `$ref` 先の失敗は画面上では小さな注記に
+> `setoka check` だけ**です。とくに `$ref` 先の失敗は画面上では小さな注記に
 > なるため、見落としやすくなっています。
 
 ## 位置情報が付かないルール
@@ -135,7 +135,7 @@ lintDisable:
 ```
 
 error のルールは抑制できません（壊れたリンクや非決定な出力が生成物に残るのを
-防ぐためのルールです）。`config-*` はページではなく `yuzu.toml` を指すため
+防ぐためのルールです）。`config-*` はページではなく `setoka.toml` を指すため
 対象外です。未知・抑制不可のルール名は `invalid-lint-suppression`、
 書いたのに発火しなかった抑制は `unused-lint-suppression` の warning になります
 （直したのに残った指定を放置させないためです）。
@@ -144,13 +144,13 @@ error のルールは抑制できません（壊れたリンクや非決定な�
 frontmatter の `lintDisable` で該当する 4 ルールを抑制しています
 （このページの原文 Markdown が実例です）。
 
-## 行単位の抑制（yuzu-lint-disable-next-line）
+## 行単位の抑制（setoka-lint-disable-next-line）
 
 1 箇所だけ例外を通したいときは、HTML コメントで**次の内容行に限り**抑制できます
-（詳しくは[品質チェック](../guide/quality.md#行単位の抑制yuzu-lint-disable-next-line)を参照）:
+（詳しくは[品質チェック](../guide/quality.md#行単位の抑制setoka-lint-disable-next-line)を参照）:
 
 ```md
-<!-- yuzu-lint-disable-next-line term-variant katakana-choon -->
+<!-- setoka-lint-disable-next-line term-variant katakana-choon -->
 この行のゆれ表記は報告されません。
 ```
 
@@ -161,7 +161,7 @@ frontmatter の `lintDisable` で該当する 4 ルールを抑制していま�
 
 ## プロジェクト全体の無効化（lint.rules）
 
-方針と合わないルールは、`yuzu.toml` の `lint.rules` に「ルール ID → `false`」を
+方針と合わないルールは、`setoka.toml` の `lint.rules` に「ルール ID → `false`」を
 書くと**プロジェクト全体で**無効化できます（対象は `lintDisable` で抑制できる
 範囲と同じ warning のルールだけです）:
 
@@ -181,6 +181,6 @@ term-variant = false
   `external-link-broken` の抑制も同じ扱いです（評価していないルールは
   発火しようがないため）。付けた実行でも、到達性を判定できずスキップした
   URL への抑制は unused にしません（発火したかどうかを判定できないため）。
-  `yuzu lint` での「yuzu check が追加するルール」への抑制も同じ扱いです
+  `setoka lint` での「setoka check が追加するルール」への抑制も同じ扱いです
   （lint はそれらを評価しません）
 - 集計行には「（無効化 N 件）」、`--format json` には `summary.disabled` が出ます

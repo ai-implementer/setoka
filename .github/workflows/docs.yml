@@ -1,5 +1,5 @@
-# yuzu 自身のドキュメントサイト（docs/）を GitHub Pages へ公開する（Phase 36）。
-# yuzu new が同梱する scaffold の deploy.yml とは別物で、タグの時点の yuzu を
+# setoka 自身のドキュメントサイト（docs/）を GitHub Pages へ公開する（Phase 36）。
+# setoka new が同梱する scaffold の deploy.yml とは別物で、タグの時点の setoka を
 # ソースからビルドし、そのタグの docs を公開する（dogfooding）。
 # リリースのタグ（v*）の push で動く（Phase 84）。main から公開すると、配布中の版の
 # 利用者が見る docs に未リリースの動作が先に出るため。main と PR では ci.yml が
@@ -47,16 +47,16 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
-      - name: yuzu をビルド（このタグの版）
+      - name: setoka をビルド（このタグの版）
         # release ビルド必須: debug はテーマをファイルシステムから読むため、
         # 埋め込みアセットの検証を兼ねて常に埋め込み経路で配信物を作る
-        run: cargo build --release -p yuzu-cli
+        run: cargo build --release -p setoka-cli
 
       - name: 品質ゲート（lint ＋ リンク切れ ＋ fmt 差分）
         # プロジェクトは --root で指定する（Phase 75 の dogfooding。cd / working-directory
         # に頼らず、リポジトリルートのまま docs/ を対象にする）
         run: |
-          target/release/yuzu check --root docs
+          target/release/setoka check --root docs
 
       - name: Pages の設定を取得
         id: pages
@@ -68,7 +68,7 @@ jobs:
         # http:// を返すため使わず、スキームを https に固定して
         # host + base_path から組み立てる
         run: |
-          target/release/yuzu build --root docs --base-url "https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/"
+          target/release/setoka build --root docs --base-url "https://${{ steps.pages.outputs.host }}${{ steps.pages.outputs.base_path }}/"
           # mermaid backend: ssr のサイトなので、フォールバック（= mermaid.js の
           # script タグ）が 1 ページでも出たら tankan の回帰として失敗させる
           # （本文中の文字列と区別するため src 属性の形で照合する）

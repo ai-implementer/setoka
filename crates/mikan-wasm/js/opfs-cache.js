@@ -29,7 +29,7 @@ export async function openNamespace(rawKey) {
   if (disabled || !navigator.storage?.getDirectory) return null;
   try {
     const root = await navigator.storage.getDirectory();
-    const app = await root.getDirectoryHandle("yuzu-search", { create: true });
+    const app = await root.getDirectoryHandle("setoka-search", { create: true });
     const ns = await app.getDirectoryHandle(sanitize(rawKey), { create: true });
     return {
       get: (path) => getBytes(ns, path),

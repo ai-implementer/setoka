@@ -61,12 +61,12 @@ impl Decode for Config {
 #[test]
 fn 必須_任意_既定値_ネストが揃って読める() {
     let report = kabosu::from_str::<Config>(
-        "title = \"yuzu\"\ntags = [\"a\", \"b\"]\n[vars]\naccent = \"#333\"\n[dev]\nenabled = true\n",
+        "title = \"setoka\"\ntags = [\"a\", \"b\"]\n[vars]\naccent = \"#333\"\n[dev]\nenabled = true\n",
     )
     .unwrap();
     assert!(!report.has_errors(), "{:?}", report.diagnostics());
     let config = report.value().unwrap();
-    assert_eq!(config.title, "yuzu");
+    assert_eq!(config.title, "setoka");
     assert_eq!(config.port, 5173, "省略は既定値");
     assert_eq!(config.tags, ["a", "b"]);
     assert_eq!(

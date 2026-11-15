@@ -1,0 +1,31 @@
+[package]
+name = "setoka-core"
+description = "setoka のドキュメントモデルとサイトモデル構築（Markdown パーサは内部に隠蔽）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# crates.io へは公開しない（配布は GitHub Release のバイナリ + cargo install --git。将来構想は ROADMAP「今後の候補」）
+publish = false
+
+[dependencies]
+comrak = { workspace = true }
+globset = { workspace = true }
+serde = { workspace = true }
+# インクリメンタルビルドのキャッシュ（.setoka/cache/ の JSON とハッシュキー）と、YAML を
+# JSON の値へ写す `yaml::to_json` 用。preserve_order はマッピングの記述順を保つため
+# （setoka-render も有効にしているので、バイナリでは従来から有効）
+serde_json = { workspace = true, features = ["preserve_order"] }
+saphyr = { workspace = true }
+saphyr-parser = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+same-file = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
