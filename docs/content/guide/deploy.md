@@ -1,6 +1,6 @@
 ---
 title: 配信とデプロイ
-order: 11
+order: 12
 description: base_url・GitHub Pages・404 ページ・git 連携メタ・sitemap・共有カード
 ---
 

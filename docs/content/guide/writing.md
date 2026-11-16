@@ -1,6 +1,6 @@
 ---
 title: 執筆の基本
-order: 3
+order: 4
 description: ページとナビゲーション・frontmatter・GFM・Admonition・脚注・画像
 ---
 

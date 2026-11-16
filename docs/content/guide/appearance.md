@@ -1,6 +1,6 @@
 ---
 title: 見た目の調整
-order: 10
+order: 11
 description: テーマの上書き・配色・favicon・フッター・ヘッダーのリンク・ダークモード・印刷と PDF
 ---
 

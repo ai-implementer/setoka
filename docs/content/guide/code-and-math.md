@@ -1,6 +1,6 @@
 ---
 title: コードと数式
-order: 4
+order: 5
 description: ビルド時のコードハイライト・コピーボタン・KaTeX 数式
 ---
 
