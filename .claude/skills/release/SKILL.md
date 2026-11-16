@@ -135,9 +135,11 @@ gh api "repos/ai-implementer/setoka/releases/tags/$v" \
   --jq '[.assets[] | select(.name != "SHA256SUMS") | .download_count - 1] | add'
 gh api repos/ai-implementer/setoka/traffic/views --jq '"\(.count) 回 / \(.uniques) 人"'   # 直近 14 日
 gh repo view ai-implementer/setoka --json stargazerCount --jq .stargazerCount
-# リリースの日（YYYY-MM-DD）以降に作られた issue と、そのうち bug ラベルのもの
-gh issue list --repo ai-implementer/setoka --state all --search 'created:>=YYYY-MM-DD' --json number --jq length
-gh issue list --repo ai-implementer/setoka --state all --label bug --search 'created:>=YYYY-MM-DD' --json number --jq length
+# リリースの日（YYYY-MM-DD）以降に作られた issue と、そのうち bug ラベルのもの。
+# 件数は検索 API の total_count で数える（gh issue list は既定で 30 件までしか取らないので、
+# 結果の length を数えると 31 件以上でも 30 になる。PR #96 のレビュー指摘）
+gh api -X GET search/issues -f q='repo:ai-implementer/setoka is:issue created:>=YYYY-MM-DD' --jq .total_count
+gh api -X GET search/issues -f q='repo:ai-implementer/setoka is:issue label:bug created:>=YYYY-MM-DD' --jq .total_count
 ```
 
 - **ダウンロードには自分の確認で取った分も入る**（binstall の dry-run・Gatekeeper の確認・手元での
