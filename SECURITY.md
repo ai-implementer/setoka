@@ -9,7 +9,8 @@ GitHub の private vulnerability reporting で報告してください（リポ�
 「Security」タブ →「Report a vulnerability」）。報告の内容は、修正版を公開するまで
 報告者とメンテナだけが見られます。
 
-公開の issue・pull request には書かないでください。
+公開の issue・pull request には書かないでください。脆弱性ではない不具合・要望・質問は、
+[CONTRIBUTING.md](CONTRIBUTING.md) のとおり issue で受け付けています。
 
 報告には、次のものがあると調査が早く進みます。
 

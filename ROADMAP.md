@@ -87,7 +87,7 @@ v0.19・v0.20 で品質側の未着手を片付けたので、外部の利用者
   | 開発コンテナを作り直す（イメージ・コンテナ・volume の名前が変わる。古いものは消してよい） | 94 | 94 のマージ後 |
   | 各 Phase の判断点を決める | 94〜99 | 着手時 |
   | ~~macOS でブラウザからダウンロードしたバイナリが Gatekeeper に止められるか確かめる~~（11-15 に済み。止められる） | 96 | 96 の着手時 |
-  | Discussions を有効にするか・ラベルを作る（97 の判断に合わせる） | 97 | 97 のマージ後 |
+  | PR の作成を collaborator だけに制限する（Settings の General、または `gh api --method PATCH repos/ai-implementer/setoka -f pull_request_creation_policy=collaborators_only`） | 97 | 97 のマージ後 |
   | リポジトリの description・topics・homepage を設定する（文案は 98 で用意する） | 98 | 98 のマージ後 |
   | 告知（記事・SNS 等。場所と時期を決める） | 99 | リリース後 |
   | リリースの 14 日後に利用の数を記録する（手順は 99 で release スキルに足す） | 99 | リリース後 |
@@ -273,7 +273,7 @@ docs の URL・リポジトリ名をまとめて変える。利用者はユー�
     節を残して `pkg-fmt` を消す・`tgz` に変える・compile を止めない、のどれでも落ちることを確かめた
 - 工数: 中
 
-### 97 問い合わせの受け口 ⬜
+### 97 問い合わせの受け口 ✅
 
 **概要**: 不具合と要望は issue で受け、PR は受け付けないと書く（11-15 にユーザが決めた）。
 CONTRIBUTING.md と issue のテンプレート（不具合・要望）を置き、README と FAQ から辿れるようにする
@@ -284,18 +284,23 @@ CONTRIBUTING.md と issue のテンプレート（不具合・要望）を置き
   v0.21 では起きない
 - 現状: 上の「現状の確認」の「受け口」。FAQ の最後に「質問・不具合の報告」の節がある。crates.io の
   owner と org のメンバーは 1 人（10-04 見直しの「権限と知識が 1 人に集中している」）
-- やること
-  - CONTRIBUTING.md: issue で受けるもの（不具合・要望・docs の誤り）・issue の書き方・PR を受け付けない
-    こと（1 人で保守できる範囲に収めるため。直してほしい箇所は issue に書いてもらう）・脆弱性は
-    `SECURITY.md` へ
-  - issue のテンプレート: 不具合（`setoka --version`・OS・再現の手順と最小の原稿）/ 要望 / 質問の
-    行き先（Discussions か issue か）
-  - 届いた PR の扱い: 閉じて issue へ案内する文面を決める。PR の作成そのものを止められるかは
-    **未確認**（GitHub の設定を着手時に確かめる。止められなければ PR のテンプレートの冒頭に書く）
-  - README・FAQ・SECURITY.md から辿れるようにする
-- 判断点
-  - 行動規範（Contributor Covenant 等）を置くか / Discussions を有効にするか（設定はユーザの作業）
-  - 英語の issue を受けるか（**推奨**: 受けると書く。対象の読者は当面日本語だけ = 98）
+- 決定（11-15。ユーザが判断点をすべて推奨案で決めた）
+  - PR の作成は GitHub の設定で collaborator だけに制限する（`pull_request_creation_policy=collaborators_only`。
+    2026-02 に足された設定で、API の値は 11-15 に `all` だった。dependabot は collaborator 扱いで PR を
+    作れる）。設定の変更はユーザの作業。制限するので PR のテンプレートは置かない
+  - 行動規範のファイルは置かず、CONTRIBUTING に「やり取りの決まり」を数行だけ書く
+  - Discussions は有効にしない。質問も issue で受ける
+  - 英語の issue も受けると書く（返信は日本語になることがある）
+- やったこと
+  - `CONTRIBUTING.md`: issue で受けるもの・不具合の報告に添えるもの・PR を受け付けない理由（fork して
+    手元で直すのはライセンスの範囲で自由）・脆弱性は SECURITY.md へ・やり取りの決まり
+  - `.github/ISSUE_TEMPLATE/`: 不具合（`bug.yml`）・要望（`feature.yml`）・質問と docs の誤り
+    （`question.yml`）の issue フォームと、`config.yml`（空の issue を止め、脆弱性の非公開報告と docs への
+    リンク）。ラベルは GitHub の既定の bug・enhancement・question を使う。YAML は setoka の YAML の読み込み
+    （jsonschema ブロック）で構文を確かめた
+  - FAQ の「質問・不具合の報告」・README・SECURITY.md から CONTRIBUTING とテンプレートの選択画面へ
+    リンクした
+  - ci.yml の docs ゲートと verify スキルに、FAQ の文言と CONTRIBUTING・`config.yml` の有無の照合を足した
 - 工数: 小
 
 ### 98 見つけてもらう ⬜

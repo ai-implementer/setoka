@@ -1,0 +1,52 @@
+name: 不具合の報告 / Bug report
+description: エラーになる・出力がおかしい・docs のとおりに動かない
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        日本語でも英語でも書けます（Japanese or English）。
+        脆弱性は公開の issue に書かず、SECURITY.md の手順で非公開で報告してください。
+  - type: input
+    id: version
+    attributes:
+      label: setoka の版
+      description: "`setoka --version` の出力"
+      placeholder: setoka 0.21.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 27.2 / Ubuntu 24.04 / Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現の手順
+      description: 実行したコマンドを順に書いてください
+      placeholder: |
+        1. setoka new my-docs
+        2. setoka build
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: 再現する最小の原稿と setoka.toml
+      description: 再現に要る部分だけを貼ってください
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待した動き
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動き
+      description: エラーの表示はそのまま貼ってください
+    validations:
+      required: true
