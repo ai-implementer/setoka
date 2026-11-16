@@ -437,6 +437,8 @@ jobs:
           grep -q 'id="macos-で開いていませんと止められる"' docs/dist/guide/faq/index.html
           # v0.21 Phase 97: 問い合わせの受け口（PR は受け付けない・CONTRIBUTING と issue のテンプレート）
           grep -q 'pull request は受け付けていません' docs/dist/guide/faq/index.html && test -s CONTRIBUTING.md && test -s .github/ISSUE_TEMPLATE/config.yml
+          # v0.21 Phase 98: mdBook との比較と選び方のページ（比べた版を書く）
+          grep -q 'id="どちらが合うか"' docs/dist/guide/compare/index.html && grep -q 'mdBook v0.5.4' docs/dist/guide/compare/index.html
           # 設定例は TOML で書く（JSON / YAML 風の `markdown.mermaid.backend: "ssr"` や
           # `"abbr": false` はコピーすると設定エラーになる）。原稿・README・雛形・スキルを見る
           if grep -rnE '`[a-z_]+(\.[a-z_]+)+: |`"[a-z_]+": |backend: ["]' docs/content README.md crates/setoka-cli/scaffold/*.md .claude/skills/; then

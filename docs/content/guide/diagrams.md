@@ -1,6 +1,6 @@
 ---
 title: 図（Mermaid）
-order: 5
+order: 6
 description: Mermaid 記法の図。ブラウザで描くか、ビルド時に SVG にするかを選べる
 ---
 

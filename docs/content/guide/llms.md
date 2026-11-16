@@ -1,6 +1,6 @@
 ---
 title: LLM 連携
-order: 8
+order: 9
 description: llms.txt / llms-full.txt の自動生成とページ単位 Markdown の配信
 ---
 

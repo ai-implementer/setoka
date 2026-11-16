@@ -5,7 +5,11 @@
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
 
 Markdown で書いた設計書を、プロダクション品質の静的 HTML ドキュメントサイトに
-変換する **Rust 製のドキュメント生成ツール**。
+変換する **Rust 製のドキュメント生成ツール**。日本語で設計書や社内のドキュメントを書く人と
+チームに向けて、日本語の全文検索と表記ゆれの検査を組み込んでいる。
+
+> setoka turns Markdown design documents into a static documentation site, with built-in
+> full-text search and wording checks for Japanese. The documentation is in Japanese only.
 
 **ドキュメントサイト**: https://ai.implementer.net/setoka/
 
@@ -75,6 +79,7 @@ eval "$(setoka completions bash)"   # シェル補完（zsh / fish / powershell 
 | 知りたいこと | 参照先 |
 | --- | --- |
 | インストールから公開まで | [ガイド](https://ai.implementer.net/setoka/guide/) |
+| mdBook との違いとどちらが合うか | [mdBook との比較](https://ai.implementer.net/setoka/guide/compare/) |
 | 記法（Admonition・図表番号・折りたたみ・インクルード） | [執筆の基本](https://ai.implementer.net/setoka/guide/writing/) |
 | 設定キー・CLI・診断ルールの一覧 | [リファレンス](https://ai.implementer.net/setoka/reference/) |
 | 内部設計・凍結した設計判断・ワークスペース構成 | [開発](https://ai.implementer.net/setoka/development/) |

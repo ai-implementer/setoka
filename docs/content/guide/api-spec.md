@@ -1,6 +1,6 @@
 ---
 title: API 仕様の描画
-order: 6
+order: 7
 description: OpenAPI / JSON Schema をビルド時に静的 HTML 化する
 ---
 

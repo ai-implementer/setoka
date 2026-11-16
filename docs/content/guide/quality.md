@@ -1,6 +1,6 @@
 ---
 title: 品質チェック
-order: 9
+order: 10
 description: setoka fmt / lint / check で文書の品質を CI で保つ
 aliases: ["guide/lint/"]
 lintDisable:
