@@ -122,6 +122,32 @@ git push origin vX.Y.Z
   `licenses/about.toml` の `accepted` に足すか確かめる。two-face の版ずれは CI の
   `third-party-licenses.sh check` が先に知らせる）
 
+## 5. リリースの 14 日後に利用の数を記録する
+
+`ROADMAP-history.md` の「利用の記録」の表に 1 行足す（v0.21 Phase 99）。閲覧数は直近 14 日の窓なので、
+リリースの 14 日後（例: 11-14 のリリースなら 11-28）に測る。遅れたら測った日をそのまま書く。
+
+```bash
+v=vX.Y.Z
+gh release view "$v" --json publishedAt --jq .publishedAt          # リリースの日
+# ダウンロード（アーカイブごとに、release.yml が SHA256SUMS を作るために取った 1 回を引く）
+gh api "repos/ai-implementer/setoka/releases/tags/$v" \
+  --jq '[.assets[] | select(.name != "SHA256SUMS") | .download_count - 1] | add'
+gh api repos/ai-implementer/setoka/traffic/views --jq '"\(.count) 回 / \(.uniques) 人"'   # 直近 14 日
+gh repo view ai-implementer/setoka --json stargazerCount --jq .stargazerCount
+# リリースの日（YYYY-MM-DD）以降に作られた issue と、そのうち bug ラベルのもの。
+# 件数は検索 API の total_count で数える（gh issue list は既定で 30 件までしか取らないので、
+# 結果の length を数えると 31 件以上でも 30 になる。PR #96 のレビュー指摘）
+gh api -X GET search/issues -f q='repo:ai-implementer/setoka is:issue created:>=YYYY-MM-DD' --jq .total_count
+gh api -X GET search/issues -f q='repo:ai-implementer/setoka is:issue label:bug created:>=YYYY-MM-DD' --jq .total_count
+```
+
+- **ダウンロードには自分の確認で取った分も入る**（binstall の dry-run・Gatekeeper の確認・手元での
+  入れ直しなど）。分かる分は引き、分からなければ表の行に注記する
+- 不具合は、bug ラベルの issue と、自分で見つけて直したもの（その版の不具合を直した `fix:` のコミットや
+  パッチ版）を合わせて数える
+- 足した行は書き換えない。コミット `docs: vX.Y.Z の利用の記録` を main へ push する（手順 1 と同じ扱い）
+
 ## 罠
 
 - **タグは打った時点の main を切り出す**。機能コミットをタグより後に積むと配布バイナリに入らない
