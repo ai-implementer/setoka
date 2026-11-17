@@ -5,21 +5,232 @@ setoka の開発計画（今の版の Phase・候補）と、これまでの版�
 判断の経緯）は [ROADMAP-history.md](ROADMAP-history.md)。レビュー・見直しの未着手の項目は、下の
 「レビューからの持ち越し（未着手）」で状態を管理する。
 
-## 現在: v0.21 まで公開済み
+## 現在: v0.22（Phase 100〜107）
 
 **v0.21.0 まで公開済み**。kabosu 0.2.1 / tankan 0.2.2 / mikan 0.3.0 は crates.io で公開済み（setoka の
-リリースとは非同期。手順は `publish-crate` スキル）。v0.21 の計画と各 Phase の記録は
-ROADMAP-history.md の「完了済み: v0.21（Phase 94〜99）の内訳」。次の版（v0.22）は未策定で、候補は下の
-「今後の候補」。
+リリースとは非同期。手順は `publish-crate` スキル）。v0.21 の計画と各 Phase の記録（リリース後の作業を
+当面しないと決めた記録を含む）は ROADMAP-history.md の「完了済み: v0.21（Phase 94〜99）の内訳」。
 
-### v0.21 のリリース後（11-17。ユーザが決めた）
+次は **v0.22**（テーマ「**単独で使える機能を crate に切り出し、検証の穴を埋める**」）を 8 つの Phase で
+進める。11-17 に策定した。ユーザが「setoka-* の中で単独で使える機能は、名前を変えて出したい」と言い、
+調べた候補 4 つ（API 仕様の HTML 化・日本語の表記ゆれの検査・開発サーバ・出力先への安全な書き込み）を
+すべて選んだ。v0.22 は切り出しを中心にし（ユーザが決めた）、先に置いた依存の追随とコードの整理は
+v0.23 の予定にした。
 
-リリース後に予定していた作業は、どれも当面しない。利用者は今のところユーザだけで、個人で使う。
+### v0.22 の方針
 
-- 利用の数の記録（v0.20.0・v0.21.0 とも）はしない。`release` スキルの手順 5 は任意にした
-- binstall と Release のアーカイブでの通しの確認は、ユーザが使うときに入れられれば十分とする
-- リポジトリの description・topics・homepage は設定済み
-- 告知は当面しない
+setoka の中の、ほかのツールでも使える機能を、tankan・mikan・kabosu と同じく setoka のほかの crate に依存しない
+汎用ライブラリとして切り出し、crates.io へ出す。setoka はそれらを使う側になる。切り出しは内部の構造を
+大きく動かすので、先にテストの穴（ブラウザ側・watch）を埋めてから行い、最後に docs ゲートを 1 つにまとめる。
+
+以下は策定の詳細。
+
+- 動機
+  - 11-17 のユーザの要望。setoka-* を調べると、単独で使える機能が 5 つ見つかった（下の「現状の確認」）
+  - v0.21 では、ブラウザでの確認をユーザに頼んだ。ブラウザ側と watch の自動の確認が無い（10-07 見直しの E6・E3）
+  - ci.yml と verify スキルに docs ゲートを二重に書いている（10-07 見直しの F6）
+- ゴール: 5 つの crate（shikuwasa・amanatsu・hebesu・jabara・kunenbo）が `crates/` にあり、setoka の
+  ほかの crate に依存せず、`cargo package` が通る。setoka はそれらを使い、出力は切り出しの前と変わらない。
+  ブラウザ側のスモークテストと watch の再ビルドの e2e が CI にある。docs ゲートが 1 か所にまとまっている
+- 名前（11-17。ユーザが提案の組み合わせで決めた。どれも柑橘で、crates.io は空き・GitHub で同名の目立つ
+  リポジトリは無い）
+
+  | crate | 機能 | 切り出し元 |
+  | --- | --- | --- |
+  | shikuwasa（シークヮーサー） | YAML の安全な読み込み（別名の展開の上限・同じ名前のキーの検出・位置の換算・YAML 1.1 寄りのスカラーの解釈） | setoka-core の `yaml.rs` |
+  | amanatsu（甘夏） | OpenAPI 3.x / Swagger 2.0 / JSON Schema を JS なしの静的 HTML にする | setoka-render の `apispec` |
+  | hebesu（へべす） | 日本語の表記ゆれの検査（全角英数・半角カナ・長音符のゆれ・用語辞書）と自動修正 | setoka-core の `lint.rs` の一部 |
+  | jabara（じゃばら） | 開発サーバ（静的ファイルの配信・ライブリロード・ファイルの監視・Host / Origin の検査・リンクの遮断） | setoka-server |
+  | kunenbo（九年母） | 出力先への安全な書き込み（ルートの外・シンボリックリンクの検査・変わったときだけ書く・残ったファイルの掃除） | setoka-core の `output.rs` |
+
+- 変わるもの: ワークスペースの crate の構成（5 つ増え、setoka-server は jabara に置き換わる）と依存の向き
+  （CLAUDE.md の図）・CI（package の検査・ブラウザのテストのジョブ・e2e）・`publish-crate` スキル・
+  第三者のライセンスの記録（新しい crate は自分の crate なので第三者ではない）。setoka の出力は変えない
+  （スナップショットとキャッシュの指紋で確かめる）。`CACHE_FORMAT_VERSION` と MSRV は据え置く見込み
+- Phase は「100 ブラウザ側の自動の確認 → 101 大事な経路のテスト → 102 shikuwasa → 103 amanatsu →
+  104 hebesu → 105 jabara → 106 kunenbo → 107 docs ゲートの一本化と dogfooding」の順
+  - 100・101 を先頭にするのは、切り出しで動かす経路（`fmt` / `lint --fix`・dev / preview・watch・検索の
+    ブラウザ側）にテストが無いため
+  - 102 を 103 より前に置くのは、amanatsu が shikuwasa を使うため（setoka-core の frontmatter も shikuwasa を使う）
+  - 106 で、10-12 レビューの R8（出力先と原稿への書き込み口を clippy の `disallowed-methods` で縛る）も行う
+  - 依存の PR #90（dependabot。saphyr 0.3.4 など 5 つ）は計画に入れず、着手の前に `dependency-update`
+    スキルで片付ける（改名で Cargo.lock の crate 名が変わったので作り直しが要る。saphyr は shikuwasa の依存になる）
+  - 着手時に判断点を決めてから実装する。応答が無いまま推奨案で進めた判断点は「仮決め」と PR と ROADMAP に書く
+- 各 crate に共通する決めごと（tankan・mikan・kabosu にそろえる。着手時に変えてもよい）
+  - `crates/<名前>/` に置き、setoka のほかの crate に依存しない。版はワークスペースと独立（0.1.0 から）。
+    README は日本語、crates.io の description は英語。MSRV はワークスペースと同じ
+  - 名前は柑橘のまま（11-17。ユーザが決めた）。名前だけでは用途が分からないので、crates.io の
+    description・keywords・categories と README の 1 行目で用途を伝える（tankan・mikan・kabosu と同じ）
+  - crates.io への公開は setoka のリリースと非同期で、ユーザが `publish-crate` スキルで行う（`cargo login` が要る）
+  - ci.yml の「package」の検査（`LICENSE-MIT` / `LICENSE-APACHE` の同梱など）の対象に足す
+- 入れないもの（v0.23 の予定にして候補に戻した）: vaporetto 0.7・mermaid の版・client 描画の Mermaid の書き間違いの
+  検査・10-12 レビューの R6（本文の組み立て）・R7（合成ページの型）・R10 の残り・10-07 見直しの E4・E5・
+  10-04 見直しの「同じ処理が 2 か所にある」。書き手の機能（非破壊 `init`・PR 検証 CI の雛形・Admonition の
+  ラベル）・長い関数・性能・E1・F2・F3・F5・F8 なども候補に残す
+- **リリース判定**（すべて満たしたらリリースする。どれもタグの前に確かめられる。「延期可」のものを v0.23 へ
+  移したら、その行は判定から外してリリースノートに書く）
+  - CI にブラウザ側のスモークテストのジョブがあり、通っている（100）
+  - CI に watch の再ビルド（原稿を編集すると作り直す）の e2e と、dev / preview の HTTP の確認がある（101。
+    Windows の CLI の e2e は延期可）
+  - 5 つの crate が setoka のほかの crate に依存せず、それぞれの `cargo package` が CI で通る（102〜106）
+  - setoka の出力が切り出しの前と変わらない（スナップショット・キャッシュの指紋・docs の dist）（102〜106）
+  - clippy の `disallowed-methods` で、出力先と原稿への書き込みを kunenbo と `rewrite_source` の口に縛っている（106）
+  - ci.yml と verify スキルが同じ docs ゲートのスクリプトを呼ぶ（107）
+  - CLAUDE.md の依存の向きの図と `publish-crate` スキルが 5 つの crate を含む（107）
+  - 仮決めのままの判断点が無い（残すならリリースノートに書く）
+  - crates.io への公開は判定に入れない（setoka のリリースと非同期。setoka はワークスペースの path で使う）
+- **非互換と注意に書く見込みのもの**: setoka の利用者から見た変化は無い見込み（出力が変わらないことを確かめる）。
+  切り出しで文言・診断・HTML が変わったら書く。新しい crate はそれぞれの README と版で知らせる
+- **ユーザの作業**
+
+  | 作業 | Phase | 時期 |
+  | --- | --- | --- |
+  | テーマと範囲（切り出し中心）を計画の PR で確かめる。普段使っていて困っていることがあれば伝える | — | 計画の PR のレビュー |
+  | 各 Phase の判断点を決める | 100〜107 | 着手時 |
+  | 5 つの crate を crates.io へ publish する（`publish-crate` スキル） | 102〜106 | それぞれのマージ後（まとめてもよい） |
+
+- **時間が足りなければ v0.23 へ移すもの**: 101 の Windows での CLI の e2e / 104 の CLI（hebesu を単独の
+  コマンドとして出す部分）。100〜103・105〜107 と 104 のライブラリの部分は移さない
+
+### 現状の確認（11-17）
+
+- 切り出す機能（行数は 11-17）
+  - YAML の読み込み: setoka-core の `yaml.rs`（707 行）。依存は saphyr と saphyr-parser だけ。frontmatter・
+    未知キーの lint・API 仕様が使う
+  - API 仕様の HTML 化: setoka-render の `apispec/render.rs`（1,927 行）と `apispec/mod.rs`（104 行）・
+    `speccheck.rs`（180 行。setoka の診断に変える側）。setoka 側で使っているのは `highlight::escape_html` と
+    `setoka_core::yaml::to_json` だけ。出力の文言は日本語（日本語を含む文字列が 70 か所）で、見た目は
+    setoka のテーマの CSS（`api-spec` などのクラス）に頼る。外部の参照は `SpecFiles` の trait で読む
+  - 日本語の表記ゆれの検査: setoka-core の `lint.rs`（1,324 行）の一部（`check_char_classes`・
+    `check_katakana_choon`・`check_terms`・`apply_fixes` など）。`Page`・`Diagnostic`・Markdown の構文木に
+    結びついていて、文字列を受ける関数として作り直す必要がある
+  - 開発サーバ: setoka-server（1,623 行）。依存は axum・notify・tokio・tower-http だけで、setoka のほかの
+    crate に依存していない
+  - 出力先への書き込み: setoka-core の `output.rs`（1,184 行）。依存は std と same-file。ただし出力の記録
+    （`OutputTracker`）は setoka の生成物の種類（`OutputKind` の `Site(SiteOutput)`）を持つ
+- 検証
+  - ブラウザ側の自動のテストは無い（テーマの JS は `crates/setoka-theme/assets/static/js/` の 13 ファイル）。
+    docs は `backend = "ssr"` で、CI は docs の dist が `mermaid.min.js` を読むと落とすので、client 描画の図は
+    docs では確かめられない（雛形は既定の client 描画）
+  - ci.yml の watch の e2e は「何もしなければ再ビルドしない」側だけで、「編集すると作り直す」側が無い
+  - ci.yml の `grep -q` は 198 個で、verify スキルにはそのうち 82 個を手で写している
+- 依存の PR #90（11-15。saphyr 0.3.4・saphyr-parser 0.3.4・notify 8.2.2・toml 1.2.1・rust-embed 8.14.0）が
+  開いたまま。作られた後に改名（PR #91）で Cargo.lock の crate 名が変わった
+
+### 100 ブラウザ側の自動の確認 ⬜
+
+**概要**: docs サイトと雛形から作ったサイトの dist に対するブラウザのスモークテストを CI に足す（10-07
+見直しの E6）。検索・配色の切替と保存・サイドバーの位置・キーボード操作・client 描画の図を、実際の
+ブラウザで確かめる。
+
+- 現状: 上の「現状の確認」の「検証」。v0.18 の Phase 80 と v0.21 の Phase 94 の確認は人手だった
+- やること: `setoka preview` で docs の dist と、`setoka new` で作ったサイトの dist を配信し、ヘッドレスの
+  ブラウザで 5〜10 本のスモークテストを動かすジョブを ci.yml に足す（client 描画の図と KaTeX は雛形の
+  サイトで見る）。Node は CI のジョブの中だけで使い、リポジトリの依存にはしない
+- 判断点: 使う道具（Playwright か、ほかのもの）と、テストのファイルの置き場 / 何を確かめるか / ジョブを
+  PR ごとに動かすか
+- 非互換と注意: なし（CI だけ）
+- 工数: 中
+
+### 101 大事な経路のテスト ⬜
+
+**概要**: 切り出しで動かす経路にテストを足す（10-07 見直しの E3、10-12 レビューの R10 の一部）。watch の
+再ビルド・dev / preview の HTTP・`lint --fix` と `--drafts`。
+
+- 現状: 上の「現状の確認」の「検証」。cli の run 関数（check・lint・search・dev・llms）にテストが無い（R10）
+- やること: ci.yml の e2e に「原稿を編集すると作り直す」watch の確認と、dev / preview で取ったページの確認を
+  足す。`lint --fix` の収束のループを純関数に出してテストする。Windows でも CLI の e2e を動かすか（延期可）
+- 判断点: watch の確認を e2e（シェル）にするか Rust のテストにするか / Windows の CLI の e2e を入れるか
+- 非互換と注意: なし
+- 工数: 中
+
+### 102 shikuwasa（YAML の安全な読み込み） ⬜
+
+**概要**: setoka-core の `yaml.rs` を crate shikuwasa に切り出す。setoka-core（frontmatter・未知キーの lint）と
+103 の amanatsu が使う。
+
+- 現状: 上の「現状の確認」の「切り出す機能」。CLAUDE.md の「YAML の読み込み」の注意（saphyr の位置は文字数・
+  別名の展開を数えない・`early_parse` 無効だとキーをスタイル込みで比べる）は、この実装が受け持っている
+- やること: crate を作り、setoka-core から使う。公開する API（読み込み・JSON への変換・位置・エラー）を決める。
+  CLAUDE.md の「YAML の読み込み」の節を shikuwasa を指すように直す。fuzz の対象に足すか決める
+- 判断点: 公開 API の形（`serde_json::Value` を返す関数を入れるか＝serde_json に依存するか）/ fuzz の対象に足すか
+- 非互換と注意: なし（frontmatter の読み方は変えない）
+- 工数: 小〜中
+
+### 103 amanatsu（API 仕様の HTML 化） ⬜
+
+**概要**: setoka-render の `apispec` を crate amanatsu に切り出す。OpenAPI 3.x / Swagger 2.0 / JSON Schema を、
+JS なしの静的 HTML にする。
+
+- 現状: 上の「現状の確認」の「切り出す機能」
+- やること: crate を作り（shikuwasa に依存）、setoka-render から使う。`escape_html` は amanatsu が持つ。
+  setoka 側の検査（`speccheck.rs`。setoka の診断に変える部分）は setoka-render に残す。HTML が切り出しの前と
+  変わらないことをスナップショットで確かめる
+- 判断点: 出力の文言（日本語のままにするか、文言を差し替えられるようにするか）/ 見た目の CSS を crate に
+  同梱するか、クラス名を README に書くだけにするか / 公開 API（`SpecFiles` の trait・エラーの型）
+- 非互換と注意: なし（HTML を変えない）
+- 工数: 中
+
+### 104 hebesu（日本語の表記ゆれの検査） ⬜
+
+**概要**: setoka-core の `lint.rs` から、日本語の表記ゆれの検査（全角英数・半角カナ・長音符のゆれ・用語辞書）と
+自動修正を crate hebesu に切り出す。文字列を受ける関数として作り直し、setoka-core は Markdown から取り出した
+文字列を渡す側になる。
+
+- 現状: 上の「現状の確認」の「切り出す機能」。抑制（`lintDisable`・行コメント）と診断の形は setoka-core の
+  `suppress.rs`・`diagnostics.rs` にある
+- やること: 文字列と位置を受けて、見つかったゆれ（位置・提案）を返す API を作る。長音符のゆれは複数の文書に
+  またがる（多数派へそろえる）ので、その集計の形も決める。setoka-core の lint はそれを使い、診断・抑制・
+  自動修正の結果が切り出しの前と同じであることを確かめる。単独のコマンド（Markdown を読んで検査する CLI）を
+  出すか決める（延期可）
+- 判断点: API の形（1 つの文字列ごとか、文書の集まりか）/ 単独の CLI を出すか（出すなら Markdown を読むために
+  comrak に依存する）/ ルールの名前（setoka の `fullwidth-alphanumeric` などとそろえるか）
+- 非互換と注意: なし（診断と自動修正の結果を変えない）
+- 工数: 中〜大（CLI は延期可）
+
+### 105 jabara（開発サーバ） ⬜
+
+**概要**: setoka-server を crate jabara に置き換える。静的ファイルの配信・ライブリロード・ファイルの監視・
+Host / Origin の検査・シンボリックリンクの遮断を、ほかの静的サイトの道具からも使えるようにする。
+
+- 現状: 上の「現状の確認」の「切り出す機能」。CLAUDE.md の「watch と dev サーバ」の注意（出力ディレクトリの
+  除外・イベントの種類で絞る・隠しディレクトリの判定は相対パス・Host / Origin の検査は IP を通す）は、この
+  実装が受け持っている
+- やること: setoka-server を jabara に改名し、setoka の都合で決めた部分（ライブリロードの経路 `/__livereload`・
+  `base_path` の扱いなど）を設定で渡せるようにする。setoka-cli から使う。serve のテストは TCP をバインドするので、CI での
+  動かし方は今のまま
+- 判断点: 公開 API の形（`ServeOptions`・`watch` の引数）/ setoka の都合で決めた名前（`/__livereload` など）を
+  どこまで設定にするか
+- 非互換と注意: なし（dev / preview の動きを変えない）
+- 工数: 小〜中
+
+### 106 kunenbo（出力先への安全な書き込み） ⬜
+
+**概要**: setoka-core の `output.rs` から、出力先への安全な書き込み（相対パスの検証・シンボリックリンクの
+検査・変わったときだけ書く・一時ファイルからの置き換え・残ったファイルの掃除）を crate kunenbo に切り出す。
+あわせて、書き込みの口を clippy で縛る（10-12 レビューの R8）。
+
+- 現状: 上の「現状の確認」の「切り出す機能」
+- やること: 汎用の部分を crate にし、setoka の生成物の種類を持つ出力の記録（`OutputTracker` と `OutputKind`）は
+  setoka-core に残すか、種類を型の引数にして kunenbo に入れるかを決める。clippy の `disallowed-methods`
+  （`clippy.toml`）で `fs::write` などを禁じ、kunenbo と `rewrite_source` の実装だけ許す
+- 判断点: 出力の記録を kunenbo に入れるか / `rewrite_source`（原稿への書き込み）も kunenbo に入れるか
+- 非互換と注意: なし
+- 工数: 中
+
+### 107 docs ゲートの一本化と dogfooding ⬜
+
+**概要**: ci.yml と verify スキルに二重に書いている docs ゲートを、1 つのスクリプトにまとめて両方から呼ぶ
+（10-07 見直しの F6）。v0.22 の切り出しを、文書（CLAUDE.md の依存の図・`publish-crate` スキル・docs の
+開発者向けページ）に反映して通して確かめる。
+
+- 現状: 上の「現状の確認」の「検証」。行番号や件数を文書に直書きしている箇所もある（F6）
+- やること: `scripts/docs-gates.sh`（仮の名前）に docs ゲートをまとめ、ci.yml と verify スキルから呼ぶ。
+  Bash 3.2 で動くように書く。CLAUDE.md の依存の向きの図・`publish-crate` スキルの表・docs の
+  `development/index.md` の crate の図を 5 つの crate を含めて直す
+- 判断点: スクリプトの名前と、e2e の確認も同じスクリプトにまとめるか
+- 非互換と注意: なし
+- 工数: 小〜中
 
 ## 今後の候補
 
@@ -75,16 +286,23 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
 
 ### その他の候補
 
-- **client 描画の Mermaid の書き間違いを check で報告する**（v0.19 Phase 85 から回した）— 今は
+- **client 描画の Mermaid の書き間違いを check で報告する**（v0.23 の予定。setoka-core は tankan に依存できないので、検査は setoka-render 側に置き `rules::CHECK_ONLY` に足す。mermaid の版の判断の後）（v0.19 Phase 85 から回した）— 今は
   既定の client では build も check も何も言わない。tankan のパースだけ通し、未対応
   （`is_unsupported`）以外の構文エラーを抑制できる warning で報告する案。tankan が未対応の
   書き方を誤りとして報告しないよう、切り分け方を決めてから扱う
-- **mermaid 12 系への更新** — v0.18.1 で 11 系に留めた（12.x は tankan の互換対象の版と
+- **mermaid 12 系への更新**（v0.23 の予定） — v0.18.1 で 11 系に留めた（12.x は tankan の互換対象の版と
   あわせて決める）。Phase 82 の照合で、11 系の最新の 11.17.2 が束ねる DOMPurify・js-yaml・
   KaTeX に勧告が 5 件見つかり、影響しない理由を書いて `scripts/vendor-advisories.sh` で
   除外している（10-10）。11-06 に DOMPurify の 3 件（修正は 3.4.17）を同じく除外に足した（計 8 件）。
   12 系へ上げるときに除外を外して照合し直す
-- **vaporetto 0.7 系への更新** — 0.7.0（10-24）はモデルの形式が変わり、同梱のモデル
+  - 11-17 に確かめたこと: 12.0.0（2026-09-10）は非互換の版で、レイアウトの既定が ELK になり
+    （`mermaid.min.js` が gzip 後で約 500 kB 増える）、既定の見た目が変わる（`layout: dagre`・`look: classic` で
+    前の見た目を保てる）。必要なブラウザは Safari 17.4 以降。最新の 12.3.0 の依存は DOMPurify ^3.4.17・
+    KaTeX ^0.18.0 で、js-yaml は外れた（除外 8 件は外せる見込み）。同梱の elkjs 0.12.1 は「EPL-2.0 OR
+    GPL-3.0-or-later」。ELK を含まない tiny 版（`@mermaid-js/tiny`）は mindmap・architecture・KaTeX・
+    遅延読み込みに対応しない。判断点は「12 の通常版 / tiny 版 / 11 のまま」と、見た目を tankan の SSR の図と
+    そろえるか
+- **vaporetto 0.7 系への更新**（v0.23 の予定。vaporetto に依存しモデルを同梱しているのは公開している mikan なので、mikan の版も上がる） — 0.7.0（10-24）はモデルの形式が変わり、同梱のモデル
   （vaporetto-models v0.5.0 の `bccwj-suw_c1.0`。0.6 の形式）を `model version mismatch` で読めない。
   モデルの差し替えと検索 wasm の作り直しが要るので、自動では上げず手動で行う（11-06。dependabot の
   #74・#75 を閉じ、`dependabot.yml` の ignore に足した）
@@ -94,7 +312,10 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
     形式へ変換したもの。分かち書きは変わらない見込みだが `setoka search` で確かめ、変わるなら
     `CACHE_FORMAT_VERSION` を上げる
   - vaporetto と vaporetto_rules は同じ版にする（片方だけだと 0.6 と 0.7 が両方入る）
-- **CLI の e2e を Windows でも実行する**（v0.20 Phase 87 から移した）— Windows・macOS は
+  - 11-17 に確かめたこと: 0.7.0 は MIT OR Apache-2.0 で、MSRV を宣言していない。`bccwj-suw_c1.0` の 0.7 形式の
+    モデルがリリースに添付されている。モデルの形式が変わるので、読者のブラウザに古い検索 wasm が残っていると
+    新しいモデルを読めず、キャッシュが切れるまで検索が止まる（リリースノートの「非互換と注意」に書く）
+- ~~**CLI の e2e を Windows でも実行する**~~ → v0.22 Phase 101（延期可）（v0.20 Phase 87 から移した）— Windows・macOS は
   `cargo test` だけで、ci.yml の e2e（`setoka new` → build → check）は ubuntu だけ
 - **i18n** — テーマ UI 文字列の多言語化（v0.21 の対象の読者は当面日本語だけ。英語に変える可能性は
   ある = 11-15 にユーザが決めた。Phase 98）
@@ -136,22 +357,22 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
   - ~~**外部への露出が無い**~~ → v0.21 Phase 96・98（cargo-binstall・README・比較のページ）
   - ~~**外部からの貢献の受け口が無い**~~ → v0.21 Phase 97
   - ⬜ **長い関数**（工数: 中）
-  - ⬜ **同じ処理が 2 か所にある**（工数: 小）
+  - ⬜ **同じ処理が 2 か所にある**（工数: 小。v0.23 の予定。`escape_html` は v0.22 の amanatsu の切り出しで 1 つ減る見込み）
   - ⬜ **性能の気になる点**（工数: 小〜中。どちらも未計測）
 - 10-07 見直し
   - ⬜ **E1 公開 crate（tankan / mikan）の semver 上の危うさ**（工数: 小〜中）
-  - ⬜ **E3 大事な経路のテストが無い**（工数: 中）
-  - ⬜ **E4 rel を `/` 区切りにする変換が `rel_to_slash` の外に 8 か所ある**
-  - ⬜ **E5 静的ファイルを毎回全バイト読み、ページの sha256 を 1 ページ 4 回計算する**
-  - ⬜ **E6 ブラウザ側に自動の検証が無い**（工数: 中）
+  - ~~**E3 大事な経路のテストが無い**~~ → v0.22 Phase 101
+  - ⬜ **E4 rel を `/` 区切りにする変換が `rel_to_slash` の外に 8 か所ある**（v0.23 の予定）
+  - ⬜ **E5 静的ファイルを毎回全バイト読み、ページの sha256 を 1 ページ 4 回計算する**（v0.23 の予定）
+  - ~~**E6 ブラウザ側に自動の検証が無い**~~ → v0.22 Phase 100
   - ⬜ **F2 判断点が応答の無いまま推奨案で出荷されている**（工数: 小）
   - ⬜ **F3 レビューの記録が GitHub に残らない**（工数: 小）
   - ⬜ **F5 性能と、リリース後の不具合件数の推移を測っていない**（工数: 小〜中）
-  - ⬜ **F6 文書と CI のゲートを二重・三重に管理している**（工数: 小〜中）
+  - ~~**F6 文書と CI のゲートを二重・三重に管理している**~~ → v0.22 Phase 107
   - ⬜ **F8 docs の URL が独自ドメインと org 側のリポジトリに依存し、雛形に焼き込まれている**（工数: 小。v0.21 Phase 94 で URL は `/setoka/` に変えたが、利用者がユーザだけなので保有者・更新日の記録は扱わなかった）
 - 10-12 レビュー（R6・R7・R8・R10）と v0.10.1 レビュー（中身ごと写したもの）
 
-- ⬜ **R6 render_body_html（292 行）のノード生成と、記法ごとの組み替え**（工数: 中）
+- ⬜ **R6 render_body_html（292 行）のノード生成と、記法ごとの組み替え**（v0.23 の予定。工数: 中）
   - `NodeHtmlBlock` の生成が 5 か所・`arena.alloc(AstNode::new(..))` が 4 か所、同じ 11 行の
     クロージャを 2 回定義している（`markdown/mod.rs`）。タブ・折りたたみ・用語集は解析側が
     tabs.rs / collapse.rs / glossary.rs にあるのに、組み替えだけが mod.rs にあり、記法の変更が
@@ -161,18 +382,18 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
     数える・用語集は他の適用の後、の制約が記法をまたぐため）。本体は約 150 行になる見込み
   - あわせて CLAUDE.md の「`markdown/mod.rs` が comrak を触る唯一の場所」を「markdown/ 配下だけ」に
     直す（実際は 6 ファイル。**10-12 に確認**）
-- ⬜ **R7 合成ページの `Page.src` は実在しないパスで、除外は否定のフィルタに頼っている**
+- ⬜ **R7 合成ページの `Page.src` は実在しないパスで、除外は否定のフィルタに頼っている**（v0.23 の予定）
   （工数: 中。**10-12 に確認**（件数））
   - `!p.is_generated()` / `!page.is_generated()` が 21 か所。書き込みや診断の経路を足すときに
     フィルタを書き忘れてもコンパイルが通る
   - 対処案: `PageOrigin { File(PathBuf), Generated(GeneratedKind) }` にし、ファイルのパスは
     `source_file() -> Option<&Path>` からしか取れなくする
-- ⬜ **R8 出力先と原稿への書き込み口を clippy で縛る**（工数: 小。**10-12 に確認**（件数））
+- ~~**R8 出力先と原稿への書き込み口を clippy で縛る**~~ → v0.22 Phase 106（工数: 小。**10-12 に確認**（件数））
   - 「書き込みは `write_under` / `rewrite_source` だけ」はコメントで縛っている。今は守られている
     （テスト以外の `fs::write` / `remove_dir_all` は実装そのものと雛形の 4 か所だけ）
   - 対処案: `clippy.toml` の `disallowed-methods` で禁じ、4 か所だけ許す（前例は `main.rs` の
     `print_stdout`）
-- ⬜ **R10 小さい整理**（工数: 各小）
+- ⬜ **R10 小さい整理**（工数: 各小。run 関数のテストと `lint --fix` の収束のループは v0.22 Phase 101、残りは v0.23 の予定）
   - `build_once` から、テストの無い同義語の合成と丸め（IndexParams の組み立て）を純関数で出す
   - cli の run 関数（check・lint・search・dev・llms）にテストが 0 件。`lint --fix` の収束ループを
     `fmt.rs` のように純関数に出してテストする
