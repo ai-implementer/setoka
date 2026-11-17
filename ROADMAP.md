@@ -59,6 +59,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 各 crate に共通する決めごと（tankan・mikan・kabosu にそろえる。着手時に変えてもよい）
   - `crates/<名前>/` に置き、setoka のほかの crate に依存しない。版はワークスペースと独立（0.1.0 から）。
     README は日本語、crates.io の description は英語。MSRV はワークスペースと同じ
+  - 名前は柑橘のまま（11-17。ユーザが決めた）。名前だけでは用途が分からないので、crates.io の
+    description・keywords・categories と README の 1 行目で用途を伝える（tankan・mikan・kabosu と同じ）
   - crates.io への公開は setoka のリリースと非同期で、ユーザが `publish-crate` スキルで行う（`cargo login` が要る）
   - ci.yml の「package」の検査（`LICENSE-MIT` / `LICENSE-APACHE` の同梱など）の対象に足す
 - 入れないもの（v0.23 の予定にして候補に戻した）: vaporetto 0.7・mermaid の版・client 描画の Mermaid の書き間違いの
