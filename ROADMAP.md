@@ -12,16 +12,14 @@ setoka の開発計画（今の版の Phase・候補）と、これまでの版�
 ROADMAP-history.md の「完了済み: v0.21（Phase 94〜99）の内訳」。次の版（v0.22）は未策定で、候補は下の
 「今後の候補」。
 
-### v0.21 のリリース後の残り
+### v0.21 のリリース後（11-17。ユーザが決めた）
 
-- 11-28: v0.20.0 の利用の数を ROADMAP-history.md の「利用の記録」に足す（リリースの 14 日後。閲覧数の
-  基準にするので、告知はこの後にする）
-- binstall（`cargo binstall --git https://github.com/ai-implementer/setoka setoka-cli@=0.21.0`）と
-  Release のアーカイブで v0.21.0 を入れ、雛形から build・check・preview まで通す（Phase 99）
-- 公開サイト `https://ai.implementer.net/setoka/` が v0.21 の docs になったことを確かめ、リポジトリの
-  homepage を設定する（ユーザ）
-- 告知の場所と時期を決める（ユーザ）
-- v0.21.0 の 14 日後: v0.21.0 の利用の数を記録する（`release` スキルの手順 5）
+リリース後に予定していた作業は、どれも当面しない。利用者は今のところユーザだけで、個人で使う。
+
+- 利用の数の記録（v0.20.0・v0.21.0 とも）はしない。`release` スキルの手順 5 は任意にした
+- binstall と Release のアーカイブでの通しの確認は、ユーザが使うときに入れられれば十分とする
+- リポジトリの description・topics・homepage は設定済み
+- 告知は当面しない
 
 ## 今後の候補
 
