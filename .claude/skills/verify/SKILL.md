@@ -291,3 +291,9 @@ grep -q '"rule": "external-link-broken"' /tmp/extlink.json && grep -q '"skipped"
 ## 7. UI・テーマ・scaffold の変更がある場合
 
 `run` スキル（プロジェクト版）でブラウザ配信まで実機確認する。
+
+## 8. ブラウザ側のスモークテスト（Node がある環境だけ）
+
+CI の `browser` ジョブ（PR ごと）と同じテスト。検索・配色の切替と保存・サイドバーの位置・`/` キー・
+コピーボタン・client 描画の Mermaid と KaTeX を Playwright で確かめる（v0.22 Phase 100）。
+手順は `tests/browser/README.md`。開発コンテナには Node が入っていないので、そこでは CI の結果を見る。

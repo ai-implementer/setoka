@@ -58,3 +58,12 @@ updates:
         update-types:
           - minor
           - patch
+
+  # ブラウザ側のスモークテストの Playwright（tests/browser/package.json。v0.22 Phase 100）。
+  # setoka のビルドには使わない。版は package.json の完全一致の指定で固定している
+  - package-ecosystem: npm
+    directory: /tests/browser
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: test

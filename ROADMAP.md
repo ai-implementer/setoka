@@ -130,6 +130,25 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 判断点: 使う道具（Playwright か、ほかのもの）と、テストのファイルの置き場 / 何を確かめるか / ジョブを
   PR ごとに動かすか
 - 非互換と注意: なし（CI だけ）
+- 決定（11-18。判断点への応答が無かったので推奨案で**仮決め**）
+  - 道具は Playwright（@playwright/test 1.65.1。CI では Chromium だけを入れる）
+  - 版は `tests/browser/package.json` の完全一致の指定で固定し、dependabot の npm で上げる。開発コンテナに
+    Node が無く package-lock.json を作れないので、lock は置かない（@playwright/test が依存する playwright・
+    playwright-core も完全一致で指定されている）
+  - CI では PR ごとに動かす（ci.yml の `browser` ジョブ）
+- 未決: 手元で動かすか（開発コンテナに Node を入れるか）。コンテナの作り直しが要るので仮決めにしない
+- やったこと
+  - `tests/browser/`（`package.json`・`playwright.config.mjs`・`smoke.spec.mjs`・`README.md`）。テストは 8 本:
+    docs サイトでヘッダーの検索欄・検索結果のページ・`/` キー・配色の切替（OS の設定 → ダーク → ライト →
+    OS の設定）と再読み込み後の保存・サイドバーの位置の維持、雛形から作ったサイトで client 描画の Mermaid
+    （「記法の例」の 9 つ）・KaTeX（3 つ）・コピーボタン。捕まえられなかった JS の例外が無いことも見る
+  - ci.yml に `browser` ジョブ（docs と雛形のサイトをビルドし、`setoka preview` で配信して Playwright を
+    動かす。失敗したら画面とトレースを artifact に残す）。`.github/dependabot.yml` に npm、`.gitignore` に
+    テストの依存と結果を足した。verify スキルに手順 8、CLAUDE.md に注意を足した
+  - テストが前提にする HTML（要素の id とクラス・数式と図の数・検索結果のページ）は、手元でビルドした dist で
+    確かめた。ci.yml と dependabot.yml の YAML の構文は setoka の YAML の読み込みで確かめた
+- 未確認: テストを実際のブラウザで動かしていない（開発コンテナに Node が無い）。最初の PR の CI の `browser`
+  ジョブで確かめる
 - 工数: 中
 
 ### 101 大事な経路のテスト ⬜

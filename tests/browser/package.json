@@ -1,0 +1,12 @@
+{
+  "name": "setoka-browser-tests",
+  "private": true,
+  "description": "setoka が出力するサイトのブラウザ側のスモークテスト（v0.22 Phase 100）",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
