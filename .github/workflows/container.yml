@@ -38,6 +38,8 @@ jobs:
             cargo clippy --version
             cargo insta --version
             rustup target list --installed | grep -q wasm32-unknown-unknown
+            node --version
+            npm --version
           '
 
       # post-create.sh の冪等性（コンテナ内で 2 回実行しても失敗しない）

@@ -296,4 +296,5 @@ grep -q '"rule": "external-link-broken"' /tmp/extlink.json && grep -q '"skipped"
 
 CI の `browser` ジョブ（PR ごと）と同じテスト。検索・配色の切替と保存・サイドバーの位置・`/` キー・
 コピーボタン・client 描画の Mermaid と KaTeX を Playwright で確かめる（v0.22 Phase 100）。
-手順は `tests/browser/README.md`。開発コンテナには Node が入っていないので、そこでは CI の結果を見る。
+手順は `tests/browser/README.md`。開発コンテナには Node（26）が入っている（Chromium は入っていないので、
+コンテナを作り直すたびに `npx playwright install --with-deps chromium` で入れる）。Node が無い環境では CI の結果を見る。
