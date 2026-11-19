@@ -5,8 +5,9 @@
 #
 # 方針:
 # - CI 相当の軽量構成（Rust stable + rustfmt/clippy + wasm32 target + cargo-insta）に加え、
-#   エージェント実行環境（Claude Code / Codex CLI / gh）を焼き込む。
-#   vendor 更新ツール（wasm-bindgen-cli / binaryen）は焼かない（頻度が低く重いため）
+#   エージェント実行環境（Claude Code / Codex CLI / gh）と、ブラウザ側のスモークテスト用の Node.js を
+#   焼き込む。vendor 更新ツール（wasm-bindgen-cli / binaryen）と Playwright のブラウザは焼かない
+#   （頻度が低く重いため）
 # - ユーザ・HOME・作業ディレクトリは ARG でパラメタ化する。既定値 = Docker 経路
 #   （devcontainer.json。vscode/1000 + /workspaces/setoka）。apple container 経路は
 #   scripts/dev-container.sh がホスト値（ユーザ名・uid・$HOME・リポジトリ実パス）を渡し、
@@ -76,6 +77,28 @@ RUN set -eux; \
     mv "/usr/local/bin/codex-code-mode-host-${arch}-unknown-linux-musl" /usr/local/bin/codex-code-mode-host; \
     chmod +x /usr/local/bin/codex /usr/local/bin/codex-code-mode-host; \
     rm -f /tmp/codex.tgz /tmp/codex-host.tgz
+
+# Node.js: ブラウザ側のスモークテスト（tests/browser/。Playwright。v0.22 Phase 100）を手元で動かすため。
+# setoka のビルドには使わない。公式の配布物（tar.xz）を版の固定＋公開 sha256（nodejs.org の
+# SHASUMS256.txt）と照合して /usr/local へ展開する。CI（ci.yml の browser ジョブ）の node-version と同じ
+# major にそろえる。Playwright のブラウザ（Chromium）はイメージに焼かず、使うときに
+# `npx playwright install --with-deps chromium` で入れる（足りないライブラリは sudo で入る）
+ARG NODE_VERSION=26.13.1
+ARG NODE_SHA256_X86_64=5c063e46bab0fbc1c17cc445d7ff129cbdcd0471be6ed83b6ab864f8143bc864
+ARG NODE_SHA256_AARCH64=89e1853138db51e8b82d3e98ba9c0d3f2956a28e5e55ea1b7e12d25aae92d5dd
+RUN set -eux; \
+    case "$(uname -m)" in \
+        x86_64) arch=x64; sha="$NODE_SHA256_X86_64" ;; \
+        aarch64) arch=arm64; sha="$NODE_SHA256_AARCH64" ;; \
+        *) echo "未対応のアーキテクチャ: $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/node.tar.xz \
+        "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${arch}.tar.xz"; \
+    echo "${sha}  /tmp/node.tar.xz" | sha256sum -c -; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner; \
+    rm -f /tmp/node.tar.xz; \
+    node --version; \
+    npm --version
 
 # 開発ユーザ（既定は devcontainer 慣例の vscode 1000:1000。VS Code の updateRemoteUserUID 対象。
 # apple 経路はホストのユーザ名・uid が入る。gid はホスト mac の staff=20 が Debian の既存 gid と

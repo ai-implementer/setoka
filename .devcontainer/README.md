@@ -1,7 +1,8 @@
 # setoka 開発コンテナ
 
 CI 相当（Rust stable + rustfmt / clippy + wasm32 target + cargo-insta）＋エージェント実行環境
-（Claude Code / Codex CLI / gh）の Linux 環境を、ホストを汚さずに使うためのコンテナ定義。
+（Claude Code / Codex CLI / gh）＋ブラウザ側のスモークテスト用の Node.js の Linux 環境を、
+ホストを汚さずに使うためのコンテナ定義。
 検証の隔離実行・Claude Code / Codex の実行環境・（必要なら）エディタ接続に使う。
 
 **環境の実体は `Dockerfile` が唯一の定義**。`devcontainer.json`（Docker 系）と
@@ -82,6 +83,10 @@ cargo build -p setoka-cli
 "$CARGO_TARGET_DIR/debug/setoka" new /tmp/e2e-docs
 ```
 
+ブラウザ側のスモークテスト（Playwright）は `../tests/browser/README.md` の手順で動かす。Chromium は
+イメージにも volume にも入っていないので、コンテナを作り直すたび（`down` → `up` の後）に
+`npx playwright install --with-deps chromium` で入れる。
+
 ## 落とし穴
 
 - **`./target/debug/setoka` は存在しない**: コンテナ内は `CARGO_TARGET_DIR=/cargo-target`
@@ -98,13 +103,14 @@ cargo build -p setoka-cli
   （toolchain 名 `stable` は `rust-toolchain.toml` と一致させる意図。版を固定するなら対で変える）。
   焼き直したイメージは `down` → `up` でコンテナを作り直すまで使われない（`up` だけでは
   既存のコンテナを使い続ける。古いイメージのままなら `build`・`up`・`shell` 等が警告する）
-- **インストーラはハッシュ検証つき**: rustup-init・cargo-binstall・codex は
+- **インストーラはハッシュ検証つき**: rustup-init・cargo-binstall・codex・Node.js は
   バージョン固定の成果物を落として sha256 を照合してから実行する（`curl | sh` にしない。
   例外は Claude Code — 固定版配布が無くネイティブインストーラを使う）。
   更新は Dockerfile の `ARG` のバージョンとハッシュを**セットで**書き換える。
   ハッシュは rustup が `https://static.rust-lang.org/rustup/archive/<版>/<target>/rustup-init.sha256`、
-  cargo-binstall / codex は release 資産の実測値。`cargo-insta` は `Cargo.lock` の `insta` と版を
-  揃え、codex はホストの `codex --version` と揃える
+  cargo-binstall / codex は release 資産の実測値、Node.js は `https://nodejs.org/dist/v<版>/SHASUMS256.txt`。
+  `cargo-insta` は `Cargo.lock` の `insta` と版を揃え、codex はホストの `codex --version` と揃え、
+  Node.js は major を ci.yml の `browser` ジョブの `node-version` と揃える
 - **`~/.claude` は rw で共有される**（ラッパー経路）: コンテナ内のプロセスはホストの
   Claude Code 設定・hooks・skills を書き換えられる（symlink の実体としてマウントした dotfiles 側の
   ディレクトリも rw）。VM による隔離はホスト認証・設定には及ばない前提で使う（GH_TOKEN も `container inspect` の env には出ないが exec へは渡る）

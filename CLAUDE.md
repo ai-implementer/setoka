@@ -530,7 +530,8 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 - **ブラウザ側のスモークテストは `tests/browser/`**（ci.yml の `browser` ジョブ。Playwright。v0.22 Phase 100）。
   docs サイトは図が `backend = "ssr"` なので、client 描画の図と KaTeX は `setoka new` の雛形から作った
   サイトで確かめる。テーマ・検索の JS・雛形の「記法の例」を変えたらテストも直す。Node はこのテストだけに使い、
-  setoka のビルドには持ち込まない（Playwright の版は `tests/browser/package.json` の完全一致の指定）
+  setoka のビルドには持ち込まない（Playwright の版は `tests/browser/package.json` の完全一致の指定）。
+  Node の major は CI の `node-version` と開発コンテナ（`.devcontainer/Dockerfile` の `NODE_VERSION`）でそろえる
 - **ci.yml の check ジョブは `target/package` を消してからキャッシュする**（`drop target/package
   before caching`）。Swatinem/rust-cache の掃除が `target/` の下をたどって kabosu のソースの `tests/` を
   テスト用のプロファイルとみなし、await せずに開いて ENOENT の注記を出す（キャッシュが完全一致しない

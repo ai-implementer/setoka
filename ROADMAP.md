@@ -134,9 +134,11 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   - 道具は Playwright（@playwright/test 1.65.1。CI では Chromium だけを入れる）
   - 版は `tests/browser/package.json` の完全一致の指定で固定し、dependabot の npm で上げる。開発コンテナに
     Node が無く package-lock.json を作れないので、lock は置かない（@playwright/test が依存する playwright・
-    playwright-core も完全一致で指定されている）
+    playwright-core も完全一致で指定されている）。11-19 にコンテナへ Node を入れたので、lock は下の
+    「未確認」のとおり決め直す
   - CI では PR ごとに動かす（ci.yml の `browser` ジョブ）
-- 未決: 手元で動かすか（開発コンテナに Node を入れるか）。コンテナの作り直しが要るので仮決めにしない
+- 決定（11-19）: 手元でも動かす。開発コンテナに Node 26（26.13.1。LTS）を入れ、CI の `browser` ジョブも
+  26 にそろえる。Playwright のブラウザ（Chromium）はイメージに焼かず、使うときに入れる
 - やったこと
   - `tests/browser/`（`package.json`・`playwright.config.mjs`・`smoke.spec.mjs`・`README.md`）。テストは 8 本:
     docs サイトでヘッダーの検索欄・検索結果のページ・`/` キー・配色の切替（OS の設定 → ダーク → ライト →
@@ -147,8 +149,12 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
     テストの依存と結果を足した。verify スキルに手順 8、CLAUDE.md に注意を足した
   - テストが前提にする HTML（要素の id とクラス・数式と図の数・検索結果のページ）は、手元でビルドした dist で
     確かめた。ci.yml と dependabot.yml の YAML の構文は setoka の YAML の読み込みで確かめた
-- 未確認: テストを実際のブラウザで動かしていない（開発コンテナに Node が無い）。最初の PR の CI の `browser`
-  ジョブで確かめる
+  - PR #99 でマージした（11-19。d887317）。CI の `browser` ジョブで 8 本とも通った（Node 22 での最初の実行）
+  - 別の PR で、開発コンテナ（`.devcontainer/Dockerfile`）に Node 26 を入れた（版の固定＋nodejs.org の
+    `SHASUMS256.txt` の sha256 と照合）。container.yml で `node --version`・`npm --version` を確かめる。ci.yml の
+    `node-version` も 26
+- 未確認: 作り直した開発コンテナでテストを動かすこと（apple container でのイメージのビルドと、Chromium の
+  `--with-deps` の導入）。lock を置くかは、コンテナで `npm install` できるようになってから決め直す
 - 工数: 中
 
 ### 101 大事な経路のテスト ⬜

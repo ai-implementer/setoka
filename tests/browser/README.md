@@ -12,7 +12,7 @@ setoka が出力するサイトを実際のブラウザで開き、検索・配�
 
 ## 手元で動かす
 
-Node（22 以降）が要る。リポジトリのルートで:
+Node が要る（CI と開発コンテナは Node 26。開発コンテナには入っている）。リポジトリのルートで:
 
 ```bash
 cargo build -p setoka-cli
@@ -22,7 +22,7 @@ S="$CARGO_TARGET_DIR/debug/setoka"   # 開発コンテナの外なら ./target/d
 
 cd tests/browser
 npm install
-npx playwright install chromium      # 初回だけ（Linux で足りないライブラリがあれば --with-deps）
+npx playwright install --with-deps chromium   # 開発コンテナでは作り直すたびに要る（足りないライブラリを sudo で入れる。mac では --with-deps は不要）
 SETOKA_BIN="$S" SETOKA_SITE=/tmp/setoka-browser-site npx playwright test
 ```
 

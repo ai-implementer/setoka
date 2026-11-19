@@ -1014,8 +1014,8 @@ jobs:
 
   # ブラウザ側のスモークテスト（v0.22 Phase 100。10-07 見直しの E6）。docs サイトと、雛形から作った
   # サイト（既定の client 描画の図と数式がある）を setoka preview で配信し、Playwright（Chromium）で
-  # 検索・配色の切替と保存・サイドバーの位置・/ キー・コピー・図と数式を確かめる。Node はこのジョブの
-  # 中だけで使い、setoka のビルドには使わない（手順は tests/browser/README.md）
+  # 検索・配色の切替と保存・サイドバーの位置・/ キー・コピー・図と数式を確かめる。Node はこのテストだけに
+  # 使い、setoka のビルドには使わない（手順は tests/browser/README.md。開発コンテナにも同じ major の Node がある）
   browser:
     runs-on: ubuntu-latest
     steps:
@@ -1024,9 +1024,10 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # Node の major は開発コンテナ（.devcontainer/Dockerfile の NODE_VERSION）とそろえる
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 26
 
       - name: build sites
         run: |
