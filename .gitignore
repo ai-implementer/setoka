@@ -19,3 +19,8 @@ dist/
 /.claude/settings.local.json
 
 /docs/design
+
+# ブラウザ側のスモークテスト（tests/browser/。v0.22 Phase 100）の依存と結果
+/tests/browser/node_modules/
+/tests/browser/test-results/
+/tests/browser/playwright-report/

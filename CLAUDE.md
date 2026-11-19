@@ -527,6 +527,10 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     外から `file=` で取り込めないので写しを置いている。v0.20 Phase 91）。ci.yml の `scaffold actions pins` が
     バイト一致と、PR 検証の例 `docs/snippets/pr-check.yml` の actions の SHA・setoka のインストール手順
     （コメントを除く）が雛形と同じかを照合する
+- **ブラウザ側のスモークテストは `tests/browser/`**（ci.yml の `browser` ジョブ。Playwright。v0.22 Phase 100）。
+  docs サイトは図が `backend = "ssr"` なので、client 描画の図と KaTeX は `setoka new` の雛形から作った
+  サイトで確かめる。テーマ・検索の JS・雛形の「記法の例」を変えたらテストも直す。Node はこのテストだけに使い、
+  setoka のビルドには持ち込まない（Playwright の版は `tests/browser/package.json` の完全一致の指定）
 - **ci.yml の check ジョブは `target/package` を消してからキャッシュする**（`drop target/package
   before caching`）。Swatinem/rust-cache の掃除が `target/` の下をたどって kabosu のソースの `tests/` を
   テスト用のプロファイルとみなし、await せずに開いて ENOENT の注記を出す（キャッシュが完全一致しない
