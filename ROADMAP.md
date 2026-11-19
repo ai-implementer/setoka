@@ -117,7 +117,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 依存の PR #90（11-15。saphyr 0.3.4・saphyr-parser 0.3.4・notify 8.2.2・toml 1.2.1・rust-embed 8.14.0）が
   開いたまま。作られた後に改名（PR #91）で Cargo.lock の crate 名が変わった
 
-### 100 ブラウザ側の自動の確認 ⬜
+### 100 ブラウザ側の自動の確認 ✅
 
 **概要**: docs サイトと雛形から作ったサイトの dist に対するブラウザのスモークテストを CI に足す（10-07
 見直しの E6）。検索・配色の切替と保存・サイドバーの位置・キーボード操作・client 描画の図を、実際の
@@ -134,11 +134,13 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   - 道具は Playwright（@playwright/test 1.65.1。CI では Chromium だけを入れる）
   - 版は `tests/browser/package.json` の完全一致の指定で固定し、dependabot の npm で上げる。開発コンテナに
     Node が無く package-lock.json を作れないので、lock は置かない（@playwright/test が依存する playwright・
-    playwright-core も完全一致で指定されている）。11-19 にコンテナへ Node を入れたので、lock は下の
-    「未確認」のとおり決め直す
+    playwright-core も完全一致で指定されている）。11-19 にコンテナへ Node を入れたので、lock は下のとおり
+    決め直した
   - CI では PR ごとに動かす（ci.yml の `browser` ジョブ）
 - 決定（11-19）: 手元でも動かす。開発コンテナに Node 26（26.13.1。LTS）を入れ、CI の `browser` ジョブも
   26 にそろえる。Playwright のブラウザ（Chromium）はイメージに焼かず、使うときに入れる
+- 決定（11-19）: `tests/browser/package-lock.json` を置き、CI と手順は `npm ci` にする（3 つのパッケージの
+  sha512 を照合してから入れる。Dockerfile のハッシュ照合・actions の SHA 固定と同じ扱い）
 - やったこと
   - `tests/browser/`（`package.json`・`playwright.config.mjs`・`smoke.spec.mjs`・`README.md`）。テストは 8 本:
     docs サイトでヘッダーの検索欄・検索結果のページ・`/` キー・配色の切替（OS の設定 → ダーク → ライト →
@@ -152,9 +154,10 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   - PR #99 でマージした（11-19。d887317）。CI の `browser` ジョブで 8 本とも通った（Node 22 での最初の実行）
   - 別の PR で、開発コンテナ（`.devcontainer/Dockerfile`）に Node 26 を入れた（版の固定＋nodejs.org の
     `SHASUMS256.txt` の sha256 と照合）。container.yml で `node --version`・`npm --version` を確かめる。ci.yml の
-    `node-version` も 26
-- 未確認: 作り直した開発コンテナでテストを動かすこと（apple container でのイメージのビルドと、Chromium の
-  `--with-deps` の導入）。lock を置くかは、コンテナで `npm install` できるようになってから決め直す
+    `node-version` も 26（PR #101。CI の `browser` ジョブは Node 26 でも 8 本とも通った）
+  - apple container でイメージを作り直し、コンテナ内で `npx playwright install --with-deps chromium` からテストまで
+    動かして 8 本とも通った（11-19。ユーザが確認）。そのとき `npm install` で作った `package-lock.json` を置き、
+    ci.yml・`tests/browser/README.md`・CLAUDE.md を `npm ci` にした
 - 工数: 中
 
 ### 101 大事な経路のテスト ⬜

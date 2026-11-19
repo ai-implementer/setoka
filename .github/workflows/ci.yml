@@ -1038,8 +1038,9 @@ jobs:
 
       - name: browser smoke tests
         working-directory: tests/browser
+        # npm ci は package-lock.json の版と sha512 のとおりに入れる（lock と package.json が食い違えば落ちる）
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
           SETOKA_BIN="$GITHUB_WORKSPACE/target/debug/setoka" SETOKA_SITE="$RUNNER_TEMP/site" npx playwright test
 
