@@ -377,8 +377,9 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   LAN の IP から開く使い方を壊さない。Vite と同じ考え方）。検査は Router の最後の
   `layer` で全経路に掛けるので、**経路を足すときは layer より前に足す**。WebSocket は
   Origin も照合し、Origin の無い接続（ブラウザ以外・テスト）は通す
-- setoka-server の serve テストと setoka-cli の `tests/serve.rs` は TCP バインドするため、サンドボックス内では
-  PermissionDenied で落ちる（コード起因ではない）
+- setoka-server の serve テスト・setoka-cli の `commands/extlink.rs` のテスト（ローカルにサーバを立てる）・
+  setoka-cli の `tests/serve.rs` は TCP バインドするため、サンドボックス内では PermissionDenied で落ちる
+  （コード起因ではない。verify スキルのテストの手順はサンドボックスの内と外に分けてある）
 - **CLI の結合テストは `crates/setoka-cli/tests/`**（v0.22 Phase 101。ビルドした setoka を子プロセスで動かす。
   CI の test-cross で Windows・macOS でも動く）。共通部分は `tests/common/mod.rs`
   - HTTP は std の `TcpStream` で取る（deny.toml が HTTP クライアントの crate を禁止している）

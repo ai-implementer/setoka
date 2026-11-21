@@ -12,27 +12,44 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 /// 待つ上限（CI の macOS・Windows の遅さを見込む）
 pub const DEADLINE: Duration = Duration::from_secs(60);
 
-/// 一時ディレクトリに作ったプロジェクト（`setoka.toml` と `content/index.md`）
+/// 目印のページ（`content/marker.md`）の URL
+const MARKER_PATH: &str = "/marker/";
+
+/// 一時ディレクトリに作ったプロジェクト（`setoka.toml`・`content/index.md`・
+/// プロジェクトごとに違う目印を書いた `content/marker.md`）
 pub struct Project {
     root: tempfile::TempDir,
     /// 子プロセスのログの置き場。監視の対象（プロジェクトルート）の外に置く
     /// （中に置くと、ログを書くたびに変更として検知されて再ビルドが続く）
     logs: tempfile::TempDir,
+    /// 配信を始めたのが自分の子プロセスかを見分ける文字列（[`Project::serve`]）
+    marker: String,
 }
 
 impl Project {
     pub fn new() -> Self {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
         let project = Self {
             root: tempfile::tempdir().unwrap(),
             logs: tempfile::tempdir().unwrap(),
+            marker: format!(
+                "marker-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ),
         };
         project.write("setoka.toml", "[site]\ntitle = \"テスト\"\n");
         project.write("content/index.md", "# トップ\n\n版その一\n");
+        project.write(
+            "content/marker.md",
+            &format!("# 目印\n\n{}\n", project.marker),
+        );
         project
     }
 
@@ -81,7 +98,8 @@ impl Project {
     }
 
     /// 配信するコマンド（`dev`・`preview`・`build --watch`）を `--port` を付けて起動し、
-    /// `/` が返るまで待つ。ポートが使用中なら別のポートでやり直す
+    /// 目印のページがこのプロジェクトの目印つきで返るまで待つ。ポートが使用中なら
+    /// 別のポートでやり直す
     pub fn serve(&self, args: &[&str]) -> Server {
         for _ in 0..3 {
             let port = free_port();
@@ -96,7 +114,7 @@ impl Project {
                 .spawn()
                 .unwrap();
             let mut server = Server { child, log, port };
-            match server.wait_ready() {
+            match server.wait_ready(&self.marker) {
                 Ready::Yes => return server,
                 // 空きを調べてから起動するまでの間に、ほかのテストが同じポートを取った
                 Ready::PortInUse => continue,
@@ -143,7 +161,11 @@ pub struct Server {
 }
 
 impl Server {
-    fn wait_ready(&mut self) -> Ready {
+    /// 自分の子プロセスが配信を始めるまで待つ。応答があるだけでは決めない = 空きを調べてから
+    /// 子プロセスがバインドするまでの間（初回のビルド中）に、ほかのテストのサーバが同じポートで
+    /// 答えることがある。目印を見て別のプロセスの応答を区別し、子プロセスがポートを取れずに
+    /// 終わるのを待ってやり直す
+    fn wait_ready(&mut self, marker: &str) -> Ready {
         let start = Instant::now();
         loop {
             if let Some(status) = self.child.try_wait().unwrap() {
@@ -153,7 +175,10 @@ impl Server {
                 }
                 panic!("setoka が配信を始める前に終了しました（{status}）\n{log}");
             }
-            if self.get("/").is_some() {
+            let ours = self
+                .get(MARKER_PATH)
+                .is_some_and(|page| page.status == 200 && page.body.contains(marker));
+            if ours {
                 return Ready::Yes;
             }
             assert!(

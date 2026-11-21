@@ -30,13 +30,13 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
 
 ```bash
 cargo test --locked --workspace --exclude setoka-server --exclude setoka-cli
-cargo test --locked -p setoka-cli --bins --test commands
+cargo test --locked -p setoka-cli --test commands
 # ↓ サンドボックス外で実行する（TCP で待ち受ける）
 cargo test --locked -p setoka-server
-cargo test --locked -p setoka-cli --test serve
+cargo test --locked -p setoka-cli --bins --test serve
 ```
 
-- **TCP で待ち受けるテストはサンドボックス外必須**: setoka-server の serve テストと、setoka-cli の結合テスト `crates/setoka-cli/tests/serve.rs`（`build --watch`・`dev`・`preview` を起動して HTTP で取る。v0.22 Phase 101）は、サンドボックス内では PermissionDenied で落ちる（コード起因ではない）。CI はまとめて `cargo test --workspace` で動かす。
+- **TCP で待ち受けるテストはサンドボックス外必須**: setoka-server の serve テスト・setoka-cli の単体テスト（`--bins`。`commands/extlink.rs` の外部リンク検査の 3 本がローカルにサーバを立てる）・setoka-cli の結合テスト `crates/setoka-cli/tests/serve.rs`（`build --watch`・`dev`・`preview` を起動して HTTP で取る。v0.22 Phase 101）は、サンドボックス内では PermissionDenied で落ちる（コード起因ではない）。CI はまとめて `cargo test --workspace` で動かす。
 - **insta スナップショット差分が出たら**: 差分が意図どおりか必ず目視 → `INSTA_UPDATE=always cargo test -p <crate>` で更新 → `git diff` で更新内容を再確認。意図しない差分は変更側のバグを疑う。CI は `INSTA_UPDATE=no` で未承認を失敗にする。
 
 ## 3. ビルドと crates.io パッケージ検証
