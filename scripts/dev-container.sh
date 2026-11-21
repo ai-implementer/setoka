@@ -133,8 +133,14 @@ export_host_env() {
   fi
 }
 
+# docker は `container inspect` に絞る（素の `docker inspect` は同名のイメージ
+# setoka-dev:latest にも一致して、コンテナが無くても成功する）
 container_exists() {
-  "$ENGINE" inspect "$NAME" >/dev/null 2>&1
+  if [ "$ENGINE" = "container" ]; then
+    "$ENGINE" inspect "$NAME" >/dev/null 2>&1
+  else
+    "$ENGINE" container inspect "$NAME" >/dev/null 2>&1
+  fi
 }
 
 container_alive() {
@@ -340,7 +346,12 @@ cmd_clean() {
 cmd_status() {
   echo "engine: $ENGINE"
   if container_exists; then
-    "$ENGINE" ls | awk -v name="$NAME" 'NR==1 || index($0, name)'
+    # docker に `ls` は無い（`docker ls` はエラーになる）ので `ps -a` を名前で絞る
+    if [ "$ENGINE" = "container" ]; then
+      "$ENGINE" ls | awk -v name="$NAME" 'NR==1 || index($0, name)'
+    else
+      "$ENGINE" ps -a --filter "name=^${NAME}$"
+    fi
   else
     echo "container: なし（up で起動）"
   fi
