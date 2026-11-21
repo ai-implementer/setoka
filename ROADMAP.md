@@ -70,8 +70,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - **リリース判定**（すべて満たしたらリリースする。どれもタグの前に確かめられる。「延期可」のものを v0.23 へ
   移したら、その行は判定から外してリリースノートに書く）
   - CI にブラウザ側のスモークテストのジョブがあり、通っている（100）
-  - CI に watch の再ビルド（原稿を編集すると作り直す）の e2e と、dev / preview の HTTP の確認がある（101。
-    Windows の CLI の e2e は延期可）
+  - CI に watch の再ビルド（原稿を編集すると作り直す）と、dev / preview の HTTP の確認がある（101。
+    setoka-cli の結合テストで、Windows・macOS でも動く。ci.yml のシェルの e2e を Windows へ移すのは延期可）
   - 5 つの crate が setoka のほかの crate に依存せず、それぞれの `cargo package` が CI で通る（102〜106）
   - setoka の出力が切り出しの前と変わらない（スナップショット・キャッシュの指紋・docs の dist）（102〜106）
   - clippy の `disallowed-methods` で、出力先と原稿への書き込みを kunenbo と `rewrite_source` の口に縛っている（106）
@@ -89,7 +89,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   | 各 Phase の判断点を決める | 100〜107 | 着手時 |
   | 5 つの crate を crates.io へ publish する（`publish-crate` スキル） | 102〜106 | それぞれのマージ後（まとめてもよい） |
 
-- **時間が足りなければ v0.23 へ移すもの**: 101 の Windows での CLI の e2e / 104 の CLI（hebesu を単独の
+- **時間が足りなければ v0.23 へ移すもの**: 101 の ci.yml のシェルの e2e を Windows でも動かすこと（11-21 に
+  仮決めで延期。Windows では結合テストが動く）/ 104 の CLI（hebesu を単独の
   コマンドとして出す部分）。100〜103・105〜107 と 104 のライブラリの部分は移さない
 
 ### 現状の確認（11-17）
@@ -170,6 +171,31 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   足す。`lint --fix` の収束のループを純関数に出してテストする。Windows でも CLI の e2e を動かすか（延期可）
 - 判断点: watch の確認を e2e（シェル）にするか Rust のテストにするか / Windows の CLI の e2e を入れるか
 - 非互換と注意: なし
+- 決定（11-21。判断点への応答が無かったので推奨案で**仮決め**）
+  - watch・dev / preview の HTTP・`lint --fix`・`--drafts` の確認は Rust の結合テスト（`crates/setoka-cli/tests/`）に
+    する。ビルドした setoka を子プロセスで動かし、HTTP は std の `TcpStream` で取る（deny.toml が HTTP クライアントを
+    禁止している）。`cargo test` に入るので、CI の test-cross で Windows・macOS でも動き、verify スキルへ手で写す
+    必要もない
+  - Windows で確かめるのはこの結合テストだけにする。ci.yml のシェルの e2e を Windows へ移すのは v0.23 へ延期する。
+    watch のテストが macOS・Windows で不安定なら、やり直しで隠さず Linux だけに限って、ここに記録する
+  - R10 の run 関数のテストは、check・lint・search・llms を 1 本ずつ（終了コードと出力の要点）。dev は watch の
+    テストで見る。ci.yml の e2e は移さない
+- やったこと
+  - `lint --fix` の収束のループを `fix_until_stable`（`commands/lint.rs`）に出した。原稿の読み込み・診断・書き込みは
+    引数で受け、テストで差し替える。テスト 6 本（1 回で止まる・連鎖を読み直して直す・上限で止める・適用 0 件と
+    同じ結果では書かない・修正の無い診断では書かない・合成した用語集のページには書かない）。上限に達したときの
+    動き（残りを違反として報告する）は変えない
+  - 結合テスト `tests/commands.rs`（5 本）: check の終了コード 0 / 1 / 2・lint の検出と `--fix` と 2 回目は書かない
+    （mtime）・search の結果と索引が無いときの 2・llms が dist 無しで出す・`build --drafts` で出た draft のページが
+    次の通常のビルドで消える
+  - 結合テスト `tests/serve.rs`（3 本）: `build --watch` と `dev` は原稿を編集すると dist を作り直す（dev は配信する
+    ページも新しくなる）・dev のページにライブリロードの script がある・preview は dist を配信し、無いページは 404・
+    preview のページにはライブリロードもオートリフレッシュも無い
+  - ci.yml の「何もしなければ作り直さない」の確認（Linux）はそのまま残した
+  - `cargo test` が結合テストのために `target/debug/setoka` を作り直すようになったので、CLAUDE.md と verify スキルの
+    「更新しない」を直した。verify スキルのテストの手順は、TCP で待ち受ける `tests/serve.rs` をサンドボックスの外で
+    動かすように分けた
+- 未確認: macOS・Windows での結合テスト（この PR の test-cross が最初の実行）
 - 工数: 中
 
 ### 102 shikuwasa（YAML の安全な読み込み） ⬜
