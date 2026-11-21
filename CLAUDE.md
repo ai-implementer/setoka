@@ -45,7 +45,7 @@ rustup target add wasm32-unknown-unknown
 cargo check -p mikan-wasm --target wasm32-unknown-unknown
 cargo check -p tankan --target wasm32-unknown-unknown
 
-# e2e（CLI 実機確認）— cargo test は target/debug/setoka を更新しないので必ず先にビルドする
+# e2e（CLI 実機確認）— 古いバイナリで確かめないよう必ず先にビルドする
 cargo build -p setoka-cli
 ./target/debug/setoka new /tmp/e2e-docs && cd /tmp/e2e-docs
 "$OLDPWD/target/debug/setoka" build && "$OLDPWD/target/debug/setoka" check
@@ -294,8 +294,9 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 
 ### ビルドとキャッシュ
 
-- `cargo test --workspace` は `target/debug/setoka` を**更新しない**。CLI の実機確認前に
-  `cargo build -p setoka-cli` を忘れない
+- CLI の実機確認前に `cargo build -p setoka-cli` を忘れない。`cargo test` は setoka-cli の結合テスト
+  （`crates/setoka-cli/tests/`）のために `target/debug/setoka` を作り直すが、`-p` でほかの crate だけを
+  試したときは**作り直さない**（v0.22 Phase 101 より前は `cargo test --workspace` でも作り直さなかった）
 - `setoka build` / `dev` は常時インクリメンタル（`.setoka/cache/`）
   - キャッシュ起因の不具合を疑うときは `--force`（または `.setoka/cache/` 削除。いつでも安全）
   - **`--force` / `.setoka` の削除は出力マニフェストも消す** = `output.clean = false` だと孤児掃除の
@@ -376,8 +377,16 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   LAN の IP から開く使い方を壊さない。Vite と同じ考え方）。検査は Router の最後の
   `layer` で全経路に掛けるので、**経路を足すときは layer より前に足す**。WebSocket は
   Origin も照合し、Origin の無い接続（ブラウザ以外・テスト）は通す
-- setoka-server の serve テストは TCP バインドするため、サンドボックス内では
+- setoka-server の serve テストと setoka-cli の `tests/serve.rs` は TCP バインドするため、サンドボックス内では
   PermissionDenied で落ちる（コード起因ではない）
+- **CLI の結合テストは `crates/setoka-cli/tests/`**（v0.22 Phase 101。ビルドした setoka を子プロセスで動かす。
+  CI の test-cross で Windows・macOS でも動く）。共通部分は `tests/common/mod.rs`
+  - HTTP は std の `TcpStream` で取る（deny.toml が HTTP クライアントの crate を禁止している）
+  - **子プロセスのログはプロジェクトルートの外に置く** = `dev` / `build --watch` はルート全体を監視するので、
+    中に置くとログを書くたびに再ビルドが続く
+  - 再ビルドは dist や配信の中身が変わるまで上限付きで待つ（固定の時間で待たない。ログの文言で判定しない）。
+    配信が始まった時点で監視は始まっている（`dev` / `build --watch` は notify への登録を終えてから待ち受ける。
+    `setoka_server::watch` は登録を済ませてから返る）
 - **監視の隠しディレクトリ判定は監視ルートからの相対パスで行う**（`WatchIgnore::is_ignored`）。
   イベントは絶対パスで届くので、全構成要素を見るとルートの祖先（`~/.config/notes/`・
   `.claude/worktrees/…`・`tempfile::tempdir()` の `.tmpXXXX`）に `.` 始まりがあるだけで

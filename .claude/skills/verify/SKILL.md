@@ -29,11 +29,14 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
 ## 2. テスト
 
 ```bash
-cargo test --locked --workspace --exclude setoka-server
-cargo test --locked -p setoka-server   # ← サンドボックス外で実行する
+cargo test --locked --workspace --exclude setoka-server --exclude setoka-cli
+cargo test --locked -p setoka-cli --bins --test commands
+# ↓ サンドボックス外で実行する（TCP で待ち受ける）
+cargo test --locked -p setoka-server
+cargo test --locked -p setoka-cli --test serve
 ```
 
-- **setoka-server はサンドボックス外必須**: serve テストが TCP バインドするため、サンドボックス内では PermissionDenied で落ちる（コード起因ではない）。
+- **TCP で待ち受けるテストはサンドボックス外必須**: setoka-server の serve テストと、setoka-cli の結合テスト `crates/setoka-cli/tests/serve.rs`（`build --watch`・`dev`・`preview` を起動して HTTP で取る。v0.22 Phase 101）は、サンドボックス内では PermissionDenied で落ちる（コード起因ではない）。CI はまとめて `cargo test --workspace` で動かす。
 - **insta スナップショット差分が出たら**: 差分が意図どおりか必ず目視 → `INSTA_UPDATE=always cargo test -p <crate>` で更新 → `git diff` で更新内容を再確認。意図しない差分は変更側のバグを疑う。CI は `INSTA_UPDATE=no` で未承認を失敗にする。
 
 ## 3. ビルドと crates.io パッケージ検証
@@ -156,7 +159,8 @@ grep -rlE 'src="[^"]*vendor/mermaid\.min\.js"' docs/dist/ --include="*.html" && 
 
 ## 6. e2e（CLI 実機）
 
-**罠: `cargo test --workspace` は `target/debug/setoka` を更新しない。必ず先にビルドする。**
+**必ず先に `cargo build -p setoka-cli` を実行する。** `cargo test` は setoka-cli の結合テストのために
+`target/debug/setoka` を作り直すが、`-p` でほかの crate だけを試したときは作り直さない（古いバイナリで確かめてしまう）。
 
 ```bash
 cargo build -p setoka-cli
