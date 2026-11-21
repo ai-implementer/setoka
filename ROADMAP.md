@@ -161,7 +161,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
     ci.yml・`tests/browser/README.md`・CLAUDE.md を `npm ci` にした
 - 工数: 中
 
-### 101 大事な経路のテスト ⬜
+### 101 大事な経路のテスト ✅
 
 **概要**: 切り出しで動かす経路にテストを足す（10-07 見直しの E3、10-12 レビューの R10 の一部）。watch の
 再ビルド・dev / preview の HTTP・`lint --fix` と `--drafts`。
@@ -195,7 +195,12 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   - `cargo test` が結合テストのために `target/debug/setoka` を作り直すようになったので、CLAUDE.md と verify スキルの
     「更新しない」を直した。verify スキルのテストの手順は、TCP で待ち受ける `tests/serve.rs` をサンドボックスの外で
     動かすように分けた
-- 未確認: macOS・Windows での結合テスト（この PR の test-cross が最初の実行）
+  - PR #103 でマージした（11-21。c7e3e3c）。結合テストは CI の test-cross で macOS・Windows とも最初の実行から
+    通った（watch のテストを Linux だけに限る必要は無かった）
+  - レビュー指摘 2 件（1b00c69）: 起動の判定に、プロジェクトごとの目印を書いたページ（`/marker/`）を使う（空きを
+    調べてから子プロセスがバインドするまでの間に、ほかのテストのサーバが同じポートで答えても起動と判断しない）。
+    verify スキルの手順で、ローカルにサーバを立てる `commands/extlink.rs` の 3 本を含む `--bins` を
+    サンドボックスの外の側へ移した
 - 工数: 中
 
 ### 102 shikuwasa（YAML の安全な読み込み） ⬜
