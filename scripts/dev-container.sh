@@ -258,14 +258,27 @@ cmd_up() {
   # - apple container はコンテナ = 軽量 VM で既定リソースが小さく、rustc の並列ビルドで
   #   メモリ不足になり得るため明示する。SSH は専用の --ssh フラグ（秘密鍵 ~/.ssh は
   #   マウントせず agent フォワードで git push/fetch を通す）
-  # - docker の run に --ssh は無いため、ホストの agent ソケットを同一パスで
-  #   bind mount して代替する（無ければスキップ = git は https か手動設定で）
+  # - docker の run に --ssh は無いため、ホストの agent ソケットを bind mount して代替する
+  #   （ホストに agent が無ければスキップ = git は https か手動設定で）。
+  #   Docker Desktop（Mac / Linux）はホストのソケットを直接マウントできないので、VM 内の
+  #   専用ソケット /run/host-services/ssh-auth.sock をマウントし、SSH_AUTH_SOCK もそのパスにする
+  #   （https://docs.docker.com/desktop/features/networking/networking-how-tos/#ssh-agent-forwarding）。
+  #   Docker Desktop かどうかは `docker version` の Server が「Docker Desktop <版>」かで判定する。
+  #   それ以外（Linux の Docker Engine 等）はホストのソケットを同一パスでマウントする
   if [ "$ENGINE" = "container" ]; then
     args+=(--ssh)
     args+=(--memory "${SETOKA_CONTAINER_MEMORY:-8g}")
     args+=(--cpus "${SETOKA_CONTAINER_CPUS:-$(sysctl -n hw.ncpu)}")
   elif [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
-    args+=(-v "$SSH_AUTH_SOCK:$SSH_AUTH_SOCK" -e SSH_AUTH_SOCK)
+    case "$("$ENGINE" version --format '{{.Server.Platform.Name}}' 2>/dev/null || true)" in
+      "Docker Desktop "*)
+        args+=(-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock
+               -e SSH_AUTH_SOCK=/run/host-services/ssh-auth.sock)
+        ;;
+      *)
+        args+=(-v "$SSH_AUTH_SOCK:$SSH_AUTH_SOCK" -e SSH_AUTH_SOCK)
+        ;;
+    esac
   fi
 
   "$ENGINE" run "${args[@]}" "$IMAGE"
@@ -292,20 +305,19 @@ ensure_up() {
 
 # shell / claude / codex の共通形: exec のたびに GH_TOKEN 等を取り直して注入する
 # （長寿命コンテナでもトークンが古くならない）。
-# stdin が TTY なら -i、stdout も TTY のときだけ -t を付ける（TTY なしの -t は
+# -i は常に付ける（stdin がパイプやファイルでも入力を渡すため。付けないと
+# `printf ... | shell -c cat` や `claude -p` への入力が失われる）。
+# -t は stdin と stdout の両方が TTY のときだけ付ける（TTY なしの -t は
 # exec が「Operation not supported on socket」で失敗する。パイプ時の色・CRLF 混入も防ぐ）
 # ※ macOS 標準の bash 3.2 は set -u で空配列展開がエラーになるため展開側で +"" を使う
 cmd_exec_interactive() {
   ensure_up
   export_host_env
-  local tty_flags=()
-  if [ -t 0 ]; then
-    tty_flags+=(-i)
-    if [ -t 1 ]; then
-      tty_flags+=(-t)
-    fi
+  local tty_flags=(-i)
+  if [ -t 0 ] && [ -t 1 ]; then
+    tty_flags+=(-t)
   fi
-  exec "$ENGINE" exec ${tty_flags[@]+"${tty_flags[@]}"} \
+  exec "$ENGINE" exec "${tty_flags[@]}" \
     ${HOST_ENV_FLAGS[@]+"${HOST_ENV_FLAGS[@]}"} "$NAME" "$@"
 }
 

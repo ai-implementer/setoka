@@ -40,7 +40,7 @@ hooks の絶対パス・codex の projects トラスト・Claude / Codex のプ�
 | Codex | `~/.codex/auth.json`（平文） | マウントだけで完結 |
 | gh | macOS Keychain | ラッパーが exec のたびに `gh auth token` で取り出し `GH_TOKEN` を値なし `-e` で注入（argv に値を出さない） |
 | git identity | `~/.gitconfig`（マウントしない） | `GIT_AUTHOR_*` / `GIT_COMMITTER_*` を env 注入（lfs filter 事故回避のため gitconfig 自体は共有しない） |
-| git push/fetch | SSH agent | `container run --ssh` の agent フォワード（`~/.ssh` はマウントしない） |
+| git push/fetch | SSH agent | apple container は `container run --ssh` の agent フォワード。docker は Docker Desktop なら `/run/host-services/ssh-auth.sock`、それ以外（Linux の Docker Engine 等）はホストの `$SSH_AUTH_SOCK` を bind mount する（どちらも `~/.ssh` はマウントしない） |
 | New Relic（OTEL） | 1Password `Private / NewRelic(claude-otel-api)` | exec のたびに `op` で取り出し `OTEL_EXPORTER_OTLP_HEADERS` を値なし `-e` で注入（送信先・`container.name=setoka` 等の設定も同時に渡す）。取れなければテレメトリ設定ごと渡さない |
 
 VS Code から接続したい場合: 設定で `"dev.containers.experimentalAppleContainerSupport": true`
