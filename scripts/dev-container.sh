@@ -344,13 +344,23 @@ cmd_clean() {
 }
 
 cmd_status() {
+  local id
   echo "engine: $ENGINE"
   if container_exists; then
-    # docker に `ls` は無い（`docker ls` はエラーになる）ので `ps -a` を名前で絞る
+    # 名前は部分一致・正規表現で探さない（setoka-dev2 や、`.` を含む名前の setoka.dev で
+    # 別のコンテナまで出る）。apple container は欄が名前と完全に一致する行だけを出す
+    # （イメージの欄 setoka-dev:latest は一致しない）。docker に `ls` は無い（`docker ls` は
+    # エラーになる）ので `ps -a` を、inspect で取ったコンテナ ID で絞る（name フィルタは正規表現）
     if [ "$ENGINE" = "container" ]; then
-      "$ENGINE" ls | awk -v name="$NAME" 'NR==1 || index($0, name)'
+      "$ENGINE" ls | awk -v name="$NAME" 'NR == 1 { print; next } { for (i = 1; i <= NF; i++) if ($i == name) { print; next } }'
     else
-      "$ENGINE" ps -a --filter "name=^${NAME}$"
+      id=$("$ENGINE" container inspect -f '{{.Id}}' "$NAME" 2>/dev/null || true)
+      # 空の id で絞ると前方一致ですべてのコンテナが出る（確かめた直後に消えたとき）
+      if [ -n "$id" ]; then
+        "$ENGINE" ps -a --filter "id=${id}"
+      else
+        echo "container: なし（up で起動）"
+      fi
     fi
   else
     echo "container: なし（up で起動）"
