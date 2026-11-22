@@ -89,8 +89,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   | 各 Phase の判断点を決める | 100〜107 | 着手時 |
   | 5 つの crate を crates.io へ publish する（`publish-crate` スキル） | 102〜106 | それぞれのマージ後（まとめてもよい） |
 
-- **時間が足りなければ v0.23 へ移すもの**: 101 の ci.yml のシェルの e2e を Windows でも動かすこと（11-21 に
-  仮決めで延期。Windows では結合テストが動く）/ 104 の CLI（hebesu を単独の
+- **時間が足りなければ v0.23 へ移すもの**: 101 の ci.yml のシェルの e2e を Windows でも動かすこと（11-23 に
+  延期を確定。Windows では結合テストが動く）/ 104 の CLI（hebesu を単独の
   コマンドとして出す部分）。100〜103・105〜107 と 104 のライブラリの部分は移さない
 
 ### 現状の確認（11-17）
@@ -131,7 +131,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 判断点: 使う道具（Playwright か、ほかのもの）と、テストのファイルの置き場 / 何を確かめるか / ジョブを
   PR ごとに動かすか
 - 非互換と注意: なし（CI だけ）
-- 決定（11-18。判断点への応答が無かったので推奨案で**仮決め**）
+- 決定（11-18 に判断点への応答が無かったので推奨案で仮決めし、11-23 にユーザがそのまま確定した）
   - 道具は Playwright（@playwright/test 1.65.1。CI では Chromium だけを入れる）
   - 版は `tests/browser/package.json` の完全一致の指定で固定し、dependabot の npm で上げる。開発コンテナに
     Node が無く package-lock.json を作れないので、lock は置かない（@playwright/test が依存する playwright・
@@ -171,7 +171,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   足す。`lint --fix` の収束のループを純関数に出してテストする。Windows でも CLI の e2e を動かすか（延期可）
 - 判断点: watch の確認を e2e（シェル）にするか Rust のテストにするか / Windows の CLI の e2e を入れるか
 - 非互換と注意: なし
-- 決定（11-21。判断点への応答が無かったので推奨案で**仮決め**）
+- 決定（11-21 に判断点への応答が無かったので推奨案で仮決めし、11-23 にユーザがそのまま確定した）
   - watch・dev / preview の HTTP・`lint --fix`・`--drafts` の確認は Rust の結合テスト（`crates/setoka-cli/tests/`）に
     する。ビルドした setoka を子プロセスで動かし、HTTP は std の `TcpStream` で取る（deny.toml が HTTP クライアントを
     禁止している）。`cargo test` に入るので、CI の test-cross で Windows・macOS でも動き、verify スキルへ手で写す
@@ -203,7 +203,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
     サンドボックスの外の側へ移した
 - 工数: 中
 
-### 102 shikuwasa（YAML の安全な読み込み） ⬜
+### 102 shikuwasa（YAML の安全な読み込み） ✅
 
 **概要**: setoka-core の `yaml.rs` を crate shikuwasa に切り出す。setoka-core（frontmatter・未知キーの lint）と
 103 の amanatsu が使う。
@@ -242,7 +242,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 確かめたこと: `cargo test --workspace`（スナップショットとキャッシュの指紋を含めて通った = `CACHE_FORMAT_VERSION` は
   据え置き）・main と切り出し後の setoka で docs の dist（312 ファイル）がバイト単位で同じ・fuzz の対象の本体を
   スクラッチの crate で型検査して動かした（開発コンテナに C++ コンパイラが無く libfuzzer-sys をビルドできない）
-- 未確認: レビュー指摘を直した後の fuzz の実行（次の定期実行か、publish の前の手動実行）
+- fuzz（2 回目）: レビュー指摘を直した後（5198ec6）にも fuzz.yml を手動実行し、6 対象とも成功（shikuwasa の `parse` は
+  600 秒で 308 万回・panic、ハング、メモリ超過なし）。shikuwasa 0.1.0 の publish の前の fuzz を兼ねる
 - レビュー指摘 2 件（PR #108）
   - [P2] saphyr が値を作れない循環した別名（`&a [*a]` の `*a`。BadValue）を値なしにしていた。frontmatter の
     `aliases: &a [*a]` が「実際: 値なし」になり、値なしは未指定として素通りする書き方もあった。`Kind::Unresolved` を
@@ -386,6 +387,10 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
 
 ### その他の候補
 
+- **ci.yml のシェルの e2e を Windows でも動かす**（v0.23 の予定。v0.22 Phase 101 で延期を決めた）— 今の
+  Windows・macOS の CLI の確認は setoka-cli の結合テスト（`crates/setoka-cli/tests/`）だけで、ci.yml の e2e（bash。
+  Linux だけ）が見ている build の報告・リンクの遮断・外部リンク検査などは Windows で動かしていない。パスと改行の
+  違いで直す所が多い
 - **client 描画の Mermaid の書き間違いを check で報告する**（v0.23 の予定。setoka-core は tankan に依存できないので、検査は setoka-render 側に置き `rules::CHECK_ONLY` に足す。mermaid の版の判断の後）（v0.19 Phase 85 から回した）— 今は
   既定の client では build も check も何も言わない。tankan のパースだけ通し、未対応
   （`is_unsupported`）以外の構文エラーを抑制できる warning で報告する案。tankan が未対応の
