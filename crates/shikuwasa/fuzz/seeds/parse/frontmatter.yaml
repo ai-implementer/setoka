@@ -1,0 +1,6 @@
+title: 設計書
+order: 2
+draft: yes
+aliases: [old/, "旧/"]
+lintDisable:
+  - term-variant

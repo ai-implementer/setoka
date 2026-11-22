@@ -1,0 +1,15 @@
+openapi: 3.1.0
+info: {title: API, version: "1.0"}
+paths:
+  /items/{id}:
+    get:
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema: &item
+                type: object
+                nullable: !!bool "true"
+                properties: {id: {type: integer}}
+        404: {description: !!str 404, schema: *item}

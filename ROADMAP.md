@@ -214,6 +214,37 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   CLAUDE.md の「YAML の読み込み」の節を shikuwasa を指すように直す。fuzz の対象に足すか決める
 - 判断点: 公開 API の形（`serde_json::Value` を返す関数を入れるか＝serde_json に依存するか）/ fuzz の対象に足すか
 - 非互換と注意: なし（frontmatter の読み方は変えない）
+- 決定（11-22。ユーザが推奨案で決めた）
+  - 読んだ木は自前の型で返す（`Node`・`Kind`・`Scalar`・`Style`・`Tag`・`ScalarValue`。位置はバイトに直した
+    `offset`）。saphyr の型は公開しない（saphyr を上げても shikuwasa の API は変わらない）
+  - `to_json`（`serde_json::Value` へ写す）は既定で無効の feature `json` に入れる（serde_json の `preserve_order`）。
+    使わない人の依存は saphyr と saphyr-parser だけ
+  - エラーの文言は日本語のまま（tankan と同じ。README に書いた）
+  - fuzz の対象に足す（`crates/shikuwasa/fuzz` の `parse`）
+- やったこと
+  - `crates/shikuwasa/`（0.1.0。`lib.rs`・`load.rs`・`scalar.rs`・`tests.rs`・README・LICENSE 2 つ）。中身は setoka-core の
+    `yaml.rs` を移したもの（別名の展開の上限・同名のキー・コアタグ・スカラーの解釈・日本語の文言）に、自前の木への
+    変換を足した。位置の変換は ASCII だけなら文字数のまま、ほかは文字の開始バイトの表を 1 回だけ作る（ノードごとに
+    数え直さない）
+  - setoka-core の `yaml.rs` を消し、frontmatter（`frontmatter.rs`）と frontmatter のエラーの位置（`markdown/mod.rs`）を
+    shikuwasa に、setoka-render の API 仕様の読み込みを `shikuwasa::to_json` にした。setoka-core の依存から saphyr と
+    saphyr-parser が外れた
+  - テスト: yaml.rs のテストを移し、木の型・タグ付きの集合の位置・文字の途中を指す位置・feature `json` の写しを足した
+    （feature 無しで 11 本・`json` 付きで 15 本・doc テスト 4 本）
+  - fuzz: `crates/shikuwasa/fuzz`（`parse`。読み込み・位置が入力の中の文字の境界を指すこと・`to_json`）と種 3 つ
+    （frontmatter・OpenAPI・別名とタグ）。fuzz.yml の対象に足した
+  - ci.yml の package の検査（LICENSE の同梱を含む）に shikuwasa を足し、既定の feature（json 無し）でのテストを 1 行足した（ワークスペースのテストでは json 付きになる）。publish-crate・verify・release スキル、
+    CLAUDE.md（依存の向きの図・凍結した設計判断・「1 実装で共有する箇所」の YAML の節・汎用ライブラリ）、docs の
+    「開発者向け」（crate の一覧・依存の図・凍結した設計判断の表）を直した
+  - crates.io の名前は 5 つ（shikuwasa・amanatsu・hebesu・jabara・kunenbo）とも空いている（11-22 に確かめた）
+- 確かめたこと: `cargo test --workspace`（スナップショットとキャッシュの指紋を含めて通った = `CACHE_FORMAT_VERSION` は
+  据え置き）・main と切り出し後の setoka で docs の dist（312 ファイル）がバイト単位で同じ・fuzz の対象の本体を
+  スクラッチの crate で型検査して動かした（開発コンテナに C++ コンパイラが無く libfuzzer-sys をビルドできない）
+- 未確認: fuzz の実行（次の定期実行か、publish の前の手動実行）
+- 103 への注意（まだ確かめていない）: amanatsu は shikuwasa（json）に依存する。path の依存は crates.io に公開するときに
+  版が要り、`cargo package -p amanatsu` は依存を crates.io から取ろうとする。103 の始めに、path の依存に `version` を
+  付けて shikuwasa と amanatsu を 1 回の `cargo package` にまとめれば CI の toolchain で通るかを確かめる。通らなければ
+  103 の package の検査を shikuwasa の公開まで外す（公開は取り消せないので、確かめる前に急いで publish しない）
 - 工数: 小〜中
 
 ### 103 amanatsu（API 仕様の HTML 化） ⬜

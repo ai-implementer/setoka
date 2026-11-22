@@ -14,12 +14,12 @@ publish = false
 comrak = { workspace = true }
 globset = { workspace = true }
 serde = { workspace = true }
-# インクリメンタルビルドのキャッシュ（.setoka/cache/ の JSON とハッシュキー）と、YAML を
-# JSON の値へ写す `yaml::to_json` 用。preserve_order はマッピングの記述順を保つため
-# （setoka-render も有効にしているので、バイナリでは従来から有効）
+# インクリメンタルビルドのキャッシュ（.setoka/cache/ の JSON とハッシュキー）用。preserve_order は
+# マッピングの記述順を保つため（YAML を JSON の値へ写すのが v0.22 Phase 102 まではここにあった。
+# setoka-render と shikuwasa の json も有効にしているので、バイナリでは従来から有効）
 serde_json = { workspace = true, features = ["preserve_order"] }
-saphyr = { workspace = true }
-saphyr-parser = { workspace = true }
+# frontmatter の YAML の読み込み（v0.22 Phase 102 で yaml.rs から切り出した）
+shikuwasa = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

@@ -43,15 +43,15 @@ cargo test --locked -p setoka-cli --bins --test serve
 
 ```bash
 cargo build --locked --workspace
-cargo package --locked -p tankan -p mikan -p kabosu
+cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa
 scripts/third-party-licenses.sh check
 scripts/build-search-wasm.sh --check   # 検索 wasm の作り直し忘れ（Phase 89。ビルドのツールは要らない）
 git grep -n -i 'y[u]zu' -- . ':!ROADMAP.md' ':!ROADMAP-history.md'   # 旧名の残り（v0.21 Phase 94。何も出なければよい）
 scripts/check-doc-refs.sh              # 文書とコメントが指すパス・スキル・ROADMAP / CLAUDE.md の節が実在するか（Phase 93）
 ```
 
-- `cargo package` は公開対象 3 crate のメタデータ・同梱内容の回帰を検出する（CI にもある）。
-  CI は加えて `cargo package --list` で 3 crate とも `LICENSE-MIT` / `LICENSE-APACHE` を含み、
+- `cargo package` は公開対象 4 crate のメタデータ・同梱内容の回帰を検出する（CI にもある）。
+  CI は加えて `cargo package --list` で 4 crate とも `LICENSE-MIT` / `LICENSE-APACHE` を含み、
   tankan に `tests/corpus` が入らないことを見る。
 - `third-party-licenses.sh check` は two-face の一覧の版（Phase 81）に加えて、使ってよい
   ライセンスの一覧が `licenses/about.toml` と `deny.toml` で同じか、検索 wasm の通知に載った

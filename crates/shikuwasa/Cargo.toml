@@ -1,0 +1,31 @@
+[package]
+name = "shikuwasa"
+# YAML の安全な読み込み（setoka-* に依存しない汎用ライブラリ。v0.22 Phase 102 で setoka-core の
+# yaml.rs から切り出した）。monorepo のまま crates.io へ公開する（開発は setoka ワークスペースで一体・
+# repository は monorepo を指す）。バージョンは workspace と独立で、変更時にだけ上げて publish する
+# （手順は `publish-crate` スキル）
+description = "Safe YAML loading with byte positions: alias expansion limit, duplicate-key detection and core-schema scalar resolution, built on saphyr"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+keywords = ["yaml", "parser", "frontmatter", "span", "saphyr"]
+categories = ["parser-implementations", "encoding"]
+
+[features]
+# YAML を serde_json::Value へ写す `to_json`（マッピングの記述順を保つため preserve_order を使う）
+json = ["dep:serde_json"]
+
+[dependencies]
+saphyr = { workspace = true }
+saphyr-parser = { workspace = true }
+serde_json = { workspace = true, optional = true, features = ["preserve_order"] }
+
+[dev-dependencies]
+serde_json = { workspace = true, features = ["preserve_order"] }
+
+[package.metadata.docs.rs]
+all-features = true

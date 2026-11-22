@@ -95,13 +95,13 @@ cargo build -p setoka-cli
 
 ```
 setoka-cli → {setoka-server, setoka-render, setoka-index, setoka-core, setoka-config}
-setoka-render → setoka-core, setoka-config, setoka-theme, tankan
+setoka-render → setoka-core, setoka-config, setoka-theme, tankan, shikuwasa（json）
 setoka-index → setoka-core, mikan       mikan-wasm → mikan
-setoka-config → kabosu（通常依存はこれだけ）
+setoka-core → shikuwasa                  setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
-tankan・mikan・mikan-wasm・kabosu は他の setoka crate 非依存の汎用ライブラリ
-（tankan・mikan・kabosu は crates.io で公開済み。検索スタックの書き側集約は
+tankan・mikan・mikan-wasm・kabosu・shikuwasa は他の setoka crate 非依存の汎用ライブラリ
+（tankan・mikan・kabosu は crates.io で公開済み。shikuwasa は v0.22 Phase 102 で切り出し、未公開。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
 setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
@@ -149,7 +149,8 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 - TOML 設定は自作の kabosu（依存ゼロ。v0.14 で serde + JSONC から移行。
   JSONC の互換読み込みは作らない）
 - YAML（frontmatter・openapi / jsonschema）は saphyr（v0.20 Phase 88 で serde_yaml_ng から移行）。
-  型の解釈は setoka-core `yaml.rs` が自前で行う（下の「1 実装で共有する箇所」）
+  読み込みと型の解釈は自作の shikuwasa（`crates/shikuwasa/`。v0.22 Phase 102 で setoka-core の yaml.rs から
+  切り出した）が行う（下の「1 実装で共有する箇所」）
 - rayon（ページ並列化。出力はスレッド数に依らずバイト同一）
 - comrak・syntect・two-face は onig（C 依存）を引かないよう **必ず
   `default-features = false`**（Cargo.toml のコメント参照）。`deny.toml` の bans が onig・
@@ -197,14 +198,18 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     `validate_spec_refs` もここ
   - **仕様の中身の検証だけが setoka-render**
 - **エイリアス** — `aliases.rs`（render と check）
-- **YAML の読み込み** — setoka-core `yaml.rs`（frontmatter・未知キーの lint・openapi / jsonschema。
-  Phase 88）。スカラーの解釈 `resolve` は置き換え前の serde_yaml_ng と同じ境界（`010` は文字列等）
-  - **saphyr の位置は文字数**（バイトではない）。`byte_offset` を通してからバイト基準の列にする
-  - **saphyr は別名（`*x`）の展開を数えない** = 入れ子の別名で指数的に膨らむ。`load` の
+- **YAML の読み込み** — crate shikuwasa（frontmatter・未知キーの lint は `shikuwasa::parse`、openapi /
+  jsonschema は feature `json` の `shikuwasa::to_json`。Phase 88 で作り v0.22 Phase 102 で切り出した）。
+  スカラーの解釈（`scalar.rs`）は置き換え前の serde_yaml_ng と同じ境界（`010` は文字列等）。setoka から
+  saphyr を直に使わない（下の 3 つを shikuwasa が受け持っている）
+  - **saphyr の位置は文字数**（バイトではない）。shikuwasa の `Node::offset` と `Error::offset` は
+    バイトに直してある（`load.rs` の `Positions`）
+  - **saphyr は別名（`*x`）の展開を数えない** = 入れ子の別名で指数的に膨らむ。`load.rs` の
     `Budgeted` が上限を掛けているので、saphyr の `load_from_str` を直に呼ばない
   - **`early_parse` 無効だと saphyr はキーをスタイルとタグ込みで比べる** = `draft` と `"draft"` を
     別のキーとして通す（後の値が黙って勝つ）。同名キーの重複と、明示のコアタグ（`!!bool "true"`）を
-    引用符より先に見るのは `load` の `validate` と `resolve`（PR #55 のレビュー指摘）
+    引用符より先に見るのは `load.rs` の `validate` と `scalar.rs` の `resolve`（PR #55 のレビュー指摘）
+  - 文言は日本語（shikuwasa の決めごと。tankan と同じ）。setoka の出力の文言はここから来る
 - **dist に出すサイト単位の生成物** — setoka-core `site_output.rs` の `SiteOutput`
   （404.html・llms・sitemap・syntect.css・build_id・`_assets`・`_search`）。書き出し（pipeline）・
   止めた生成物の掃除（`unpublished_outputs`）・check のリンクの有効ターゲットがすべて
@@ -280,9 +285,10 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   フラグ・`--format json` のキー・診断ルールの名前を消す・改名する変更はマイナー版だけで、
   `--format json` のキーはマイナー版でも消さない。リリースノートの「非互換と注意」はこのページの
   対象を見て書く（`release` スキル）
-- **汎用ライブラリ（tankan / mikan / kabosu）** — setoka のリリースと非同期。手順は
-  **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須）
-  - fuzz.yml は 3 crate の対象（kabosu 3・mikan のシャード・tankan の `render_svg`）を週 1 回実行する
+- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa）** — setoka のリリースと非同期。手順は
+  **`publish-crate` スキル**（kabosu と shikuwasa の初回は publish 前に fuzz 必須）
+  - fuzz.yml は 4 crate の対象（kabosu 3・mikan のシャード・shikuwasa の `parse`・tankan の `render_svg`）を
+    週 1 回実行する
     （v0.20 Phase 92）。合否は artifact と終了コードで決め、tankan の panic だけは最後まで実行できたら
     （終了コード 0）受け流して件数を出す（ハング・メモリ超過・0 以外の終了は必ず失敗。panic があるだけで
     終了コードを見ないと、OOM killer 等で artifact を残さず止まった実行を成功にする。PR #81 のレビュー指摘）。制限の値は fuzz.yml の `env` の 1 か所。mikan の種

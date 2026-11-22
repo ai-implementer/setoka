@@ -31,7 +31,6 @@ mod site_output;
 mod suppress;
 mod traits;
 pub mod urlpath;
-pub mod yaml;
 
 use std::fs;
 use std::path::{Path, PathBuf};
