@@ -235,6 +235,8 @@ fn kind_name(node: &Node) -> &'static str {
         },
         Kind::Sequence(_) => "配列",
         Kind::Mapping(_) => "マッピング",
+        // 値を作れなかった循環した別名（`&a [*a]` の `*a`）
+        Kind::Unresolved => "値",
     }
 }
 
@@ -575,6 +577,19 @@ mod tests {
         assert_eq!((got[0].0, got[0].1), (3, 22));
         let got = problems("---\r\ntitle: x\r\norder: x\r\n---\r\n");
         assert_eq!((got[0].0, got[0].1), (3, 8), "CRLF でも行がずれない");
+    }
+
+    /// PR #108 のレビュー指摘: 循環した別名（saphyr が値を作れない）を値なしにしていた。
+    /// 切り出し前と同じく型の違いにする（値なしにすると未指定として素通りする）
+    #[test]
+    fn 循環した別名は値なしではなく型の違い() {
+        let got = problems("---\naliases: &a [*a]\n---\n");
+        assert_eq!(
+            got[0].2,
+            "`aliases` の 1 番目の型が違います（期待: 文字列、実際: 値）"
+        );
+        let got = problems("---\ntitle: &a [*a]\n---\n");
+        assert!(got[0].2.contains("実際: 配列"), "{got:?}");
     }
 
     #[test]

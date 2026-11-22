@@ -10,7 +10,7 @@ fn check(text: &str, node: &shikuwasa::Node) {
     assert!(text.is_char_boundary(node.offset), "位置が文字の途中");
     let _ = shikuwasa::line_col(text, node.offset);
     match &node.kind {
-        shikuwasa::Kind::Scalar(_) => {}
+        shikuwasa::Kind::Scalar(_) | shikuwasa::Kind::Unresolved => {}
         shikuwasa::Kind::Sequence(items) => items.iter().for_each(|n| check(text, n)),
         shikuwasa::Kind::Mapping(entries) => entries.iter().for_each(|(k, v)| {
             check(text, k);

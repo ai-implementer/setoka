@@ -99,6 +99,9 @@ pub enum Kind {
     Sequence(Vec<Node>),
     /// キーと値の組（書いた順。同名のキーは読み込みがエラーにしている）
     Mapping(Vec<(Node, Node)>),
+    /// saphyr が値を作れなかったもの（作っている途中のアンカーを指す循環した別名 `&a [*a]` の `*a` など）。
+    /// 値なし（null）とは区別する。[`to_json`] では null になる
+    Unresolved,
 }
 
 /// スカラー
@@ -222,13 +225,10 @@ fn convert(node: &Raw<'_>, pos: &Positions<'_>) -> Node {
             });
             node
         }
-        // 読み込みでは作られない（別名は展開済み・解決できない別名は構文エラー・
-        // `early_parse` は無効）。値なしとして扱う
-        _ => leaf(Kind::Scalar(Scalar {
-            text: String::new(),
-            style: Style::Plain,
-            value: ScalarValue::Null,
-        })),
+        // 作っている途中のアンカーを指す循環した別名などで saphyr が値を作れなかったもの（BadValue）。
+        // 値なしとは区別する（値なしにすると frontmatter の型の検査を素通りする。PR #108 のレビュー指摘。
+        // `early_parse` は無効なので Value は作られない）
+        _ => leaf(Kind::Unresolved),
     }
 }
 
@@ -242,16 +242,30 @@ fn style_of(style: ScalarStyle) -> Style {
     }
 }
 
-/// バイト位置を 1 始まりの行・バイト基準の列にする
+/// バイト位置を 1 始まりの行・バイト基準の列にする。改行は LF・CR・CRLF（YAML 1.2 と同じ。
+/// CRLF は 1 つの改行として数える）
 ///
 /// ```
 /// assert_eq!(shikuwasa::line_col("a: 1\nタイトル: x\n", 19), (2, 15));
+/// assert_eq!(shikuwasa::line_col("a: 1\rb: 2\r\nc: 3", 12), (3, 2));
 /// ```
 pub fn line_col(text: &str, offset: usize) -> (usize, usize) {
-    let head = &text[..floor_char_boundary(text, offset)];
-    let line = head.matches('\n').count() + 1;
-    let col = head.rsplit_once('\n').map_or(head.len(), |(_, l)| l.len()) + 1;
-    (line, col)
+    let end = floor_char_boundary(text, offset);
+    let bytes = text.as_bytes();
+    let (mut line, mut line_start) = (1, 0);
+    for i in 0..end {
+        let breaks = match bytes[i] {
+            b'\n' => true,
+            // CRLF の CR は数えない（続く LF で数える）
+            b'\r' => bytes.get(i + 1) != Some(&b'\n'),
+            _ => false,
+        };
+        if breaks {
+            line += 1;
+            line_start = i + 1;
+        }
+    }
+    (line, end - line_start + 1)
 }
 
 /// `offset` 以下でいちばん近い文字の境界（入力の長さを超えたら長さ）
@@ -311,6 +325,8 @@ fn json_of(node: &Node) -> Result<serde_json::Value, usize> {
             }
             Value::Object(object)
         }
+        // 値を作れなかった別名（setoka-core の yaml.rs のときから null にしている）
+        Kind::Unresolved => Value::Null,
     })
 }
 

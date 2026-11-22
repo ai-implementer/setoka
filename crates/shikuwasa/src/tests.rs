@@ -227,6 +227,39 @@ fn タグ付きの集合は外側の位置とタグを持つ() {
     assert!(c.as_mapping().is_some() && c.tag.is_none());
 }
 
+/// PR #108 のレビュー指摘: saphyr が値を作れない循環した別名（BadValue）を値なしにしていたので、
+/// frontmatter の `aliases: &a [*a]` が「実際: 値なし」になり、型の検査を素通りする書き方もあった
+#[test]
+fn 循環した別名は値なしと区別する() {
+    let root = root("a: &x [*x]\nb: &y {k: *y}\n");
+    let a = entries(&root)[0].1.as_sequence().unwrap();
+    assert_eq!(a[0].kind, Kind::Unresolved);
+    assert!(!a[0].is_null());
+    let b = entries(&root)[1].1.as_mapping().unwrap();
+    assert_eq!(b[0].1.kind, Kind::Unresolved);
+}
+
+/// PR #108 のレビュー指摘: YAML 1.2 は CR だけの改行も認める（saphyr も改行として読む）のに、
+/// LF だけを数えていたので、CR 区切りの文書のエラーが 1 行目を指していた
+#[test]
+fn 改行は_lf_と_cr_と_crlf_を数える() {
+    assert_eq!(line_col("a\rb", 2), (2, 1));
+    assert_eq!(line_col("a\r\nb", 3), (2, 1));
+    assert_eq!(line_col("a\nb", 2), (2, 1));
+    // CRLF の LF を指したときはまだ前の行（CR の次の列）
+    assert_eq!(line_col("ab\r\nc", 3), (1, 4));
+    assert_eq!(line_col("a\r\rb", 3), (3, 1));
+    for (text, line) in [
+        ("x: 1\ra: 1\ra: 2\r", 3),
+        ("x: 1\r\na: 1\r\na: 2\r\n", 3),
+        ("x: 1\na: 1\na: 2\n", 3),
+    ] {
+        let e = parse(text).unwrap_err();
+        assert_eq!((e.line, e.col), (line, 1), "{text:?}");
+        assert_eq!(e.message, DUPLICATE_KEY, "{text:?}");
+    }
+}
+
 #[test]
 fn 行と列は文字の途中を指しても文字の頭で数える() {
     // 「あ」は 3 バイト。2 バイト目を指しても落ちない

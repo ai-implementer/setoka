@@ -213,7 +213,9 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - やること: crate を作り、setoka-core から使う。公開する API（読み込み・JSON への変換・位置・エラー）を決める。
   CLAUDE.md の「YAML の読み込み」の節を shikuwasa を指すように直す。fuzz の対象に足すか決める
 - 判断点: 公開 API の形（`serde_json::Value` を返す関数を入れるか＝serde_json に依存するか）/ fuzz の対象に足すか
-- 非互換と注意: なし（frontmatter の読み方は変えない）
+- 非互換と注意: なし（frontmatter の読み方は変えない）。ただし CR だけで改行した原稿では、frontmatter のエラーと
+  `frontmatter-unknown-key` の行と列が正しくなる（不具合の修正。以前は LF だけを数えて 1 行目を指していた。
+  PR #108 のレビュー指摘）
 - 決定（11-22。ユーザが推奨案で決めた）
   - 読んだ木は自前の型で返す（`Node`・`Kind`・`Scalar`・`Style`・`Tag`・`ScalarValue`。位置はバイトに直した
     `offset`）。saphyr の型は公開しない（saphyr を上げても shikuwasa の API は変わらない）
@@ -240,7 +242,15 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 確かめたこと: `cargo test --workspace`（スナップショットとキャッシュの指紋を含めて通った = `CACHE_FORMAT_VERSION` は
   据え置き）・main と切り出し後の setoka で docs の dist（312 ファイル）がバイト単位で同じ・fuzz の対象の本体を
   スクラッチの crate で型検査して動かした（開発コンテナに C++ コンパイラが無く libfuzzer-sys をビルドできない）
-- 未確認: fuzz の実行（次の定期実行か、publish の前の手動実行）
+- 未確認: レビュー指摘を直した後の fuzz の実行（次の定期実行か、publish の前の手動実行）
+- レビュー指摘 2 件（PR #108）
+  - [P2] saphyr が値を作れない循環した別名（`&a [*a]` の `*a`。BadValue）を値なしにしていた。frontmatter の
+    `aliases: &a [*a]` が「実際: 値なし」になり、値なしは未指定として素通りする書き方もあった。`Kind::Unresolved` を
+    足して区別し、切り出し前と同じ「実際: 値」の型の違い（終了コード 2）に戻した。`to_json` は従来どおり null
+  - [P3] `line_col` が LF だけを数えていた（yaml.rs のときから）。YAML 1.2 と saphyr は CR だけの改行も認めるので、
+    CR 区切りの文書のエラーが 1 行目を指していた。LF・CR・CRLF を数える（CRLF は 1 つ）
+- fuzz: ブランチ（3e93073。上の 2 件を直す前）で fuzz.yml を手動実行し、6 対象とも成功（shikuwasa の `parse` は
+  600 秒で 397 万回・panic、ハング、メモリ超過なし。ハーネスもここで初めてビルドした）
 - 103 への注意（まだ確かめていない）: amanatsu は shikuwasa（json）に依存する。path の依存は crates.io に公開するときに
   版が要り、`cargo package -p amanatsu` は依存を crates.io から取ろうとする。103 の始めに、path の依存に `version` を
   付けて shikuwasa と amanatsu を 1 回の `cargo package` にまとめれば CI の toolchain で通るかを確かめる。通らなければ
