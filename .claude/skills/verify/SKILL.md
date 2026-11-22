@@ -21,7 +21,7 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
 - CI の cargo は `--locked` 付き（Phase 82）。Cargo.lock の更新が要る変更は、手元で lock を
   更新してコミットに含める（CI では lock を書き換えられず失敗する）。
 - cargo-deny は CI の `EmbarkStudios/cargo-deny-action` が使う版に合わせる
-  （v2.1.1 → cargo-deny 0.20.2。`cargo install cargo-deny --version 0.20.2 --locked`）。
+  （v2.1.2 → cargo-deny 0.21.0。`cargo install cargo-deny --version 0.21.0 --locked`）。
   設定は `deny.toml`。依存（Cargo.toml・Cargo.lock）を触ったら `cargo deny check advisories` と
   `scripts/vendor-advisories.sh` も流す（CI では deps.yml が PR で動く）。
   失敗したときの扱いは `dependency-update` スキル。
