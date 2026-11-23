@@ -55,7 +55,7 @@ pub fn resolve_output_rel(root: &Path, rel: &str) -> std::io::Result<PathBuf> {
 ///   なので配下の判定を通り、ルートの下の別のディレクトリを壊せる
 /// - 最終要素だけ見る判定では中間要素のリンクを取りこぼす
 ///
-/// リンクは**向き先に関わらず拒否する**（ルート内を指していても危険なため）。
+/// リンクは**リンク先がどこでも拒否する**（ルート内を指していても危険なため）。
 ///
 /// 検査範囲は `root` 自身と、そこから `target` までの各要素。
 /// **root の祖先は見ない**（macOS の `/tmp -> private/tmp` のように、
@@ -80,6 +80,29 @@ pub fn ensure_no_symlink_under(root: &Path, target: &Path) -> std::io::Result<()
     ensure_symlink_free(root, target)
 }
 
+/// [`ensure_no_symlink_under`] の、末端の要素だけはシンボリックリンクでもよい版（リンク自体を消すときに使う。
+/// `remove_file` はリンクを辿らずリンク自体を消すので、末端がリンクでもリンク先には届かない）。
+/// `target == root`・root の外・`..` を含むパス・親までの経路のリンクは断る
+pub(crate) fn ensure_no_symlink_above(root: &Path, target: &Path) -> std::io::Result<()> {
+    let invalid = |message: String| std::io::Error::new(std::io::ErrorKind::InvalidInput, message);
+    if target
+        .strip_prefix(root)
+        .is_ok_and(|rel| rel.as_os_str().is_empty())
+    {
+        return Err(invalid(format!(
+            "出力先が基準ディレクトリ自身です: {}",
+            root.display()
+        )));
+    }
+    // `file_name` は末尾が `..` のとき None
+    let parent = target
+        .file_name()
+        .and(target.parent())
+        .ok_or_else(|| invalid(format!("{} はファイルを指していません", target.display())))?;
+    // 親は root 自身でもよい。root の外・`..`・経路のリンクはここで断る
+    ensure_symlink_free(root, parent)
+}
+
 /// `target` が `root` 自身またはその配下で、`root` から `target` までの経路に
 /// シンボリックリンクが無いことを確認する。
 ///
@@ -87,7 +110,8 @@ pub fn ensure_no_symlink_under(root: &Path, target: &Path) -> std::io::Result<()
 /// 許す**こと（開発サーバは `/` の要求で基点ディレクトリ自身の metadata を
 /// 引く）。検査範囲と「まだ存在しない要素は Ok」の規律は書き側と同じ = 書き側が
 /// 拒否したリンクを読み側だけが辿ることがない。
-/// `root` 自身がリンクなら `Ok` になる経路は無い（配下をいくら検査しても無意味なため）
+/// `root` 自身がリンクなら `Ok` になる経路は無い（配下をいくら検査しても無意味なため）。
+/// `root` より後ろに `..` を含む `target`（`root/a/../../outside`）も断る（前方一致だけでは外を指せるため）
 pub fn ensure_symlink_free(root: &Path, target: &Path) -> std::io::Result<()> {
     let invalid = |message: String| std::io::Error::new(std::io::ErrorKind::InvalidInput, message);
 
@@ -98,6 +122,15 @@ pub fn ensure_symlink_free(root: &Path, target: &Path) -> std::io::Result<()> {
             root.display()
         ))
     })?;
+    // strip_prefix は字句の前方一致を見るだけで、残りの `..` を畳まない（`root/a/../../outside` は
+    // `a/../../outside` が残り、下の検査を通ったうえで root の外を指す）。ファイルシステムに触る前に断る
+    if rel.components().any(|c| !matches!(c, Component::Normal(_))) {
+        return Err(invalid(format!(
+            "{} は .. を含みます（{} の外を指せるので使いません）",
+            target.display(),
+            root.display()
+        )));
+    }
     if root
         .symlink_metadata()
         .is_ok_and(|m| m.file_type().is_symlink())
@@ -197,6 +230,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         assert!(ensure_no_symlink_under(dir.path(), dir.path()).is_err());
         assert!(ensure_no_symlink_under(dir.path(), Path::new("/etc")).is_err());
+    }
+
+    /// 前方一致では root の下に見えるが、`..` で外を指すパス（PR #112 のレビュー指摘）
+    #[test]
+    fn root_より後ろの親ディレクトリ参照を拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("dist");
+        let real = root.join("a");
+        let escape = real.join("..").join("..").join("outside");
+        for check in [ensure_no_symlink_under, ensure_symlink_free] {
+            let err = check(&root, &escape).unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+            assert!(check(&root, &root.join("a").join("..").join("b")).is_err());
+        }
+        let err = ensure_no_symlink_above(&root, &escape).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(ensure_no_symlink_above(&root, &real.join("..")).is_err());
+    }
+
+    #[test]
+    fn ensure_no_symlink_above_は親まで検査し基点自身と外を拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        ensure_no_symlink_above(&root, &root.join("a.json")).unwrap();
+        ensure_no_symlink_above(&root, &root.join("pages/a.json")).unwrap();
+        assert!(ensure_no_symlink_above(&root, &root).is_err());
+        assert!(ensure_no_symlink_above(&root, &dir.path().join("a.json")).is_err());
     }
 
     /// 読み側の版は基点自身を許す（基点の外とリンクは書き側と同じく断る）

@@ -593,6 +593,36 @@ mod tests {
         assert!(cache3.body(Path::new("deleted.md"), "src").is_none());
     }
 
+    /// `pages/` に置かれた要らないリンクは、リンク自体を消す。残すと、同じパスの原稿を戻したときに
+    /// そのリンクでキャッシュの保存が断られ、build がエラーになる（PR #112 のレビュー指摘）
+    #[cfg(unix)]
+    #[test]
+    fn pages_の要らないリンクは掃除で消え_後で同じ名前に保存できる() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let target = outside.path().join("keep.json");
+        fs::write(&target, b"keep").unwrap();
+        let cache = BuildCache::load(dir.path(), "env1");
+        cache.store_body(Path::new("a.md"), "src", body("x"));
+        cache.save().unwrap();
+        let link = dir
+            .path()
+            .join("pages")
+            .join(format!("{}.json", BuildCache::source_hash("restored.md")));
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let cache2 = BuildCache::load(dir.path(), "env1");
+        cache2.begin_build();
+        let _ = cache2.body(Path::new("a.md"), "src");
+        cache2.save().unwrap();
+        assert!(link.symlink_metadata().is_err(), "リンクは消える");
+        assert_eq!(fs::read(&target).unwrap(), b"keep", "リンク先は残る");
+
+        let cache3 = BuildCache::load(dir.path(), "env1");
+        cache3.store_body(Path::new("restored.md"), "src", body("y"));
+        cache3.save().unwrap();
+    }
+
     #[test]
     fn 破損した_global_json_は空キャッシュとして開始() {
         let dir = tempfile::tempdir().unwrap();

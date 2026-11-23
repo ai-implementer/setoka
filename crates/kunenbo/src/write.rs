@@ -1,9 +1,10 @@
 //! 書き込み・作成・削除（どれも経路の検査を通してから行う）
 
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::guard::{ensure_no_symlink_under, resolve_output_rel};
+use crate::guard::{ensure_no_symlink_above, ensure_no_symlink_under, resolve_output_rel};
 
 /// 書き込みの結果（`Unchanged` = 内容が同じなので書かなかった）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,16 +53,18 @@ pub fn write_under(
     Ok((path, outcome))
 }
 
-/// [`write_under`] の原子的版（`{rel}.tmp` へ書いて rename）。
+/// [`write_under`] の原子的版（同じディレクトリの一時ファイルへ書いて rename で置き換える）。
 ///
 /// 使いどころは「**書き込みの途中で止まると、次に読む側が壊れた内容を
 /// 掴む**」ファイルだけ（キャッシュの目次のように、それが健全なら残りも整合しているとみなす
 /// ファイルなど）。
 ///
 /// 3 つの防御（字句検証・経路のリンク検査・親ディレクトリの作成）は [`write_under`]
-/// と同じものを通し、**一時ファイルのパスにもリンク検査をかける**。
-/// 内容が同じでも書き直す（原子性のため）ので、更新時刻を変えたくない出力には使わない。
-/// 一時ファイルの名前は固定なので、同じ出力先へ同時に書くことは想定していない
+/// と同じものを通す。一時ファイルは同じディレクトリに、まだ何も無い名前
+/// （`.{ファイル名}.kunenbo-tmp-{n}`）で**排他的に**作る（`create_new`。既にあるファイルや
+/// シンボリックリンクは開かずに次の名前へ進む）。固定名へ書くと、たまたま同じ名前の別のファイルを
+/// 上書きして消し、そこに置かれたリンクを辿る。書き込みか置き換えに失敗したら、作った一時ファイルを消す。
+/// 内容が同じでも書き直す（原子性のため）ので、更新時刻を変えたくない出力には使わない
 pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Result<PathBuf> {
     let path = resolve_output_rel(root, rel)?;
     ensure_no_symlink_under(root, &path)?;
@@ -69,12 +72,44 @@ pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Resul
         fs::create_dir_all(parent)?;
     }
     // 同一ディレクトリへ置く（rename が同一ファイルシステム内で完結する）
-    let tmp_rel = format!("{rel}.tmp");
-    let tmp = resolve_output_rel(root, &tmp_rel)?;
-    ensure_no_symlink_under(root, &tmp)?;
-    fs::write(&tmp, data)?;
-    fs::rename(&tmp, &path)?;
+    let (tmp, file) = create_temp_beside(&path)?;
+    let written = (|| {
+        let mut file = file;
+        file.write_all(data)?;
+        // Windows は開いたままのファイルを rename できないので先に閉じる
+        drop(file);
+        fs::rename(&tmp, &path)
+    })();
+    if let Err(e) = written {
+        // 消すのは自分で作った一時ファイルだけ
+        let _ = fs::remove_file(&tmp);
+        return Err(e);
+    }
     Ok(path)
+}
+
+/// `path` と同じディレクトリに一時ファイルを排他的に作る（[`write_atomic_under`] 用）
+fn create_temp_beside(path: &Path) -> std::io::Result<(PathBuf, fs::File)> {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    for n in 0..100 {
+        let tmp = path.with_file_name(format!(".{name}.kunenbo-tmp-{n}"));
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)
+        {
+            Ok(file) => return Ok((tmp, file)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "使える一時ファイルの名前がありません（同じ名前の一時ファイルが 100 個あります）",
+    ))
 }
 
 /// [`ensure_no_symlink_under`] で経路を確認してから、`dir` までのディレクトリを作る。
@@ -99,11 +134,15 @@ pub fn remove_dir_all_under(root: &Path, dir: &Path) -> std::io::Result<bool> {
     Ok(true)
 }
 
-/// [`ensure_no_symlink_under`] で経路を確認してからファイルを消す。
-/// 消したら `Ok(true)`、無ければ `Ok(false)`。`path` 自身がシンボリックリンクなら断る
-/// （[`remove_orphans`](crate::remove_orphans) と同じ規律）
+/// 親ディレクトリまでの経路を確認してからファイルを消す。消したら `Ok(true)`、無ければ `Ok(false)`。
+///
+/// `root` 自身・`root` の外・`..` を含むパス・親までの経路のシンボリックリンクは断る。`path` 自身は
+/// シンボリックリンクでもよく、**リンク自体を消す**（リンク先は辿らない）。要らなくなったファイルの掃除で、
+/// 置かれたリンクを残すと、後で同じ名前へ書く [`write_under`] がそのリンクで断られ続けるため
+/// （PR #112 のレビュー指摘）。前回の一覧から消す [`remove_orphans`](crate::remove_orphans) は、末端の
+/// リンクも消さずに飛ばす（一覧は書き換えられうる記録なので、名前を当てたリンクを消させない）
 pub fn remove_file_under(root: &Path, path: &Path) -> std::io::Result<bool> {
-    ensure_no_symlink_under(root, path)?;
+    ensure_no_symlink_above(root, path)?;
     match fs::remove_file(path) {
         Ok(()) => Ok(true),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
@@ -197,7 +236,59 @@ mod tests {
         let path = write_atomic_under(dir.path(), "cache/global.json", b"{}").unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"{}");
         // 中間ファイルが残っていない（次回の読み込みや掃除が拾わない）
-        assert!(!dir.path().join("cache/global.json.tmp").exists());
+        assert_eq!(names(&dir.path().join("cache")), ["global.json"]);
+    }
+
+    fn names(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// 一時ファイルの名前に当たる既存のファイルを上書きしない（PR #112 のレビュー指摘。以前は
+    /// `{rel}.tmp` の固定名へ書いて rename していたので、`report.json.tmp` が消えた）
+    #[test]
+    fn write_atomic_under_は同じディレクトリの別のファイルを消さない() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("report.json.tmp"), b"keep1").unwrap();
+        fs::write(root.join(".report.json.kunenbo-tmp-0"), b"keep2").unwrap();
+
+        write_atomic_under(root, "report.json", b"new").unwrap();
+        assert_eq!(fs::read(root.join("report.json")).unwrap(), b"new");
+        assert_eq!(fs::read(root.join("report.json.tmp")).unwrap(), b"keep1");
+        assert_eq!(
+            fs::read(root.join(".report.json.kunenbo-tmp-0")).unwrap(),
+            b"keep2"
+        );
+        assert_eq!(
+            names(root),
+            [
+                ".report.json.kunenbo-tmp-0",
+                "report.json",
+                "report.json.tmp"
+            ],
+            "使った一時ファイルは残らない"
+        );
+    }
+
+    /// 一時ファイルの名前に置かれたリンクを辿って、リンク先へ書かない
+    #[cfg(unix)]
+    #[test]
+    fn write_atomic_under_は一時ファイルの名前のリンクを辿らない() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        let outside = dir.path().join("outside.json");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(&outside, b"keep").unwrap();
+        std::os::unix::fs::symlink(&outside, root.join(".global.json.kunenbo-tmp-0")).unwrap();
+
+        write_atomic_under(&root, "global.json", b"new").unwrap();
+        assert_eq!(fs::read(root.join("global.json")).unwrap(), b"new");
+        assert_eq!(fs::read(&outside).unwrap(), b"keep", "リンク先へ書かない");
     }
 
     #[test]
@@ -229,6 +320,22 @@ mod tests {
         assert!(!dir.path().join("outside").exists());
     }
 
+    /// `root/pages/../../outside` は前方一致では root の下に見える（PR #112 のレビュー指摘）
+    #[test]
+    fn 作成と削除は親ディレクトリ参照で外へ出ない() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        fs::create_dir_all(root.join("pages")).unwrap();
+        fs::write(dir.path().join("keep.json"), b"keep").unwrap();
+        let up = root.join("pages").join("..").join("..");
+
+        assert!(create_dir_all_under(&root, &up.join("outside")).is_err());
+        assert!(!dir.path().join("outside").exists(), "外に作らない");
+        assert!(remove_file_under(&root, &up.join("keep.json")).is_err());
+        assert!(dir.path().join("keep.json").exists(), "外を消さない");
+        assert!(remove_dir_all_under(&root, &up.join("outside")).is_err());
+    }
+
     #[cfg(unix)]
     #[test]
     fn create_dir_all_under_は経路のリンクを拒否する() {
@@ -256,6 +363,25 @@ mod tests {
             "無ければ false"
         );
         assert!(remove_file_under(root, root).is_err(), "ルート自身");
+    }
+
+    /// 末端のリンクはリンク自体を消す（リンク先は残る）。残すと後で同じ名前へ書けなくなる
+    /// （PR #112 のレビュー指摘）
+    #[cfg(unix)]
+    #[test]
+    fn remove_file_under_は末端のリンク自体を消す() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        let outside = dir.path().join("outside.json");
+        fs::create_dir_all(root.join("pages")).unwrap();
+        fs::write(&outside, b"keep").unwrap();
+        let link = root.join("pages/stale.json");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+
+        assert!(remove_file_under(&root, &link).unwrap());
+        assert!(link.symlink_metadata().is_err(), "リンクは消える");
+        assert_eq!(fs::read(&outside).unwrap(), b"keep", "リンク先は残る");
+        write_under(&root, "pages/stale.json", b"new").unwrap();
     }
 
     #[cfg(unix)]

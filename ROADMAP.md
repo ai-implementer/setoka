@@ -445,8 +445,6 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
     wasm 以外でしか言えなくなる。mikan はファイルへ書かないので、縛りを外しても失うものは小さい。**次に検索 wasm を作り直すとき**
     （v0.23 の vaporetto 0.7 か mikan の版上げ）に、テストに `cfg_attr(test, allow(…))` を足して `clippy.toml` を消す（下の
     「その他の候補」）。mikan の publish には版上げ＝wasm の作り直しが要るので、`clippy.toml` は配布物に入らない
-  - キャッシュの `pages/` の掃除は `remove_file_under`（末端のリンクも断る）を通すので、`pages/` に置かれたシンボリックリンクは
-    消さずに残るようになった（前はリンク自体を消していた。読まないファイルなので害は無い）
 - やったこと
   - `crates/kunenbo/`（0.1.0。依存は same-file・walkdir。`lib.rs`・`guard.rs`・`write.rs`・`orphans.rs`・README・LICENSE 2 つ）。
     setoka-core の `output.rs` の `resolve_output_rel`・`ensure_no_symlink_under`・`ensure_symlink_free`・`write_if_changed`・
@@ -466,6 +464,22 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   バイト単位で同じ・マニフェストに不正なパスを入れたときの警告の文言が同じ・`cargo package -p kunenbo`（11 ファイル）・
   `cargo doc -p kunenbo` に警告なし・README の例をスクラッチの crate で動かした・`build-search-wasm.sh --check`（mikan の src は
   変えていない）
+- レビュー指摘 3 件（PR #112）
+  - [P2] 経路の検査（`ensure_no_symlink_under`・`ensure_symlink_free`）は `strip_prefix` の字句の前方一致だけを見ていて、残りの
+    `..` を畳まないので、`root/a/../../outside` が検査を通って root の外を指した（新しく足した `create_dir_all_under`・
+    `remove_file_under` は `&Path` を受けるので、外に作る・外を消すことができた）。root より後ろに通常の名前以外の要素
+    （`..`）があれば、ファイルシステムに触る前に断るようにした。setoka が渡すパスには `..` が無い（設定と出力の相対パスの検証・
+    配信は `ServeDir` が `..` を断る）ので、setoka の動きは変わらない
+  - [P2] `write_atomic_under` は固定名の `{rel}.tmp` に `fs::write` してから rename していたので、`report.json.tmp` という別の
+    ファイルがあると、`report.json` を書いたときに消えた（main から引き継いだ動き）。同じディレクトリに、まだ何も無い名前
+    （`.{ファイル名}.kunenbo-tmp-{n}`）で `create_new` で排他的に作り、失敗したら作った一時ファイルを消すようにした（置かれた
+    リンクも辿らない）。setoka の `.setoka/cache/global.json` の一時ファイルの名前が変わるが、書き終えたら残らない
+  - [P3] キャッシュの `pages/` の掃除が `remove_file_under`（末端のリンクも断る）を通るようにしたことで、要らないリンクが消えずに
+    残り、同じパスの原稿を戻すとそのリンクでキャッシュの保存が断られて build がエラーになった（この PR で入った後退）。
+    `remove_file_under` は親までの経路を検査し、末端のリンクはリンク自体を消す（リンク先は辿らない）ようにした（main と同じ
+    動き）。`remove_orphans` は今までどおり末端のリンクも消さずに飛ばす（前回の一覧は書き換えられうる記録なので）
+  - 確かめたこと: 3 件それぞれのテストを足した（kunenbo 36 本・setoka-core の cache に 1 本）。修正の後も main の setoka と
+    docs の dist と `.setoka` がバイト単位で同じ
 - 工数: 中
 
 ### 107 docs ゲートの一本化と dogfooding ⬜
