@@ -6,7 +6,7 @@ description: 汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amana
 # 汎用ライブラリの crates.io 公開
 
 対象は monorepo 内の 8 crate。バージョンは workspace と独立で、各 `Cargo.toml` の
-`version` を明示指定している（公開済み: tankan 0.2.2 / mikan 0.3.0 / kabosu 0.2.1 / shikuwasa 0.1.0 / amanatsu 0.1.0 / hebesu 0.1.0 / jabara 0.1.0。kunenbo は未公開で、初回は 0.1.0）。
+`version` を明示指定している（公開済み: tankan 0.2.2 / mikan 0.3.0 / kabosu 0.2.1 / shikuwasa 0.1.0 / amanatsu 0.1.0 / hebesu 0.1.0 / jabara 0.1.0 / kunenbo 0.1.0）。
 
 | crate | 役割 | 備考 |
 | --- | --- | --- |

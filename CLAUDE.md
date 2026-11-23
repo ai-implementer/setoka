@@ -103,7 +103,7 @@ setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
 tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu・jabara・kunenbo は他の setoka crate 非依存の汎用ライブラリ
-（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu・jabara は crates.io で公開済み。kunenbo は v0.22 Phase 106 で setoka-core の output.rs から切り出し、未公開。検索スタックの書き側集約は
+（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu・jabara・kunenbo は crates.io で公開済み。kunenbo は v0.22 Phase 106 で setoka-core の output.rs から切り出した。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
 setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
