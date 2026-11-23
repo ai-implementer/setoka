@@ -257,9 +257,11 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   版が要り、`cargo package -p amanatsu` は依存を crates.io から取ろうとする。103 の始めに、path の依存に `version` を
   付けて shikuwasa と amanatsu を 1 回の `cargo package` にまとめれば CI の toolchain で通るかを確かめる。通らなければ
   103 の package の検査を shikuwasa の公開まで外す（公開は取り消せないので、確かめる前に急いで publish しない）
+  → 103 に着手する前（11-23）にユーザが shikuwasa 0.1.0 を publish したので、確かめるまでもなく
+  `cargo package -p amanatsu` は crates.io の shikuwasa で通った
 - 工数: 小〜中
 
-### 103 amanatsu（API 仕様の HTML 化） ⬜
+### 103 amanatsu（API 仕様の HTML 化） ✅
 
 **概要**: setoka-render の `apispec` を crate amanatsu に切り出す。OpenAPI 3.x / Swagger 2.0 / JSON Schema を、
 JS なしの静的 HTML にする。
@@ -270,7 +272,50 @@ JS なしの静的 HTML にする。
   変わらないことをスナップショットで確かめる
 - 判断点: 出力の文言（日本語のままにするか、文言を差し替えられるようにするか）/ 見た目の CSS を crate に
   同梱するか、クラス名を README に書くだけにするか / 公開 API（`SpecFiles` の trait・エラーの型）
-- 非互換と注意: なし（HTML を変えない）
+- 非互換と注意: なし（HTML を変えない）。ログ（stderr）だけ変わる: build の API 仕様の警告に `page=` が付き、
+  パースの失敗の理由が文の中に入る（以前は `error=` の欄）。check では `$ref` 先を読めないときの WARN の行が
+  出なくなる（同じ内容を `spec-error` の診断で出している）
+- 決定（11-23 に判断点への応答が無かったので推奨案で仮決めし、同じ日にユーザがそのまま確定した）
+  - 出力の文言は日本語のまま（tankan・shikuwasa と同じ。README に書いた）
+  - CSS は setoka のテーマに残し、出力のクラスの一覧と構造を amanatsu の README に書く（CSS を 2 か所に持たない）
+  - 公開 API は今の形: `render`（`Rendered` = HTML と警告）・`check`（`Issue` の一覧）・`SpecKind`・`SpecFiles`
+    （読み込みのエラーは利用者に見せる文字列）・`NoFiles`・`error_box`・`escape_html`。フェンスの言語名
+    （openapi / jsonschema）との対応は setoka に残す
+  - 警告はログに出さず `Rendered::warnings` で返す（amanatsu は tracing に依存しない）。setoka がページ名を付けて
+    ログに出す
+- やったこと
+  - `crates/amanatsu/`（0.1.0。`lib.rs`・`render.rs`・README・LICENSE 2 つ）。`render.rs` は setoka-render の
+    `apispec/render.rs` を `git mv` で移し、`tracing::warn!` の 4 か所を警告の返り値にした。テスト 29 本も移した
+  - setoka-render: `apispec.rs` は言語名と `SpecKind` の対応・警告をページ名付きでログに出す包みだけにし、
+    `speccheck.rs` は `amanatsu::check` を使う。`highlight.rs` の `escape_html` は amanatsu の 1 実装を使う
+    （setoka-render の写しを消した）。setoka-render の依存から serde_json と shikuwasa が外れた
+  - ワークスペースの `shikuwasa` の依存に `version = "0.1.0"` を書いた（公開する amanatsu が crates.io の shikuwasa を
+    指すため）
+  - ci.yml の package の検査・publish-crate・verify・release スキル・CLAUDE.md（依存の向きの図・特別レンダリング
+    言語・外部ファイル参照の節・汎用ライブラリ）・docs の「開発者向け」（crate の一覧・依存の図）を直した。shikuwasa を
+    「公開済み 0.1.0」にした
+- 確かめたこと: `cargo test --workspace`（1177 本。スナップショットとキャッシュの指紋を含む = `CACHE_FORMAT_VERSION` は
+  据え置き）・clippy・main と切り出し後の setoka で docs の dist（312 ファイル。API 仕様のページを含む）がバイト単位で
+  同じ（docs の「開発者向け」を直す前に比べた）・壊れた仕様と読めない `$ref` の check の診断と終了コードが main と同じ・
+  `cargo package -p amanatsu`（shikuwasa 0.1.0 が公開済みなので通る。9 ファイル）・`cargo doc -p amanatsu` に警告なし
+- 未確認: fuzz の対象は足していない（判断点に無かった。必要なら候補にする）
+- レビュー指摘 4 件（PR #109。公開の前に文書を動きに合わせた。setoka の出力は変えない）
+  - [P2] README の `SpecFiles` の例が、`$ref` から渡されたパスをそのまま読んでいた（パスの正規化は字句の上だけで、
+    シンボリックリンクで外へ出るものを止めない）。最初の例を `NoFiles` にし、ファイルを読む例は `canonicalize` した
+    結果が基準の下にあるかを確かめる実装にした（スクラッチの crate でビルドし、外を指すリンクを断ることを確かめた）。
+    `SpecFiles` の rustdoc にも書いた
+  - [P2] `escape_html` の説明が属性値全般に使えるように読めた（`'` は変換しない）。HTML のテキストと二重引用符で
+    囲んだ属性値に限ると書いた（変換を足すと setoka の出力が変わるので、動きはそのまま）
+  - [P3] `check` の `fatal` を「描画で文書全体がエラーボックスになる」と書いていたが、参照先のファイルを読めないときは
+    `fatal` でも描画は注記になる。`fatal` は検査の上での重大度と書き直し、`check` が見る範囲（文書の中の参照の指す先・
+    循環は見ない）を rustdoc と README に書いた
+  - [P3] 参照ファイルの上限（16）が数えるのは読み込みとパースに成功したファイルだけ（読めない参照先が多いとその数だけ
+    `SpecFiles::read` を呼ぶ）。動きはそのままにして、README・rustdoc・定数のコメントに書いた
+  - 上の 3 つの動き（上限は読めたファイルだけ・check は文書の中の参照を見ない・参照先を読めないとき描画は注記）を
+    テスト 3 本で固定した
+  - 再レビュー [P3] `check` の文言を「描画と同じ」と書いていたが、同じなのはパースの失敗と対応していない版の
+    エラーボックスだけ（参照先のファイルの問題は、描画では「User（読み込み失敗）」と短く、`check` はパスと理由を含む）。
+    rustdoc・README・コメントを「検査用の文言で報告する」に直した
 - 工数: 中
 
 ### 104 hebesu（日本語の表記ゆれの検査） ⬜
@@ -388,6 +433,10 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
 
 ### その他の候補
 
+- **API 仕様の検査（`setoka check` / amanatsu の `check`）で文書の中の参照も見る**（v0.22 Phase 103 のレビューで
+  分かった）— 今は別ファイルへの `$ref` の読み込みとパースまでで、`#/components/schemas/Nope` のように指す先が無い
+  参照や循環は、描画で注記になるだけで check は何も言わない。足すと check の出力が増える（新しい診断）。参照ファイルの
+  上限に読めなかったファイルも数えるか（今は読めたファイルだけ）も一緒に決める
 - **ci.yml のシェルの e2e を Windows でも動かす**（v0.23 の予定。v0.22 Phase 101 で延期を決めた）— 今の
   Windows・macOS の CLI の確認は setoka-cli の結合テスト（`crates/setoka-cli/tests/`）だけで、ci.yml の e2e（bash。
   Linux だけ）が見ている build の報告・リンクの遮断・外部リンク検査などは Windows で動かしていない。パスと改行の
@@ -463,7 +512,8 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
   - ~~**外部への露出が無い**~~ → v0.21 Phase 96・98（cargo-binstall・README・比較のページ）
   - ~~**外部からの貢献の受け口が無い**~~ → v0.21 Phase 97
   - ⬜ **長い関数**（工数: 中）
-  - ⬜ **同じ処理が 2 か所にある**（工数: 小。v0.23 の予定。`escape_html` は v0.22 の amanatsu の切り出しで 1 つ減る見込み）
+  - ⬜ **同じ処理が 2 か所にある**（工数: 小。v0.23 の予定。`escape_html` は v0.22 Phase 103 で setoka-render の写しを消して amanatsu の 1 実装にした。setoka-core の
+    `markdown/mod.rs` に 1 つ残る）
   - ⬜ **性能の気になる点**（工数: 小〜中。どちらも未計測）
 - 10-07 見直し
   - ⬜ **E1 公開 crate（tankan / mikan）の semver 上の危うさ**（工数: 小〜中）

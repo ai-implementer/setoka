@@ -117,8 +117,11 @@ mikan = { path = "crates/mikan" }
 tankan = { path = "crates/tankan" }
 # TOML 設定ライブラリ（setoka 非依存・依存ゼロ・no_std+alloc。crates.io で公開）
 kabosu = { path = "crates/kabosu" }
-# YAML の安全な読み込み（setoka 非依存の汎用ライブラリ。v0.22 Phase 102。frontmatter と API 仕様が使う）
-shikuwasa = { path = "crates/shikuwasa" }
+# YAML の安全な読み込み（setoka 非依存の汎用ライブラリ。v0.22 Phase 102。frontmatter と API 仕様が使う）。
+# 公開した crate（amanatsu）が依存するので版も書く（crates.io の shikuwasa を指す。path は開発用）
+shikuwasa = { path = "crates/shikuwasa", version = "0.1.0" }
+# API 仕様（OpenAPI / JSON Schema）の静的 HTML 化（setoka 非依存の汎用ライブラリ。v0.22 Phase 103。setoka-render が使う）
+amanatsu = { path = "crates/amanatsu" }
 
 # 配布バイナリのサイズ最適化（LTO ＋ debuginfo 除去。ビルド時間より配布サイズを優先。
 # シンボルテーブルは残す = クラッシュ時のバックトレースに関数名を出すため strip は

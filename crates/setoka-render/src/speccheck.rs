@@ -11,8 +11,8 @@
 //! ここは**解決できたブロックだけ**を見て、パース失敗・未対応バージョン・
 //! `$ref` 先の失敗を報告する（同じ失敗を二重に出さない分担）。
 //!
-//! 検証を setoka-render に置くのは、apispec のパーサ（版判定・`$ref` の
-//! ファイル間解決）がこの crate にしか無いため。本文の解釈とファイル読みは
+//! 検証を setoka-render に置くのは、setoka の診断（`spec-error` / `spec-warning`）に変える部分だから。
+//! 中身の検査（版判定・`$ref` のファイル間解決）は crate amanatsu の `check`。本文の解釈とファイル読みは
 //! core の 1 実装（`resolve_spec_source` / `resolve_spec_file`）を共有する。
 
 use std::path::Path;
@@ -57,7 +57,7 @@ pub fn validate_api_specs(pages: &[Page], root: &Path, opts: &MarkdownOptions) -
             else {
                 continue;
             };
-            for issue in apispec::check_spec(kind, source.text(), source.origin(), &files) {
+            for issue in amanatsu::check(kind, source.text(), source.origin(), &files) {
                 // 描画が止まる誤りは spec-error、注記へ縮退するだけのものは spec-warning
                 let rule = if issue.fatal {
                     setoka_core::rules::SPEC_ERROR
@@ -121,7 +121,10 @@ mod tests {
         }
         assert_eq!(SpecKind::ALL.len(), setoka_core::SPEC_LANGS.len());
         for kind in SpecKind::ALL {
-            assert!(setoka_core::SPEC_LANGS.contains(&kind.lang()), "{kind:?}");
+            assert!(
+                setoka_core::SPEC_LANGS.contains(&apispec::lang(kind)),
+                "{kind:?}"
+            );
         }
     }
 

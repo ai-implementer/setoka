@@ -18,10 +18,8 @@ tankan = { workspace = true }
 minijinja = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-# OpenAPI / JSON Schema の SSR（YAML/JSON → Value 走査 → HTML）用
-serde_json = { workspace = true, features = ["preserve_order"] }
-# OpenAPI / JSON Schema の YAML / JSON を serde_json::Value へ読む（frontmatter と同じ読み込み口）
-shikuwasa = { workspace = true, features = ["json"] }
+# OpenAPI / JSON Schema の SSR（v0.22 Phase 103 で apispec から切り出した。escape_html もこれを使う）
+amanatsu = { workspace = true }
 syntect = { workspace = true }
 thiserror = { workspace = true }
 two-face = { workspace = true }
