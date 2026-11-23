@@ -10,6 +10,9 @@
 //! `llms.txt` / `llms-full.txt`（正規化 md の連結）もこの crate が担う（Phase 4）。
 //! `setoka fmt` の整形コアは setoka-core の `format_document`（Phase 6）。
 
+// テストのコードは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![cfg_attr(test, allow(clippy::disallowed_methods))]
+
 mod apispec;
 mod assets;
 mod context;

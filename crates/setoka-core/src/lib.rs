@@ -11,6 +11,9 @@
 //! 2. [`render_body_html`] — 本文の HTML 化（コードブロック差し替え・
 //!    リンク書き換えのフックを通す）
 
+// テストのコードは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![cfg_attr(test, allow(clippy::disallowed_methods))]
+
 mod aliases;
 pub mod cache;
 mod diagnostics;

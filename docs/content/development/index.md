@@ -23,7 +23,8 @@ crate を分けています。
     ├─ shikuwasa    # YAML の安全な読み込み（frontmatter・API 仕様。setoka 非依存・crates.io 公開）
     ├─ amanatsu     # OpenAPI / JSON Schema → 静的 HTML（setoka 非依存・crates.io 公開）
     ├─ hebesu       # 日本語の表記ゆれの検査（依存ゼロ・setoka 非依存・crates.io 公開）
-    ├─ jabara       # 開発サーバ（配信・ライブリロード・監視・Host の検査。setoka 非依存）
+    ├─ jabara       # 開発サーバ（配信・ライブリロード・監視・Host の検査。setoka 非依存・crates.io 公開）
+    ├─ kunenbo      # 出力先への安全な書き込み（パスの検証・リンクの検査・掃除。setoka 非依存）
     ├─ setoka-theme   # デフォルトテーマ（rust-embed: テンプレ + CSS + JS + mermaid.js）
     ├─ setoka-cli     # CLI（bin: setoka）
     ├─ setoka-index   # 検索インデクサ（ページ抽出・ファイル I/O・wasm 成果物の同梱）
@@ -50,16 +51,17 @@ flowchart TD
     API --> YAML[shikuwasa]
     CORE --> YAML
     CORE --> HEB[hebesu]
+    CORE --> KUN[kunenbo]
     IDX --> CORE
     IDX --> FMT[mikan]
     WASM[mikan-wasm] --> FMT
     classDef generic fill:#fff3d6,stroke:#8a6d1a
-    class TAN,FMT,WASM,KAB,YAML,API,HEB,SRV generic
+    class TAN,FMT,WASM,KAB,YAML,API,HEB,SRV,KUN generic
 ```
 
 Figure: crate 間の依存方向（色付きは setoka 非依存の汎用ライブラリ） {#fig:deps}
 
-色を付けた **tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu・jabara** は setoka の他の
+色を付けた **tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu・jabara・kunenbo** は setoka の他の
 crate に依存しない汎用ライブラリです。tankan（Mermaid SSR）と mikan（検索エンジン）
 は [crates.io で公開](https://crates.io/crates/mikan)しており
 （開発はこの monorepo で一体のまま）、書き側集約は `mikan::build`、読み側クエリエンジンは
@@ -71,7 +73,10 @@ JSON Schema を静的 HTML にする）は v0.22 で setoka-render から切り�
 あります）。hebesu（全角英数・半角カナ・長音符のゆれ・用語辞書の検査）は v0.22 で setoka-core の lint から
 切り出しました。setoka-core は Markdown から本文のテキストを取り出して渡し、結果を診断に変えます。
 jabara（dist の配信・ライブリロード・ファイルの監視・Host / Origin の検査）は v0.22 で setoka-server を改名して
-切り出しました。再ビルドの中身は setoka-cli がコールバックで渡します。
+切り出しました。再ビルドの中身は setoka-cli がコールバックで渡します。kunenbo（出力先の相対パスの検証・経路の
+シンボリックリンクの検査・内容が同じなら書かない書き込み・残ったファイルの掃除）は v0.22 で setoka-core の
+出力の書き込みから切り出しました。ページ・リダイレクト・生成物の種類ごとの出力の記録は setoka-core に残しています。
+setoka のコードは出力先へ標準ライブラリや tokio のファイル操作の関数で直に書かず、kunenbo を通します（clippy の `disallowed-methods` で確かめています）。
 
 ## 凍結した設計判断
 

@@ -25,7 +25,8 @@ hebesu = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-same-file = { workspace = true }
+# 出力先への安全な書き込み（v0.22 Phase 106 で output.rs から切り出した。setoka の crate は output の再エクスポートを通す）
+kunenbo = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]

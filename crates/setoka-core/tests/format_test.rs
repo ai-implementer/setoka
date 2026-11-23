@@ -1,6 +1,9 @@
 //! format_document（`setoka fmt` の整形コア）のテスト。
 //! 本文は normalize と同じ正規形、frontmatter はバイト温存
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
 use std::fs;
 
 use setoka_core::{MarkdownOptions, Page, build_source_pages, format_document};
