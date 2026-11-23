@@ -219,8 +219,11 @@ fn check_live_reload_path(path: &str, base: &str) -> Result<(), String> {
             "ライブリロードの経路「{path}」に `?` と `#` は使えません"
         ));
     }
-    let mount = base.trim_end_matches('/');
-    if !mount.is_empty() && path.trim_end_matches('/') == mount {
+    // router に登録する形（`literal_route` で `{` `}` を `%7B` `%7D` にしたもの）で比べる。変換前の文字列で
+    // 比べると、`/a{b}/` と `/a%7Bb%7D` が別物として通り、同じ経路として登録されて panic した
+    // （PR #111 の再レビューの指摘）
+    let mount = literal_route(base.trim_end_matches('/'));
+    if !mount.is_empty() && literal_route(path.trim_end_matches('/')) == mount {
         return Err(format!(
             "ライブリロードの経路「{path}」はサイトの公開先のパス（{base}）と同じなので使えません"
         ));
@@ -778,6 +781,10 @@ mod tests {
             ("/a#b", "/"),
             ("/docs", "/docs/"),
             ("/docs/", "/docs/"),
+            // 登録する形（{ } を %7B %7D にしたもの）で同じなら衝突（PR #111 の再レビューの指摘）
+            ("/a%7Bb%7D", "/a{b}/"),
+            ("/a{b}", "/a%7Bb%7D/"),
+            ("/a{b}/", "/a{b}/"),
         ] {
             assert!(
                 super::check_live_reload_path(path, base).is_err(),
@@ -785,7 +792,7 @@ mod tests {
             );
         }
         let dir = tempfile::tempdir().unwrap();
-        for base in ["/", "/docs/"] {
+        for base in ["/", "/docs/", "/a{b}/"] {
             for path in [
                 "/_reload",
                 "/__livereload",

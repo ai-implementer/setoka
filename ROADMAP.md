@@ -402,8 +402,10 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   - [P2] `live_reload_path` が `/` で始まらない（`_reload`）・base が `/` で `:` や `*` で始まる・base と同じ経路
     （`/docs/` に `/docs`）だと、`serve` が `ServerError` を返す前に router の組み立てが panic した。router に渡す前に
     検査して `ServerError::InvalidLiveReloadPath` で返すようにし（`/` で始める・`/` だけ・`?` `#`・base と同じを断る）、
-    `{` `}` `:` `*` は base と同じく文字どおりに扱うようにした（`{b}` は変数として扱われていた）。base 2 通り ×
-    経路 9 通りで panic しないことと、不正な経路の起動エラーをテストした。`ServerError` も `#[non_exhaustive]` にした
+    `{` `}` `:` `*` は base と同じく文字どおりに扱うようにした（`{b}` は変数として扱われていた）。base 3 通り
+    （`/a{b}/` を含む）× 経路 9 通りで panic しないことと、不正な経路の起動エラーをテストした。`ServerError` も
+    `#[non_exhaustive]` にした。再レビューの指摘で、base と同じかは router に登録する形（`{` `}` を `%7B` `%7D` に
+    したもの）で比べるようにした（`/a{b}/` と `/a%7Bb%7D` が検査を通り、同じ経路として登録されて panic していた）
   - [P3] `PathGuard` に渡るパスを「絶対パス」と書いていたが、`dir` に相対パスを渡すと相対のパスが渡っていた。
     `serve` の初めに `std::path::absolute` で絶対パスにするようにした（setoka は絶対パスを渡しているので変わらない）
   - [P3] `RUST_LOG` で crate 単位に絞るときの名前が `setoka_server` から `jabara` に変わることを、上の「非互換と注意」と
