@@ -108,7 +108,7 @@ pub(crate) fn warn_config_diagnostics(rc: &ResolvedConfig) {
 ///   古い内容から作った結果で上書きしない）
 #[expect(
     clippy::disallowed_methods,
-    reason = "原稿への書き込みの口そのもの（一時ファイルの rename と、失敗したときの一時ファイルの削除）"
+    reason = "原稿への書き込みの口そのもの（一時ファイルへの権限の引き継ぎ・rename・失敗したときの一時ファイルの削除）"
 )]
 pub(crate) fn rewrite_source(
     path: &std::path::Path,

@@ -80,6 +80,12 @@ pub fn ensure_no_symlink_under(root: &Path, target: &Path) -> std::io::Result<()
     ensure_symlink_free(root, target)
 }
 
+/// 構成要素から組み直したパス（末尾の区切りを落とす。`dist/` → `dist`）。末尾に区切りがあると、
+/// `symlink_metadata` や `remove_file` はリンクを辿ってリンク先を見る（POSIX のパスの解決）
+pub(crate) fn without_trailing_separator(path: &Path) -> PathBuf {
+    path.components().collect()
+}
+
 /// [`ensure_no_symlink_under`] の、末端の要素だけはシンボリックリンクでもよい版（リンク自体を消すときに使う。
 /// `remove_file` はリンクを辿らずリンク自体を消すので、末端がリンクでもリンク先には届かない）。
 /// `target == root`・root の外・`..` を含むパス・親までの経路のリンクは断る
@@ -131,6 +137,9 @@ pub fn ensure_symlink_free(root: &Path, target: &Path) -> std::io::Result<()> {
             root.display()
         )));
     }
+    // 末尾に区切りがある `dist/` を渡すと、lstat はリンクを辿ってリンク先のディレクトリを返す（POSIX）ので、
+    // 構成要素から組み直して末尾の区切りを落としてから見る（PR #112 の再レビューの指摘）
+    let root = without_trailing_separator(root);
     if root
         .symlink_metadata()
         .is_ok_and(|m| m.file_type().is_symlink())
@@ -141,7 +150,7 @@ pub fn ensure_symlink_free(root: &Path, target: &Path) -> std::io::Result<()> {
         )));
     }
 
-    let mut cur = root.to_path_buf();
+    let mut cur = root;
     for comp in rel.components() {
         cur.push(comp);
         match cur.symlink_metadata() {
@@ -247,6 +256,26 @@ mod tests {
         let err = ensure_no_symlink_above(&root, &escape).unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
         assert!(ensure_no_symlink_above(&root, &real.join("..")).is_err());
+    }
+
+    /// 基点の末尾に区切りがあると、lstat はリンクを辿ってリンク先のディレクトリを返す（PR #112 の再レビューの指摘）
+    #[cfg(unix)]
+    #[test]
+    fn 末尾に区切りがある基点でもリンクを拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&outside).unwrap();
+        let link = dir.path().join("dist");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        let mut with_slash = link.into_os_string();
+        with_slash.push("/");
+        let root = Path::new(&with_slash);
+
+        assert!(ensure_no_symlink_under(root, &root.join("index.html")).is_err());
+        assert!(ensure_symlink_free(root, root).is_err());
+        assert!(ensure_no_symlink_above(root, &root.join("index.html")).is_err());
+        assert!(crate::write_under(root, "index.html", b"x").is_err());
+        assert!(!outside.join("index.html").exists(), "リンク先へ書かない");
     }
 
     #[test]

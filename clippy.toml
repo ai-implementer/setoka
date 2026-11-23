@@ -42,7 +42,12 @@ disallowed-methods = [
   { path = "tokio::fs::OpenOptions::open", reason = "出力先は setoka_core::output::write_under を通す", allow-invalid = true },
   { path = "tokio::fs::hard_link", reason = "出力先と原稿にリンクを作らない", allow-invalid = true },
   { path = "tokio::fs::symlink", reason = "出力先と原稿にリンクを作らない", allow-invalid = true },
+  { path = "tokio::fs::symlink_file", reason = "出力先と原稿にリンクを作らない", allow-invalid = true },
+  { path = "tokio::fs::symlink_dir", reason = "出力先と原稿にリンクを作らない", allow-invalid = true },
   { path = "tokio::fs::set_permissions", reason = "リンクを辿って権限を変える", allow-invalid = true },
+  # 開いたファイルの権限の変更（原稿の一時ファイルに元の権限を引き継ぐ commands::rewrite_source だけが使う）
+  { path = "std::fs::File::set_permissions", reason = "原稿の権限は commands::rewrite_source が引き継ぐ" },
+  { path = "tokio::fs::File::set_permissions", reason = "原稿の権限は commands::rewrite_source が引き継ぐ", allow-invalid = true },
   # 経路を検査せずに書く（kunenbo の中で write_under が使う下請け）。setoka_core::output からは再エクスポートしない
   { path = "kunenbo::write_if_changed", reason = "経路を検査しない。setoka_core::output::write_under を通す", allow-invalid = true },
 ]

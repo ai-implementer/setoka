@@ -191,7 +191,7 @@ fn match_case(root: &Path, rel: &str) -> std::io::Result<()> {
         }
         if let Some(old) = on_disk {
             let old = parent.join(old);
-            let tmp = unused_name(&parent, name)?;
+            let tmp = unused_name(&parent)?;
             ensure_no_symlink_under(root, &old)?;
             fs::rename(&old, &tmp)?;
             fs::rename(&tmp, &exact)?;
@@ -203,10 +203,11 @@ fn match_case(root: &Path, rel: &str) -> std::io::Result<()> {
 
 /// `dir` の中で、まだ何も無い一時名を選ぶ。rename は行き先に既にあるものを上書きするので、
 /// 固定名だと、たまたま同じ名前の出力を消してしまう。区別しない FS では、大文字小文字違いの
-/// 既存エントリも `symlink_metadata` が見つける
-fn unused_name(dir: &Path, name: &str) -> std::io::Result<PathBuf> {
+/// 既存エントリも `symlink_metadata` が見つける。名前に元の名前を含めない（含めると、上限に近い長さの名前だけ
+/// 付け直せなくなる）
+fn unused_name(dir: &Path) -> std::io::Result<PathBuf> {
     for n in 0..100 {
-        let candidate = dir.join(format!(".{name}.kunenbo-case-{n}"));
+        let candidate = dir.join(format!(".kunenbo-case-{n}"));
         match fs::symlink_metadata(&candidate) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(candidate),
             Err(e) => return Err(e),
@@ -287,9 +288,9 @@ mod tests {
         fs::create_dir_all(root.join("Guide")).unwrap();
         fs::write(root.join("Guide/index.html"), b"new").unwrap();
         // 改名の一時名と同じ名前の出力（利用者のファイルのコピー等）があっても上書きしない
-        fs::write(root.join(".guide.kunenbo-case-0"), b"keep").unwrap();
+        fs::write(root.join(".kunenbo-case-0"), b"keep").unwrap();
         let previous = set(&["Guide/index.html"]);
-        let current = set(&["guide/index.html", ".guide.kunenbo-case-0"]);
+        let current = set(&["guide/index.html", ".kunenbo-case-0"]);
 
         let mut warnings = Vec::new();
         let removed = remove_orphans_with(root, &previous, &current, case_insensitive, |w| {
@@ -305,14 +306,33 @@ mod tests {
         names.sort();
         assert_eq!(
             names,
-            [".guide.kunenbo-case-0", "guide"],
+            [".kunenbo-case-0", "guide"],
             "ディレクトリ名を今回の大文字小文字に付け直し、一時名を残さない"
         );
         assert_eq!(fs::read(root.join("guide/index.html")).unwrap(), b"new");
-        assert_eq!(
-            fs::read(root.join(".guide.kunenbo-case-0")).unwrap(),
-            b"keep"
-        );
+        assert_eq!(fs::read(root.join(".kunenbo-case-0")).unwrap(), b"keep");
+    }
+
+    /// 一時名に元の名前を含めないので、上限（多くの FS で 255 バイト）に近い名前でも付け直せる
+    #[test]
+    fn 長い名前でも大文字小文字を付け直せる() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let old = format!("G{}", "a".repeat(249));
+        let new = format!("g{}", "a".repeat(249));
+        fs::create_dir_all(root.join(&old)).unwrap();
+        fs::write(root.join(&old).join("index.html"), b"new").unwrap();
+        let previous = set(&[&format!("{old}/index.html")]);
+        let current = set(&[&format!("{new}/index.html")]);
+
+        let mut warnings = Vec::new();
+        remove_orphans_with(root, &previous, &current, case_insensitive, |w| {
+            warnings.push(w)
+        })
+        .unwrap();
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert!(root.join(&new).join("index.html").is_file());
+        assert!(!root.join(&old).exists());
     }
 
     #[test]

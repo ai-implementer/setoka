@@ -4,7 +4,10 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::guard::{ensure_no_symlink_above, ensure_no_symlink_under, resolve_output_rel};
+use crate::guard::{
+    ensure_no_symlink_above, ensure_no_symlink_under, resolve_output_rel,
+    without_trailing_separator,
+};
 
 /// 書き込みの結果（`Unchanged` = 内容が同じなので書かなかった）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,7 +64,7 @@ pub fn write_under(
 ///
 /// 3 つの防御（字句検証・経路のリンク検査・親ディレクトリの作成）は [`write_under`]
 /// と同じものを通す。一時ファイルは同じディレクトリに、まだ何も無い名前
-/// （`.{ファイル名}.kunenbo-tmp-{n}`）で**排他的に**作る（`create_new`。既にあるファイルや
+/// （`.kunenbo-tmp-{n}`。出力のファイル名を含めないので、名前の長さの上限に近い出力でも作れる）で**排他的に**作る（`create_new`。既にあるファイルや
 /// シンボリックリンクは開かずに次の名前へ進む）。固定名へ書くと、たまたま同じ名前の別のファイルを
 /// 上書きして消し、そこに置かれたリンクを辿る。書き込みか置き換えに失敗したら、作った一時ファイルを消す。
 /// 内容が同じでも書き直す（原子性のため）ので、更新時刻を変えたくない出力には使わない
@@ -90,12 +93,10 @@ pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Resul
 
 /// `path` と同じディレクトリに一時ファイルを排他的に作る（[`write_atomic_under`] 用）
 fn create_temp_beside(path: &Path) -> std::io::Result<(PathBuf, fs::File)> {
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
+    // 名前に出力のファイル名を含めない（含めると、上限に近い長さの名前で一時ファイルだけが作れなくなる。
+    // PR #112 の再レビューの指摘）。同じディレクトリのほかの書き込みとは create_new で分かれる
     for n in 0..100 {
-        let tmp = path.with_file_name(format!(".{name}.kunenbo-tmp-{n}"));
+        let tmp = path.with_file_name(format!(".kunenbo-tmp-{n}"));
         match fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -143,7 +144,9 @@ pub fn remove_dir_all_under(root: &Path, dir: &Path) -> std::io::Result<bool> {
 /// リンクも消さずに飛ばす（一覧は書き換えられうる記録なので、名前を当てたリンクを消させない）
 pub fn remove_file_under(root: &Path, path: &Path) -> std::io::Result<bool> {
     ensure_no_symlink_above(root, path)?;
-    match fs::remove_file(path) {
+    // 末尾の区切り（`x/`）を落とす。付いたままだと remove_file がリンクを辿る
+    let path = without_trailing_separator(path);
+    match fs::remove_file(&path) {
         Ok(()) => Ok(true),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(e) => Err(e),
@@ -255,22 +258,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         fs::write(root.join("report.json.tmp"), b"keep1").unwrap();
-        fs::write(root.join(".report.json.kunenbo-tmp-0"), b"keep2").unwrap();
+        fs::write(root.join(".kunenbo-tmp-0"), b"keep2").unwrap();
 
         write_atomic_under(root, "report.json", b"new").unwrap();
         assert_eq!(fs::read(root.join("report.json")).unwrap(), b"new");
         assert_eq!(fs::read(root.join("report.json.tmp")).unwrap(), b"keep1");
-        assert_eq!(
-            fs::read(root.join(".report.json.kunenbo-tmp-0")).unwrap(),
-            b"keep2"
-        );
+        assert_eq!(fs::read(root.join(".kunenbo-tmp-0")).unwrap(), b"keep2");
         assert_eq!(
             names(root),
-            [
-                ".report.json.kunenbo-tmp-0",
-                "report.json",
-                "report.json.tmp"
-            ],
+            [".kunenbo-tmp-0", "report.json", "report.json.tmp"],
             "使った一時ファイルは残らない"
         );
     }
@@ -284,11 +280,21 @@ mod tests {
         let outside = dir.path().join("outside.json");
         fs::create_dir_all(&root).unwrap();
         fs::write(&outside, b"keep").unwrap();
-        std::os::unix::fs::symlink(&outside, root.join(".global.json.kunenbo-tmp-0")).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join(".kunenbo-tmp-0")).unwrap();
 
         write_atomic_under(&root, "global.json", b"new").unwrap();
         assert_eq!(fs::read(root.join("global.json")).unwrap(), b"new");
         assert_eq!(fs::read(&outside).unwrap(), b"keep", "リンク先へ書かない");
+    }
+
+    /// 一時ファイルの名前が出力のファイル名に依らないので、上限（多くの FS で 255 バイト）に近い名前でも書ける
+    /// （PR #112 の再レビューの指摘。出力のファイル名を含めた一時名だと上限を超えた）
+    #[test]
+    fn write_atomic_under_は長いファイル名でも書ける() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = format!("{}.json", "a".repeat(245));
+        write_atomic_under(dir.path(), &name, b"x").unwrap();
+        assert_eq!(names(dir.path()), [name]);
     }
 
     #[test]

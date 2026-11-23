@@ -158,6 +158,8 @@ impl OutputTracker {
     }
 
     fn new_with(root: &Path, same: fn(&Path, &Path) -> bool) -> std::io::Result<Self> {
+        // 末尾の区切り（`dist/`）を落としてから見る（付いたままだと lstat がリンクを辿る）
+        let root: PathBuf = root.components().collect();
         if root
             .symlink_metadata()
             .is_ok_and(|m| m.file_type().is_symlink())
@@ -171,7 +173,7 @@ impl OutputTracker {
             ));
         }
         Ok(Self {
-            root: root.to_path_buf(),
+            root,
             same,
             state: Mutex::new(TrackerState::default()),
         })
@@ -502,6 +504,10 @@ mod tests {
         std::os::unix::fs::symlink(&outside, &link).unwrap();
 
         assert!(OutputTracker::new(&link).is_err());
+        // 末尾に区切りがあっても同じ（付いたままだと lstat がリンクを辿る。PR #112 の再レビューの指摘）
+        let mut with_slash = link.into_os_string();
+        with_slash.push("/");
+        assert!(OutputTracker::new(Path::new(&with_slash)).is_err());
     }
 
     #[test]
