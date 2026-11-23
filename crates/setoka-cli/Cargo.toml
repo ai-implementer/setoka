@@ -35,7 +35,7 @@ setoka-config = { workspace = true }
 setoka-core = { workspace = true }
 setoka-index = { workspace = true }
 setoka-render = { workspace = true }
-setoka-server = { workspace = true }
+jabara = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }

@@ -363,7 +363,7 @@ JS なしの静的 HTML にする。
     置き換える必要がある、と `Finding::range` と README に書いた（setoka の `apply_fixes` はこの選別をしている）
 - 工数: 中〜大（CLI は延期可）
 
-### 105 jabara（開発サーバ） ⬜
+### 105 jabara（開発サーバ） ✅
 
 **概要**: setoka-server を crate jabara に置き換える。静的ファイルの配信・ライブリロード・ファイルの監視・
 Host / Origin の検査・シンボリックリンクの遮断を、ほかの静的サイトの道具からも使えるようにする。
@@ -376,7 +376,40 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   動かし方は今のまま
 - 判断点: 公開 API の形（`ServeOptions`・`watch` の引数）/ setoka の都合で決めた名前（`/__livereload` など）を
   どこまで設定にするか
-- 非互換と注意: なし（dev / preview の動きを変えない）
+- 非互換と注意: なし（dev / preview の動きを変えない。403 の応答の本文とポートが使用中のときの文言も前と同じ）。
+  ただし `RUST_LOG` で crate 単位にログを絞るとき、配信と監視のログの名前が `setoka_server` から `jabara` に変わる
+  （`RUST_LOG=setoka_server=info` は `RUST_LOG=jabara=info` にする。`-q` / `-v` はレベルだけで絞るので変わらない。
+  PR #111 のレビュー指摘）
+- 決定（11-23。ユーザが推奨案で決めた）
+  - 公開 API は今の形（`serve`・`ServeOptions`・`watch`・`WatchIgnore`・`WatchHandle`・`WatchFailure`・`ReloadNotifier`・
+    `base_path`・`PathGuard`・`ServerError`）に、`ServeOptions::new(dir, host, port)` を足す（`#[non_exhaustive]` にして、
+    後で項目を足しても使う側が壊れないようにした）
+  - setoka の都合の名前で設定にするのはライブリロードの経路だけ（`ServeOptions::live_reload_path`。既定は `/__livereload` で、
+    setoka は既定のまま）。404.html を返すことと base の扱いは今のまま README に書いた
+  - 文言は日本語のまま。setoka のコマンドや設定への案内は setoka-cli が足す（下）
+- やったこと
+  - `crates/setoka-server` を `git mv` で `crates/jabara`（0.1.0。公開する）にし、README・LICENSE 2 つを足した
+  - `ServeOptions` に `new` と `live_reload_path` と `forbidden_hint`（Host / Origin で断ったときの 403 の応答に添える案内）を
+    足した。403 の本文と `ServerError::PortInUse` の文言から setoka の案内（`setoka.toml` の `[dev] allowed_hosts`・`--port`）を
+    外し、setoka-cli の `serve_dist`（`commands/preview.rs`）が同じ文言を渡す・足すようにした
+  - テスト: ライブリロードの経路を変えられる・`ServeOptions::new` の既定値の 2 本を足した（jabara は 36 本）
+  - 依存の向き（`setoka-cli → jabara`）と、CLAUDE.md・verify・release・publish-crate スキル・`.devcontainer/README.md`・
+    docs の「開発者向け」（crate の一覧・依存の図・監視の説明）・ci.yml の package の検査を直した。hebesu を「公開済み 0.1.0」にした
+- 確かめたこと: `cargo test --workspace`（1194 本。setoka-cli の `build --watch`・`dev`・`preview` の結合テストを含む）・clippy・
+  ポートが使用中のときの `setoka preview` の文言と終了コード 2・Host を偽った要求への 403 の本文が main のバイナリとバイト単位で
+  同じ・`cargo package -p jabara`（13 ファイル）・`cargo doc -p jabara` に警告なし・README の例をスクラッチの crate でビルドした
+- レビュー指摘 3 件（PR #111）
+  - [P2] `live_reload_path` が `/` で始まらない（`_reload`）・base が `/` で `:` や `*` で始まる・base と同じ経路
+    （`/docs/` に `/docs`）だと、`serve` が `ServerError` を返す前に router の組み立てが panic した。router に渡す前に
+    検査して `ServerError::InvalidLiveReloadPath` で返すようにし（`/` で始める・`/` だけ・`?` `#`・base と同じを断る）、
+    `{` `}` `:` `*` は base と同じく文字どおりに扱うようにした（`{b}` は変数として扱われていた）。base 3 通り
+    （`/a{b}/` を含む）× 経路 9 通りで panic しないことと、不正な経路の起動エラーをテストした。`ServerError` も
+    `#[non_exhaustive]` にした。再レビューの指摘で、base と同じかは router に登録する形（`{` `}` を `%7B` `%7D` に
+    したもの）で比べるようにした（`/a{b}/` と `/a%7Bb%7D` が検査を通り、同じ経路として登録されて panic していた）
+  - [P3] `PathGuard` に渡るパスを「絶対パス」と書いていたが、`dir` に相対パスを渡すと相対のパスが渡っていた。
+    `serve` の初めに `std::path::absolute` で絶対パスにするようにした（setoka は絶対パスを渡しているので変わらない）
+  - [P3] `RUST_LOG` で crate 単位に絞るときの名前が `setoka_server` から `jabara` に変わることを、上の「非互換と注意」と
+    jabara の README に書いた（リリースノートに載せる）
 - 工数: 小〜中
 
 ### 106 kunenbo（出力先への安全な書き込み） ⬜

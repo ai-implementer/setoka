@@ -74,7 +74,7 @@ docker 時代の named volume・イメージは引き継がれない（初回ビ
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace          # setoka-server の serve テストも通る（TCP 制約なし）
+cargo test --workspace          # jabara の serve テストも通る（TCP 制約なし）
 cargo check -p mikan-wasm --target wasm32-unknown-unknown
 cargo check -p tankan --target wasm32-unknown-unknown
 

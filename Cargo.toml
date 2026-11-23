@@ -83,7 +83,7 @@ walkdir = "2"
 same-file = "1"
 globset = "0.4"
 # 9.0 は rc 段階のため 8.2 に固定。debounce とイベントの種類の絞り込みは
-# setoka-server の監視スレッドで行う（debouncer は種類を捨てるので使わない。
+# jabara（旧 setoka-server）の監視スレッドで行う（debouncer は種類を捨てるので使わない。
 # Linux の inotify が届ける「開いただけ」のイベントで再ビルドが止まらなくなる）
 notify = "8.2"
 # 既定の features（json・form・query の extractor・matched-path 等）は使わないので外し、配信に要る
@@ -103,13 +103,14 @@ toml = "1.1"
 tokio-tungstenite = "0.30"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
-# 内部 crate（依存方向の凍結: cli → {server, render, index, core, config} /
+# 内部 crate（依存方向の凍結: cli → {jabara, render, index, core, config} /
 # render, index → core / config → kabosu / core, render → shikuwasa / 検索スタック: mikan-wasm → mikan・setoka-index → mikan）
 setoka-core = { path = "crates/setoka-core" }
 setoka-render = { path = "crates/setoka-render" }
 setoka-config = { path = "crates/setoka-config" }
 setoka-theme = { path = "crates/setoka-theme" }
-setoka-server = { path = "crates/setoka-server" }
+# 静的サイトの開発サーバ（setoka 非依存の汎用ライブラリ。v0.22 Phase 105 で setoka-server を改名して切り出した）
+jabara = { path = "crates/jabara" }
 setoka-index = { path = "crates/setoka-index" }
 # 検索エンジン本体（setoka-* 非依存の汎用ライブラリ。crates.io で公開）
 mikan = { path = "crates/mikan" }

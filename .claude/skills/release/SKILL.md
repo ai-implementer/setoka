@@ -162,6 +162,6 @@ gh api -X GET search/issues -f q='repo:ai-implementer/setoka is:issue label:bug 
 - `cargo package --locked -p tankan -p mikan` は**作業ツリーが dirty だと拒否される**。
   バンプコミット後に走らせること（CI はコミット済みなので通る）
 
-## crates.io（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu）は非同期
+## crates.io（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu / jabara）は非同期
 
 setoka のリリースとは切り離して、変更が溜まったときだけ行う。手順は `publish-crate` スキル。

@@ -37,30 +37,60 @@ use crate::host::HostPolicy;
 use crate::livereload::{LIVERELOAD_PATH, ReloadNotifier, handle_socket};
 use crate::watch::WatchFailure;
 
-/// 配信パスの検査述語。引数は配信ディレクトリ配下の**絶対パス**（`ServeDir` が
-/// 要求パスを結合した後の値）。`Err(理由)` なら配信しない（404 扱い・理由は
-/// warn ログに出る）
+/// 配信パスの検査述語。引数は配信ディレクトリ配下の**絶対パス**（[`ServeOptions::dir`] を
+/// 絶対パスにしたものに、`ServeDir` が要求パスを結合した値。`dir` に相対パスを渡しても絶対パスになる。
+/// シンボリックリンクは解決しない）。`Err(理由)` なら配信しない（404 扱い・理由は warn ログに出る）
 pub type PathGuard = Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>;
 
+/// [`serve`] の設定。[`ServeOptions::new`] で作り、必要な項目を書き換える
+/// （項目は後から増えることがあるので、構造体のリテラルでは作れない）
+#[non_exhaustive]
 pub struct ServeOptions {
-    /// 配信ディレクトリ（通常は `dist/`）
+    /// 配信ディレクトリ（ビルドした静的サイト。setoka なら `dist/`）
     pub dir: PathBuf,
     pub host: IpAddr,
     pub port: u16,
-    /// 正規化済み baseUrl（`/` または `/docs/`。フル URL ならパス部を使う）
+    /// サイトの公開先のパス（`/` または `/docs/`。フル URL ならパス部を使う。既定は `/`）。
+    /// `/` 以外ならそのパスの下で配信し、`/` からはそこへリダイレクトする
     pub base_url: String,
-    /// Some なら `/__livereload` に WS エンドポイントを生やす（`setoka dev` 用）。
-    /// preview / build --watch は None
+    /// Some なら [`live_reload_path`](Self::live_reload_path) に WebSocket のエンドポイントを生やし、
+    /// [`ReloadNotifier::notify`] で接続中のページへ再読み込みを送る（既定は None = 配信だけ）
     pub live_reload: Option<ReloadNotifier>,
+    /// ライブリロードの WebSocket の経路（既定は [`LIVERELOAD_PATH`] = `/__livereload`）。
+    /// `base_url` に依らずオリジンのルートからのパス。`/` で始め、`/` だけ・`?` や `#` を含むもの・
+    /// `base_url` と同じものは使えない（[`serve`] が [`ServerError::InvalidLiveReloadPath`] を返す）。
+    /// `{` `}` `:` `*` は経路の構文ではなく文字どおりに扱う
+    pub live_reload_path: String,
     /// 配信パスの検査（None なら `ServeDir` の既定どおりリンクも辿る）
     pub path_guard: Option<PathGuard>,
-    /// `localhost`・`*.localhost`・IP アドレスのほかに受け付ける Host（`dev.allowed_hosts`）。
+    /// `localhost`・`*.localhost`・IP アドレスのほかに受け付ける Host（setoka なら `dev.allowed_hosts`）。
     /// これ以外の Host の要求と、WebSocket の Origin が合わない要求は 403（`host.rs`）
     pub allowed_hosts: Vec<String>,
-    /// 監視と一緒に配信するとき（`dev` / `build --watch`）に渡す。監視スレッドが
+    /// Host / Origin の検査で断ったときの 403 の応答に添える、通す方法の案内（既定は一般的な文言。
+    /// 使う側の設定の名前で案内したいときに書き換える。setoka は `setoka.toml` の `[dev] allowed_hosts` を案内する）
+    pub forbidden_hint: String,
+    /// 監視と一緒に配信するとき（setoka なら `dev` / `build --watch`）に渡す。監視スレッドが
     /// panic で止まったら配信も止めて [`ServerError::WatchStopped`] を返す
     /// （監視だけが黙って止まり、編集しても再ビルドされない状態を残さない）
     pub watch_failure: Option<WatchFailure>,
+}
+
+impl ServeOptions {
+    /// `dir` を `host:port` で配信する設定（ほかの項目は既定値）
+    pub fn new(dir: impl Into<PathBuf>, host: IpAddr, port: u16) -> Self {
+        Self {
+            dir: dir.into(),
+            host,
+            port,
+            base_url: "/".to_string(),
+            live_reload: None,
+            live_reload_path: LIVERELOAD_PATH.to_string(),
+            path_guard: None,
+            allowed_hosts: Vec::new(),
+            forbidden_hint: crate::host::DEFAULT_FORBIDDEN_HINT.to_string(),
+            watch_failure: None,
+        }
+    }
 }
 
 /// `TokioBackend` を包み、`open` / `metadata` の前に [`PathGuard`] を通す。
@@ -107,15 +137,25 @@ impl Backend for GuardedBackend {
 /// ブロッキングで配信を開始する（内部で tokio ランタイムを立ち上げる。
 /// 呼び出し側の cli を async にしないための設計）。Ctrl+C で終了
 pub fn serve(opts: ServeOptions) -> Result<(), ServerError> {
+    let base = base_path(&opts.base_url).to_string();
+    // 不正な経路は router に渡す前に起動エラーにする（axum は panic する。PR #111 のレビュー指摘）
+    if opts.live_reload.is_some() {
+        check_live_reload_path(&opts.live_reload_path, &base)
+            .map_err(ServerError::InvalidLiveReloadPath)?;
+    }
+    // 配信ディレクトリを絶対パスにする（`PathGuard` には常に絶対パスを渡す。相対の `dist` を渡すと
+    // `./dist/index.html` が渡り、絶対パスを前提にした検査が配信してよいファイルまで断っていた。
+    // PR #111 のレビュー指摘）
+    let dir = std::path::absolute(&opts.dir)?;
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(async move {
-        let base = base_path(&opts.base_url).to_string();
         let app = build_router(
-            &opts.dir,
+            &dir,
             &base,
-            opts.live_reload,
+            opts.live_reload
+                .map(|notifier| (notifier, opts.live_reload_path.clone())),
             opts.path_guard,
-            HostPolicy::new(&opts.allowed_hosts),
+            HostPolicy::new(&opts.allowed_hosts).with_hint(&opts.forbidden_hint),
         );
 
         let addr = SocketAddr::new(opts.host, opts.port);
@@ -160,11 +200,43 @@ fn literal_route(path: &str) -> String {
     path.replace('{', "%7B").replace('}', "%7D")
 }
 
+/// ライブリロードの経路の検査（router に渡す前。不正な値で axum が panic しないように、起動エラーにする）。
+/// `/` で始まり、`/` だけではなく、`?` `#` を含まず、`base`（サイトの公開先のパス）と同じでないこと
+fn check_live_reload_path(path: &str, base: &str) -> Result<(), String> {
+    if !path.starts_with('/') {
+        return Err(format!(
+            "ライブリロードの経路「{path}」は `/` で始めてください"
+        ));
+    }
+    if path == "/" {
+        return Err(
+            "ライブリロードの経路に `/` だけは使えません（サイトのトップページと重なります）"
+                .to_string(),
+        );
+    }
+    if path.contains(['?', '#']) {
+        return Err(format!(
+            "ライブリロードの経路「{path}」に `?` と `#` は使えません"
+        ));
+    }
+    // router に登録する形（`literal_route` で `{` `}` を `%7B` `%7D` にしたもの）で比べる。変換前の文字列で
+    // 比べると、`/a{b}/` と `/a%7Bb%7D` が別物として通り、同じ経路として登録されて panic した
+    // （PR #111 の再レビューの指摘）
+    let mount = literal_route(base.trim_end_matches('/'));
+    if !mount.is_empty() && literal_route(path.trim_end_matches('/')) == mount {
+        return Err(format!(
+            "ライブリロードの経路「{path}」はサイトの公開先のパス（{base}）と同じなので使えません"
+        ));
+    }
+    Ok(())
+}
+
 /// Router の組み立て（テスト容易性のため分離）
 fn build_router(
     dir: &Path,
     base: &str,
-    live_reload: Option<ReloadNotifier>,
+    // 通知と WebSocket の経路（`ServeOptions::live_reload_path`）
+    live_reload: Option<(ReloadNotifier, String)>,
     path_guard: Option<PathGuard>,
     host_policy: HostPolicy,
 ) -> Router {
@@ -198,7 +270,11 @@ fn build_router(
     }));
 
     let mut app = if base == "/" {
-        Router::new().fallback_service(serve_dir)
+        // without_v07_checks: 下のライブリロードの経路が `:` / `*` で始まるセグメントを含んでも
+        // 字句どおりに扱う（base が `/` 以外のときと同じ）
+        Router::new()
+            .without_v07_checks()
+            .fallback_service(serve_dir)
     } else {
         // nest_service のパスは末尾スラッシュなし（例: "/docs"）。"/" を渡すと panic
         let mount = literal_route(base.trim_end_matches('/'));
@@ -217,15 +293,16 @@ fn build_router(
             )
     };
 
-    if let Some(notifier) = live_reload {
+    if let Some((notifier, live_reload_path)) = live_reload {
         // State は使わず Clone クロージャに notifier を捕捉する。
         // subscribe はハンドシェイク前（handler 冒頭）に行い、
         // upgrade 中に発生した通知も Receiver にバッファさせる。
         // ブラウザは WebSocket に Origin を必ず付けるので、別のサイトのページからの接続は
         // ここで断る（Host の検査は下の layer。Origin が無いのはブラウザ以外の接続）
         let origin_policy = host_policy.clone();
+        // 経路は呼ぶ前に検査済み（`check_live_reload_path`）。`{` `}` は base と同じく文字どおりに扱う
         app = app.route(
-            LIVERELOAD_PATH,
+            &literal_route(&live_reload_path),
             any(move |headers: HeaderMap, ws: WebSocketUpgrade| {
                 let origin = headers
                     .get(header::ORIGIN)
@@ -234,11 +311,12 @@ fn build_router(
                     .as_deref()
                     .is_none_or(|o| origin_policy.allows_origin(o));
                 let rx = notifier.subscribe();
+                let hint = origin_policy.hint().to_string();
                 async move {
                     if !allowed {
                         let origin = origin.unwrap_or_default();
                         tracing::warn!(origin = %origin, "許可していない Origin の WebSocket を断りました");
-                        return forbidden(&format!("Origin「{origin}」"));
+                        return forbidden(&format!("Origin「{origin}」"), &hint);
                     }
                     ws.on_upgrade(move |socket| handle_socket(socket, rx))
                 }
@@ -303,20 +381,19 @@ async fn check_host(State(policy): State<HostPolicy>, req: Request, next: Next) 
         other => {
             let host = other.unwrap_or_default();
             tracing::warn!(host = %host, "許可していない Host の要求を断りました");
-            forbidden(&format!("Host「{host}」"))
+            forbidden(&format!("Host「{host}」"), policy.hint())
         }
     }
 }
 
-/// 403 の応答（何を断ったかと、通す方法を書く）
-fn forbidden(what: &str) -> Response {
+/// 403 の応答（何を断ったかと、通す方法の案内 `hint` を書く）
+fn forbidden(what: &str, hint: &str) -> Response {
     (
         StatusCode::FORBIDDEN,
         [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
         format!(
             "403 Forbidden: {what}からのアクセスは受け付けていません。\n\
-             setoka dev / preview は localhost と IP アドレスで開くものです。別のホスト名で開くなら、\n\
-             setoka.toml の [dev] allowed_hosts にそのホスト名を足して起動し直してください\n\
+             {hint}\n\
              （外部のサイトから手元のサーバを読まれないための検査です）。\n"
         ),
     )
@@ -420,16 +497,9 @@ mod tests {
         let (done_tx, done_rx) = std::sync::mpsc::channel();
         let dir = root.clone();
         std::thread::spawn(move || {
-            let result = super::serve(super::ServeOptions {
-                dir,
-                host: std::net::IpAddr::from([127, 0, 0, 1]),
-                port: 0,
-                base_url: "/".to_string(),
-                live_reload: None,
-                path_guard: None,
-                allowed_hosts: Vec::new(),
-                watch_failure: failure,
-            });
+            let mut opts = super::ServeOptions::new(dir, std::net::IpAddr::from([127, 0, 0, 1]), 0);
+            opts.watch_failure = failure;
+            let result = super::serve(opts);
             let _ = done_tx.send(result);
         });
         // サーバが待ち受けに入ってから変更を起こす
@@ -478,7 +548,7 @@ mod tests {
         let app = build_router(
             dir,
             base,
-            live_reload,
+            live_reload.map(|n| (n, crate::LIVERELOAD_PATH.to_string())),
             path_guard,
             HostPolicy::new(&allowed),
         );
@@ -663,6 +733,119 @@ mod tests {
             .expect("ストリームが閉じていない")
             .expect("受信エラーなし");
         assert_eq!(msg.into_text().unwrap(), "reload");
+    }
+
+    /// v0.22 Phase 105: ライブリロードの経路は設定で変えられる（setoka は既定の `/__livereload`）
+    #[tokio::test]
+    async fn ライブリロードの経路は設定で変えられる() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("index.html"), "<html></html>").unwrap();
+        let notifier = ReloadNotifier::new();
+        let app = build_router(
+            dir.path(),
+            "/",
+            Some((notifier.clone(), "/_reload".to_string())),
+            None,
+            HostPolicy::default(),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let (mut ws, _resp) = tokio_tungstenite::connect_async(format!("ws://{addr}/_reload"))
+            .await
+            .expect("設定した経路で WS ハンドシェイクが成功する");
+        notifier.notify();
+        let msg = tokio::time::timeout(Duration::from_secs(2), ws.next())
+            .await
+            .expect("2 秒以内に受信")
+            .expect("ストリームが閉じていない")
+            .expect("受信エラーなし");
+        assert_eq!(msg.into_text().unwrap(), "reload");
+        // 既定の経路にはもう無い
+        assert!(
+            tokio_tungstenite::connect_async(format!("ws://{addr}/__livereload"))
+                .await
+                .is_err()
+        );
+    }
+
+    /// PR #111 のレビュー指摘: `/` で始まらない経路などで、router の組み立てが panic していた。
+    /// 不正な経路は起動エラーにし、通した経路では panic しない
+    #[test]
+    fn ライブリロードの経路は検査してから使う() {
+        for (path, base) in [
+            ("_reload", "/"),
+            ("/", "/"),
+            ("/a?b", "/"),
+            ("/a#b", "/"),
+            ("/docs", "/docs/"),
+            ("/docs/", "/docs/"),
+            // 登録する形（{ } を %7B %7D にしたもの）で同じなら衝突（PR #111 の再レビューの指摘）
+            ("/a%7Bb%7D", "/a{b}/"),
+            ("/a{b}", "/a%7Bb%7D/"),
+            ("/a{b}/", "/a{b}/"),
+        ] {
+            assert!(
+                super::check_live_reload_path(path, base).is_err(),
+                "{path} / {base}"
+            );
+        }
+        let dir = tempfile::tempdir().unwrap();
+        for base in ["/", "/docs/", "/a{b}/"] {
+            for path in [
+                "/_reload",
+                "/__livereload",
+                "/docs/x",
+                "/a/{b}",
+                "/{*x}",
+                "/:x",
+                "/*x",
+                "/a//b",
+                "/a/",
+            ] {
+                assert!(
+                    super::check_live_reload_path(path, base).is_ok(),
+                    "{path} / {base}"
+                );
+                let built = std::panic::catch_unwind(|| {
+                    let _ = build_router(
+                        dir.path(),
+                        base,
+                        Some((ReloadNotifier::new(), path.to_string())),
+                        None,
+                        HostPolicy::default(),
+                    );
+                });
+                assert!(built.is_ok(), "base = {base}・経路 = {path} で panic した");
+            }
+        }
+    }
+
+    #[test]
+    fn 不正なライブリロードの経路は_serve_が起動エラーで返す() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut opts =
+            super::ServeOptions::new(dir.path(), std::net::IpAddr::from([127, 0, 0, 1]), 0);
+        opts.live_reload = Some(ReloadNotifier::new());
+        opts.live_reload_path = "_reload".to_string();
+        match super::serve(opts) {
+            Err(crate::ServerError::InvalidLiveReloadPath(message)) => {
+                assert!(message.contains("`/` で始めて"), "{message}");
+            }
+            other => panic!("InvalidLiveReloadPath を期待したが {other:?}"),
+        }
+    }
+
+    #[test]
+    fn serve_options_の既定値() {
+        let opts = super::ServeOptions::new("dist", std::net::IpAddr::from([127, 0, 0, 1]), 5173);
+        assert_eq!(opts.dir, std::path::PathBuf::from("dist"));
+        assert_eq!(opts.port, 5173);
+        assert_eq!(opts.base_url, "/");
+        assert_eq!(opts.live_reload_path, crate::LIVERELOAD_PATH);
+        assert!(opts.live_reload.is_none() && opts.path_guard.is_none());
+        assert!(opts.allowed_hosts.is_empty() && opts.watch_failure.is_none());
     }
 
     #[tokio::test]
