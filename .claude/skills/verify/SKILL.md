@@ -21,8 +21,10 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
   落ちたら出力先は `setoka_core::output` の口（実体は kunenbo）、原稿は `commands::rewrite_source` を通す。
   テストのコードは各 crate のルートの `#![cfg_attr(test, allow(clippy::disallowed_methods))]` と結合テストのファイルの
   先頭の `#![allow(…)]` で許している（結合テストのファイルを足したら先頭に書く）。mikan は当面 crate の `clippy.toml` で
-  縛りを外している（ソースが検索 wasm の入力のハッシュに入るため。次に wasm を作り直すときに消す）。clippy は前の結果を再利用するので、設定だけを変えて
-  確かめるときは `touch crates/*/src/lib.rs crates/setoka-cli/src/main.rs` してから実行する
+  縛りを外している（ソースが検索 wasm の入力のハッシュに入るため。次に wasm を作り直すときに消す）。既にある clippy.toml を書き換えたときは clippy が
+  気付いて検査し直すが、**新しく clippy.toml を置いたとき**（mikan のように crate に置くなど）は気付かず前の結果を
+  再利用するので、`touch crates/*/src/lib.rs crates/setoka-cli/src/main.rs` してから実行する。一覧は std::fs に加えて
+  tokio::fs・リンクの作成・`set_permissions`・`kunenbo::write_if_changed` も禁じている（`clippy.toml` のコメント）
 - machete の false positive は該当 crate の Cargo.toml に
   `[package.metadata.cargo-machete] ignored = ["<crate>"]` を書いて抑制する。
 - CI の cargo は `--locked` 付き（Phase 82）。Cargo.lock の更新が要る変更は、手元で lock を

@@ -5,4 +5,5 @@
 # 入っていて、テストのための属性 1 つでも wasm の作り直しが要るため。
 # 次に検索 wasm を作り直すとき（vaporetto 0.7 への更新か mikan の版上げ）に、lib.rs に
 # `#![cfg_attr(test, allow(clippy::disallowed_methods))]` を足してこのファイルを消す（ROADMAP「その他の候補」）。
-# mikan の publish には版上げ＝wasm の作り直しが要るので、このファイルは配布物に入れない
+# 今は cargo package --list -p mikan にこのファイルが入る。mikan の publish には版上げ＝wasm の作り直しが要るので、
+# その前に消す（publish-crate スキルの手順で一覧に無いことを確かめる）

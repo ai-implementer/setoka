@@ -19,10 +19,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+// kunenbo::write_if_changed は経路を検査しないので再エクスポートしない（clippy.toml でも禁じている）
 pub use kunenbo::{
     WriteOutcome, create_dir_all_under, ensure_no_symlink_under, ensure_symlink_free,
     list_files_under, remove_dir_all_under, remove_file_under, resolve_output_rel,
-    write_atomic_under, write_if_changed, write_under,
+    write_atomic_under, write_under,
 };
 
 /// 前回書き出したが今回書き出さなかったファイルを削除し、

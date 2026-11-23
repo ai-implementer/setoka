@@ -423,14 +423,17 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   setoka-core に残すか、種類を型の引数にして kunenbo に入れるかを決める。clippy の `disallowed-methods`
   （`clippy.toml`）で `fs::write` などを禁じ、kunenbo と `rewrite_source` の実装だけ許す
 - 判断点: 出力の記録を kunenbo に入れるか / `rewrite_source`（原稿への書き込み）も kunenbo に入れるか
-- 非互換と注意: なし（出力・キャッシュ・ログの文言を変えない）
+- 非互換と注意: なし（出力・キャッシュ・ログの文言を変えない）。ただし `dist/_search/index` がシンボリックリンクのときの
+  エラーの先頭のパスが `…/_search/index/0000.bin` から `…/_search` に変わる（前はリンクを辿ってディレクトリを作った後の
+  書き込みで断り、今は作る前に断る。どちらも書かずに終了コード 2）
 - 決定（11-23。ユーザが推奨案で決めた）
   - 出力の記録（`OutputTracker`・`OutputKind`）とマニフェストは setoka-core に残す。kunenbo は生成物の種類を持たない
   - `rewrite_source`（原稿への書き込み）は setoka-cli に残す
   - R8 の範囲は書き込み・削除・作成: std::fs の `write`・`remove_file`・`remove_dir`・`remove_dir_all`・`rename`・`copy`・
     `create_dir`・`create_dir_all`・`File::create`・`File::create_new`・`OpenOptions::open` を禁じる。許すのは kunenbo・
     `rewrite_source`・`setoka new` の雛形の書き出し・テストのコードだけ。キャッシュ（`cache.rs`）・setoka-index・setoka-render の
-    ディレクトリの作成と削除は、経路のリンクを検査する kunenbo の口に替える
+    ディレクトリの作成と削除は、経路のリンクを検査する kunenbo の口に替える（一覧は PR #112 のレビューでリンクの作成・
+    `set_permissions`・`tokio::fs` などを足した。下の「別のエージェントによるレビュー」）
 - 実装で決めたこと（判断点ではない。変えるならレビューで）
   - kunenbo はログを出さない（tracing に依存しない）。掃除の警告は `remove_orphans` のコールバック（`OrphanWarning`）で渡し、
     setoka-core の `output::remove_orphans` が切り出しの前と同じ文言・target（`setoka_core::output`）でログに出す。戻り値の
@@ -444,7 +447,8 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
     作り直しが要るため。いま作り直すと wasm のバイトが変わり（rustc・wasm-opt の版で変わる）、「出力が切り出しの前と変わらない」を
     wasm 以外でしか言えなくなる。mikan はファイルへ書かないので、縛りを外しても失うものは小さい。**次に検索 wasm を作り直すとき**
     （v0.23 の vaporetto 0.7 か mikan の版上げ）に、テストに `cfg_attr(test, allow(…))` を足して `clippy.toml` を消す（下の
-    「その他の候補」）。mikan の publish には版上げ＝wasm の作り直しが要るので、`clippy.toml` は配布物に入らない
+    「その他の候補」）。今は `cargo package --list -p mikan` に `clippy.toml` が入るが、mikan の publish には版上げ＝wasm の
+    作り直しが要るので、その前に消す（publish-crate スキルの手順で一覧に無いことを確かめる）
 - やったこと
   - `crates/kunenbo/`（0.1.0。依存は same-file・walkdir。`lib.rs`・`guard.rs`・`write.rs`・`orphans.rs`・README・LICENSE 2 つ）。
     setoka-core の `output.rs` の `resolve_output_rel`・`ensure_no_symlink_under`・`ensure_symlink_free`・`write_if_changed`・
@@ -480,6 +484,22 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
     動き）。`remove_orphans` は今までどおり末端のリンクも消さずに飛ばす（前回の一覧は書き換えられうる記録なので）
   - 確かめたこと: 3 件それぞれのテストを足した（kunenbo 36 本・setoka-core の cache に 1 本）。修正の後も main の setoka と
     docs の dist と `.setoka` がバイト単位で同じ
+- 別のエージェントによるレビュー（PR #112。上の 2 件と同じ指摘を除く）
+  - [P2] `clippy.toml` の一覧に、書き込み・作成にあたる経路が漏れていた（今の非テストのコードには無い）。`DirBuilder::create`・
+    `hard_link`・`soft_link`・`set_permissions`（リンクを辿って権限を変える）・`std::os::unix::fs::symlink`・Windows の
+    `symlink_file` / `symlink_dir`・jabara が使える `tokio::fs` の同じ種類の関数と、経路を検査しない `kunenbo::write_if_changed` を
+    足し、`setoka_core::output` からの `write_if_changed` の再エクスポートをやめた（setoka に呼び出し元は無い）。OS や依存によって
+    パスが無い項目には `allow-invalid = true` を付けた。非テストのコードに書くと落ちることを確かめた（R8 の範囲「書き込み・削除・
+    作成」の中で、一覧を足しただけ）
+  - [P3] 上の「非互換と注意」の `_search/index` のエラーの文言の違い。main と同じにするにはリンクを辿って作る必要があるので、
+    文言は変えずに記録した
+  - [P3] mikan の `clippy.toml` は今の `cargo package --list -p mikan` に入る（「配布物に入らない」は publish の前に消すことに頼る）。
+    コメントと上の記録を直し、publish-crate スキルの手順に一覧に無いことを確かめる 1 行を足した
+  - [P3] ルートの `clippy.toml` のコメントに mikan の例外を足した・CLAUDE.md の依存の図の 2 列が続いて読める行を分けた・verify
+    スキルの `touch` の理由を「新しく clippy.toml を置いたときは clippy が気付かない」に直した
+  - 直さなかったもの: キャッシュの `load` は `pages/` のリンクも辿って読む（main と同じ。`pages/` にリンクを置ける人は同じ中身の
+    通常のファイルも置けるので、リンクだけ読まないようにしても守れるものが無い）・大文字小文字の付け直しの一時名が 1 バイト
+    長くなった（名前がちょうど 240 バイトのときだけ付け直せずに警告になる）
 - 工数: 中
 
 ### 107 docs ゲートの一本化と dogfooding ⬜

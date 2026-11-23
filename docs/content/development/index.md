@@ -76,7 +76,7 @@ jabara（dist の配信・ライブリロード・ファイルの監視・Host /
 切り出しました。再ビルドの中身は setoka-cli がコールバックで渡します。kunenbo（出力先の相対パスの検証・経路の
 シンボリックリンクの検査・内容が同じなら書かない書き込み・残ったファイルの掃除）は v0.22 で setoka-core の
 出力の書き込みから切り出しました。ページ・リダイレクト・生成物の種類ごとの出力の記録は setoka-core に残しています。
-setoka のコードは出力先へ std の関数で直に書かず、kunenbo を通します（clippy の `disallowed-methods` で確かめています）。
+setoka のコードは出力先へ標準ライブラリや tokio のファイル操作の関数で直に書かず、kunenbo を通します（clippy の `disallowed-methods` で確かめています）。
 
 ## 凍結した設計判断
 

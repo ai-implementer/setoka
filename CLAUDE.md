@@ -97,7 +97,8 @@ cargo build -p setoka-cli
 setoka-cli → {jabara, setoka-render, setoka-index, setoka-core, setoka-config}
 setoka-render → setoka-core, setoka-config, setoka-theme, tankan, amanatsu
 setoka-index → setoka-core, mikan       mikan-wasm → mikan
-setoka-core → shikuwasa, hebesu, kunenbo amanatsu → shikuwasa（json）
+setoka-core → shikuwasa, hebesu, kunenbo
+amanatsu → shikuwasa（json）
 setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
@@ -515,7 +516,8 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   kunenbo はログを出さないので、孤児掃除の警告は `output::remove_orphans` がコールバックで受けて切り出しの前と同じ
   文言・target（`setoka_core::output`）でログに出す
 - **書き込みの口は clippy で縛っている**（ルートの `clippy.toml` の `disallowed-methods`。10-12 レビューの R8）。
-  std::fs の書き込み・削除・作成を直に呼ぶと CI の clippy が落ちる。許しているのは kunenbo（crate 全体）・
+  std::fs・tokio::fs の書き込み・削除・作成（リンクの作成・`set_permissions` を含む）と、経路を検査しない
+  `kunenbo::write_if_changed`（`setoka_core::output` からは再エクスポートしない）を直に呼ぶと CI の clippy が落ちる。許しているのは kunenbo（crate 全体）・
   `rewrite_source` と一時ファイルの作成・`setoka new` の雛形の書き出し（関数に `#[expect(…, reason)]`）・テストのコード
   （crate のルートの `cfg_attr(test, …)` と結合テストのファイルの先頭）だけ。**新しい書き込みのために allow を足さない**。
   mikan は当面 crate の `clippy.toml` で縛りを外している（mikan はファイルへ書かず、src が検索 wasm の入力のハッシュに

@@ -36,6 +36,8 @@ gh workflow run fuzz.yml          # 1 対象 600 秒。結果は Actions の Sum
 #    （nightly・cargo-fuzz・C++ コンパイラが要る。開発コンテナには g++ が無い）
 cd crates/kabosu && cargo +nightly fuzz run parse -- -max_total_time=600 -timeout=10 -rss_limit_mb=2048   # roundtrip / decode も（shikuwasa は crates/shikuwasa の parse）
 # 4. dry-run → publish（要 cargo login。公開は取り消し不可・yank のみ可能）
+#    mikan は crate の clippy.toml を消してあること（v0.22 Phase 106 の当面の措置。何も出なければよい）
+cargo package --locked --list -p mikan | grep -x clippy.toml
 cargo publish --dry-run -p <crate>
 cargo publish -p <crate>
 ```
