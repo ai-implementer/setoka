@@ -1,5 +1,6 @@
-/// 配信・監視のエラー
+/// 配信・監視のエラー（種類は後から増えることがある）
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ServerError {
     #[error("サーバの起動に失敗しました: {0}")]
     Io(#[from] std::io::Error),
@@ -12,6 +13,10 @@ pub enum ServerError {
 
     #[error("ファイル監視に失敗しました: {0}")]
     Notify(#[from] notify::Error),
+
+    /// `ServeOptions::live_reload_path` が使えない形（`/` で始まらない等）
+    #[error("{0}")]
+    InvalidLiveReloadPath(String),
 
     /// 監視中の再ビルドが panic して監視スレッドが止まったので、配信も止めた
     #[error("監視中の再ビルドで内部エラーが起きたため、配信を終了しました: {0}")]

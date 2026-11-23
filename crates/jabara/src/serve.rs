@@ -37,9 +37,9 @@ use crate::host::HostPolicy;
 use crate::livereload::{LIVERELOAD_PATH, ReloadNotifier, handle_socket};
 use crate::watch::WatchFailure;
 
-/// 配信パスの検査述語。引数は配信ディレクトリ配下の**絶対パス**（`ServeDir` が
-/// 要求パスを結合した後の値）。`Err(理由)` なら配信しない（404 扱い・理由は
-/// warn ログに出る）
+/// 配信パスの検査述語。引数は配信ディレクトリ配下の**絶対パス**（[`ServeOptions::dir`] を
+/// 絶対パスにしたものに、`ServeDir` が要求パスを結合した値。`dir` に相対パスを渡しても絶対パスになる。
+/// シンボリックリンクは解決しない）。`Err(理由)` なら配信しない（404 扱い・理由は warn ログに出る）
 pub type PathGuard = Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>;
 
 /// [`serve`] の設定。[`ServeOptions::new`] で作り、必要な項目を書き換える
@@ -57,7 +57,9 @@ pub struct ServeOptions {
     /// [`ReloadNotifier::notify`] で接続中のページへ再読み込みを送る（既定は None = 配信だけ）
     pub live_reload: Option<ReloadNotifier>,
     /// ライブリロードの WebSocket の経路（既定は [`LIVERELOAD_PATH`] = `/__livereload`）。
-    /// `base_url` に依らずオリジンのルートからのパス
+    /// `base_url` に依らずオリジンのルートからのパス。`/` で始め、`/` だけ・`?` や `#` を含むもの・
+    /// `base_url` と同じものは使えない（[`serve`] が [`ServerError::InvalidLiveReloadPath`] を返す）。
+    /// `{` `}` `:` `*` は経路の構文ではなく文字どおりに扱う
     pub live_reload_path: String,
     /// 配信パスの検査（None なら `ServeDir` の既定どおりリンクも辿る）
     pub path_guard: Option<PathGuard>,
@@ -135,11 +137,20 @@ impl Backend for GuardedBackend {
 /// ブロッキングで配信を開始する（内部で tokio ランタイムを立ち上げる。
 /// 呼び出し側の cli を async にしないための設計）。Ctrl+C で終了
 pub fn serve(opts: ServeOptions) -> Result<(), ServerError> {
+    let base = base_path(&opts.base_url).to_string();
+    // 不正な経路は router に渡す前に起動エラーにする（axum は panic する。PR #111 のレビュー指摘）
+    if opts.live_reload.is_some() {
+        check_live_reload_path(&opts.live_reload_path, &base)
+            .map_err(ServerError::InvalidLiveReloadPath)?;
+    }
+    // 配信ディレクトリを絶対パスにする（`PathGuard` には常に絶対パスを渡す。相対の `dist` を渡すと
+    // `./dist/index.html` が渡り、絶対パスを前提にした検査が配信してよいファイルまで断っていた。
+    // PR #111 のレビュー指摘）
+    let dir = std::path::absolute(&opts.dir)?;
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(async move {
-        let base = base_path(&opts.base_url).to_string();
         let app = build_router(
-            &opts.dir,
+            &dir,
             &base,
             opts.live_reload
                 .map(|notifier| (notifier, opts.live_reload_path.clone())),
@@ -189,6 +200,34 @@ fn literal_route(path: &str) -> String {
     path.replace('{', "%7B").replace('}', "%7D")
 }
 
+/// ライブリロードの経路の検査（router に渡す前。不正な値で axum が panic しないように、起動エラーにする）。
+/// `/` で始まり、`/` だけではなく、`?` `#` を含まず、`base`（サイトの公開先のパス）と同じでないこと
+fn check_live_reload_path(path: &str, base: &str) -> Result<(), String> {
+    if !path.starts_with('/') {
+        return Err(format!(
+            "ライブリロードの経路「{path}」は `/` で始めてください"
+        ));
+    }
+    if path == "/" {
+        return Err(
+            "ライブリロードの経路に `/` だけは使えません（サイトのトップページと重なります）"
+                .to_string(),
+        );
+    }
+    if path.contains(['?', '#']) {
+        return Err(format!(
+            "ライブリロードの経路「{path}」に `?` と `#` は使えません"
+        ));
+    }
+    let mount = base.trim_end_matches('/');
+    if !mount.is_empty() && path.trim_end_matches('/') == mount {
+        return Err(format!(
+            "ライブリロードの経路「{path}」はサイトの公開先のパス（{base}）と同じなので使えません"
+        ));
+    }
+    Ok(())
+}
+
 /// Router の組み立て（テスト容易性のため分離）
 fn build_router(
     dir: &Path,
@@ -228,7 +267,11 @@ fn build_router(
     }));
 
     let mut app = if base == "/" {
-        Router::new().fallback_service(serve_dir)
+        // without_v07_checks: 下のライブリロードの経路が `:` / `*` で始まるセグメントを含んでも
+        // 字句どおりに扱う（base が `/` 以外のときと同じ）
+        Router::new()
+            .without_v07_checks()
+            .fallback_service(serve_dir)
     } else {
         // nest_service のパスは末尾スラッシュなし（例: "/docs"）。"/" を渡すと panic
         let mount = literal_route(base.trim_end_matches('/'));
@@ -254,8 +297,9 @@ fn build_router(
         // ブラウザは WebSocket に Origin を必ず付けるので、別のサイトのページからの接続は
         // ここで断る（Host の検査は下の layer。Origin が無いのはブラウザ以外の接続）
         let origin_policy = host_policy.clone();
+        // 経路は呼ぶ前に検査済み（`check_live_reload_path`）。`{` `}` は base と同じく文字どおりに扱う
         app = app.route(
-            &live_reload_path,
+            &literal_route(&live_reload_path),
             any(move |headers: HeaderMap, ws: WebSocketUpgrade| {
                 let origin = headers
                     .get(header::ORIGIN)
@@ -721,6 +765,69 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    /// PR #111 のレビュー指摘: `/` で始まらない経路などで、router の組み立てが panic していた。
+    /// 不正な経路は起動エラーにし、通した経路では panic しない
+    #[test]
+    fn ライブリロードの経路は検査してから使う() {
+        for (path, base) in [
+            ("_reload", "/"),
+            ("/", "/"),
+            ("/a?b", "/"),
+            ("/a#b", "/"),
+            ("/docs", "/docs/"),
+            ("/docs/", "/docs/"),
+        ] {
+            assert!(
+                super::check_live_reload_path(path, base).is_err(),
+                "{path} / {base}"
+            );
+        }
+        let dir = tempfile::tempdir().unwrap();
+        for base in ["/", "/docs/"] {
+            for path in [
+                "/_reload",
+                "/__livereload",
+                "/docs/x",
+                "/a/{b}",
+                "/{*x}",
+                "/:x",
+                "/*x",
+                "/a//b",
+                "/a/",
+            ] {
+                assert!(
+                    super::check_live_reload_path(path, base).is_ok(),
+                    "{path} / {base}"
+                );
+                let built = std::panic::catch_unwind(|| {
+                    let _ = build_router(
+                        dir.path(),
+                        base,
+                        Some((ReloadNotifier::new(), path.to_string())),
+                        None,
+                        HostPolicy::default(),
+                    );
+                });
+                assert!(built.is_ok(), "base = {base}・経路 = {path} で panic した");
+            }
+        }
+    }
+
+    #[test]
+    fn 不正なライブリロードの経路は_serve_が起動エラーで返す() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut opts =
+            super::ServeOptions::new(dir.path(), std::net::IpAddr::from([127, 0, 0, 1]), 0);
+        opts.live_reload = Some(ReloadNotifier::new());
+        opts.live_reload_path = "_reload".to_string();
+        match super::serve(opts) {
+            Err(crate::ServerError::InvalidLiveReloadPath(message)) => {
+                assert!(message.contains("`/` で始めて"), "{message}");
+            }
+            other => panic!("InvalidLiveReloadPath を期待したが {other:?}"),
+        }
     }
 
     #[test]

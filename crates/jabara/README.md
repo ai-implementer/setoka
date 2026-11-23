@@ -15,7 +15,8 @@
   `allowed_hosts` に書いたホスト名だけを通す（Vite の `server.allowedHosts` と同じ考え方）。
   WebSocket は Origin も照合する。断った要求は 403 で、通す方法の案内（`forbidden_hint`）を添える
 - **シンボリックリンクの遮断**（`PathGuard`）— `ServeDir` はパスを字句で検査するだけでリンクを辿るので、
-  ファイルを開く前に呼ぶ述語を渡せる（拒否したパスは無いものとして 404）
+  ファイルを開く前に呼ぶ述語を渡せる（拒否したパスは無いものとして 404）。述語には常に絶対パスが渡る
+  （`dir` を相対パスで渡しても絶対パスにしてから結合する。シンボリックリンクは解決しない）
 - **ファイルの監視**（`watch`。notify）
   - 内容を変えない種類のイベント（開いた・読んだだけ）は捨てる（Linux の inotify は読んだだけでも届けるので、
     捨てないとビルドが原稿を読むたびに再ビルドが続く）
@@ -76,8 +77,11 @@ jabara::serve(opts)?;
 - `ServeOptions::new(dir, host, port)` で作り、`base_url`・`live_reload`・`live_reload_path`・`path_guard`・
   `allowed_hosts`・`forbidden_hint`・`watch_failure` を必要に応じて書き換える（項目は増えることがあるので、
   構造体のリテラルでは作れない）
+- `live_reload_path` は `/` で始める。`/` だけ・`?` や `#` を含むもの・`base_url` と同じものは使えず、
+  `serve` が `ServerError::InvalidLiveReloadPath` を返す。`{` `}` `:` `*` は経路の構文ではなく文字どおりに扱う
 - `serve` は内部で tokio のランタイムを立ち上げるブロッキングの関数（呼び出し側を async にしなくてよい）
 - ポートが使用中なら `ServerError::PortInUse`（別のポートの指定の仕方は使う側で案内する）
+- ログは tracing に出す。target は `jabara`（`RUST_LOG=jabara=info` のように絞れる）
 
 ## ライセンス
 

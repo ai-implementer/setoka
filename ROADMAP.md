@@ -376,7 +376,10 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   動かし方は今のまま
 - 判断点: 公開 API の形（`ServeOptions`・`watch` の引数）/ setoka の都合で決めた名前（`/__livereload` など）を
   どこまで設定にするか
-- 非互換と注意: なし（dev / preview の動きを変えない。403 の応答の本文とポートが使用中のときの文言も前と同じ）
+- 非互換と注意: なし（dev / preview の動きを変えない。403 の応答の本文とポートが使用中のときの文言も前と同じ）。
+  ただし `RUST_LOG` で crate 単位にログを絞るとき、配信と監視のログの名前が `setoka_server` から `jabara` に変わる
+  （`RUST_LOG=setoka_server=info` は `RUST_LOG=jabara=info` にする。`-q` / `-v` はレベルだけで絞るので変わらない。
+  PR #111 のレビュー指摘）
 - 決定（11-23。ユーザが推奨案で決めた）
   - 公開 API は今の形（`serve`・`ServeOptions`・`watch`・`WatchIgnore`・`WatchHandle`・`WatchFailure`・`ReloadNotifier`・
     `base_path`・`PathGuard`・`ServerError`）に、`ServeOptions::new(dir, host, port)` を足す（`#[non_exhaustive]` にして、
@@ -395,6 +398,16 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
 - 確かめたこと: `cargo test --workspace`（1194 本。setoka-cli の `build --watch`・`dev`・`preview` の結合テストを含む）・clippy・
   ポートが使用中のときの `setoka preview` の文言と終了コード 2・Host を偽った要求への 403 の本文が main のバイナリとバイト単位で
   同じ・`cargo package -p jabara`（13 ファイル）・`cargo doc -p jabara` に警告なし・README の例をスクラッチの crate でビルドした
+- レビュー指摘 3 件（PR #111）
+  - [P2] `live_reload_path` が `/` で始まらない（`_reload`）・base が `/` で `:` や `*` で始まる・base と同じ経路
+    （`/docs/` に `/docs`）だと、`serve` が `ServerError` を返す前に router の組み立てが panic した。router に渡す前に
+    検査して `ServerError::InvalidLiveReloadPath` で返すようにし（`/` で始める・`/` だけ・`?` `#`・base と同じを断る）、
+    `{` `}` `:` `*` は base と同じく文字どおりに扱うようにした（`{b}` は変数として扱われていた）。base 2 通り ×
+    経路 9 通りで panic しないことと、不正な経路の起動エラーをテストした。`ServerError` も `#[non_exhaustive]` にした
+  - [P3] `PathGuard` に渡るパスを「絶対パス」と書いていたが、`dir` に相対パスを渡すと相対のパスが渡っていた。
+    `serve` の初めに `std::path::absolute` で絶対パスにするようにした（setoka は絶対パスを渡しているので変わらない）
+  - [P3] `RUST_LOG` で crate 単位に絞るときの名前が `setoka_server` から `jabara` に変わることを、上の「非互換と注意」と
+    jabara の README に書いた（リリースノートに載せる）
 - 工数: 小〜中
 
 ### 106 kunenbo（出力先への安全な書き込み） ⬜
