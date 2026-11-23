@@ -877,6 +877,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "jabara"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "notify",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
 name = "kabosu"
 version = "0.2.1"
 dependencies = [
@@ -1500,6 +1515,7 @@ dependencies = [
  "anyhow",
  "clap",
  "clap_complete",
+ "jabara",
  "open",
  "rayon",
  "serde",
@@ -1508,7 +1524,6 @@ dependencies = [
  "setoka-core",
  "setoka-index",
  "setoka-render",
- "setoka-server",
  "similar 3.2.1",
  "tempfile",
  "tracing",
@@ -1578,21 +1593,6 @@ dependencies = [
  "tracing",
  "two-face",
  "walkdir",
-]
-
-[[package]]
-name = "setoka-server"
-version = "0.21.0"
-dependencies = [
- "axum",
- "futures-util",
- "notify",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-tungstenite 0.30.0",
- "tower-http",
- "tracing",
 ]
 
 [[package]]

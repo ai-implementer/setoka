@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use anyhow::bail;
 
+use jabara::{PathGuard, ReloadNotifier, ServeOptions, WatchFailure};
 use setoka_config::ResolvedConfig;
-use setoka_server::{PathGuard, ReloadNotifier, ServeOptions, WatchFailure};
 
 use super::build::StartupSettings;
 
@@ -45,17 +45,29 @@ pub(crate) fn serve_dist(
     watch_failure: Option<WatchFailure>,
 ) -> anyhow::Result<()> {
     let startup = StartupSettings::of(rc);
-    setoka_server::serve(ServeOptions {
-        dir: startup.output_dir,
-        host: startup.host,
-        port: port.unwrap_or(startup.port),
-        base_url: startup.base_url,
-        live_reload,
-        path_guard: Some(symlink_guard(&rc.root)),
-        allowed_hosts: startup.allowed_hosts,
-        watch_failure,
-    })?;
-    Ok(())
+    let mut opts = ServeOptions::new(
+        startup.output_dir,
+        startup.host,
+        port.unwrap_or(startup.port),
+    );
+    opts.base_url = startup.base_url;
+    // ライブリロードの経路は jabara の既定（`/__livereload`。テーマの livereload.js が繋ぐ）
+    opts.live_reload = live_reload;
+    opts.path_guard = Some(symlink_guard(&rc.root));
+    opts.allowed_hosts = startup.allowed_hosts;
+    // 403 の応答の案内は setoka の設定の名前で書く（v0.22 Phase 105 までは setoka-server の文言だった。文言は変えない）
+    opts.forbidden_hint = "setoka dev / preview は localhost と IP アドレスで開くものです。別のホスト名で開くなら、\n\
+                           setoka.toml の [dev] allowed_hosts にそのホスト名を足して起動し直してください"
+        .to_string();
+    opts.watch_failure = watch_failure;
+    jabara::serve(opts).map_err(|e| match e {
+        // jabara の文言はコマンドに触れないので、setoka の `--port` の案内をここで足す
+        // （v0.22 Phase 105 までは setoka-server の文言に入っていた。文言は変えない）
+        jabara::ServerError::PortInUse { host, port } => anyhow::anyhow!(
+            "ポート {port} は既に使用中です（{host} にバインドできません）。`--port` で別のポートを指定するか、そのポートを使っているプロセスを止めてください"
+        ),
+        other => other.into(),
+    })
 }
 
 /// 配信パスの検査述語（`preview` / `dev` / `build --watch` で共用）。

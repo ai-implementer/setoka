@@ -12,11 +12,23 @@
 
 use std::net::IpAddr;
 
+/// 断ったときの応答に添える、通す方法の案内の既定（使う側の設定の名前を知らないので一般的な言い方）
+pub(crate) const DEFAULT_FORBIDDEN_HINT: &str = "localhost と IP アドレスで開いてください。別のホスト名で開くなら、\
+     そのホスト名を許可するホスト（allowed_hosts）に足して起動し直してください";
+
 /// 受け付ける Host の規則（[`HostPolicy::allows`]）
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct HostPolicy {
-    /// 正規化済みの `dev.allowed_hosts`（小文字・末尾の `.` とポートを除いたもの）
+    /// 正規化済みの `allowed_hosts`（小文字・末尾の `.` とポートを除いたもの）
     allowed: Vec<String>,
+    /// 断ったときの 403 の応答に添える案内（`ServeOptions::forbidden_hint`）
+    hint: String,
+}
+
+impl Default for HostPolicy {
+    fn default() -> Self {
+        Self::new(&[])
+    }
 }
 
 impl HostPolicy {
@@ -26,7 +38,19 @@ impl HostPolicy {
             .map(|entry| normalize(strip_port(entry.trim())))
             .filter(|entry| !entry.is_empty() && entry != ".")
             .collect();
-        Self { allowed }
+        Self {
+            allowed,
+            hint: DEFAULT_FORBIDDEN_HINT.to_string(),
+        }
+    }
+
+    pub(crate) fn with_hint(mut self, hint: &str) -> Self {
+        self.hint = hint.to_string();
+        self
+    }
+
+    pub(crate) fn hint(&self) -> &str {
+        &self.hint
     }
 
     /// `Host` ヘッダ（または HTTP/2 の `:authority`）の値を受け付けるか。

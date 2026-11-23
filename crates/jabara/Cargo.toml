@@ -1,0 +1,29 @@
+[package]
+name = "jabara"
+# 静的サイトの開発サーバ（setoka-* に依存しない汎用ライブラリ。v0.22 Phase 105 で setoka-server を改名して
+# 切り出した）。monorepo のまま crates.io へ公開する（開発は setoka ワークスペースで一体・repository は monorepo を
+# 指す）。バージョンは workspace と独立で、変更時にだけ上げて publish する（手順は `publish-crate` スキル）
+description = "Development server for static sites: serves a build directory, WebSocket live reload, file watching with event filtering, Host/Origin checks and symlink blocking"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+keywords = ["dev-server", "live-reload", "static-site", "file-watcher", "axum"]
+categories = ["web-programming::http-server", "development-tools", "filesystem"]
+
+[dependencies]
+axum = { workspace = true }
+notify = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+futures-util = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+tokio-tungstenite = { workspace = true }

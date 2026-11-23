@@ -3,8 +3,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
+use jabara::ReloadNotifier;
 use setoka_render::LiveReloadMode;
-use setoka_server::ReloadNotifier;
 
 use crate::commands::build::{self, StartupSettings};
 use crate::commands::preview;
@@ -43,7 +43,7 @@ pub fn run(
     // session と設定はクロージャへ move してセッション全体で再利用する
     let mut watcher = build::WatchBuild::new(rc.clone(), overrides, mode, drafts, session);
     let root = rc.root.clone();
-    let mut watch_handle = setoka_server::watch(&paths, ignore, build::DEBOUNCE, move |changed| {
+    let mut watch_handle = jabara::watch(&paths, ignore, build::DEBOUNCE, move |changed| {
         tracing::info!(changed = %build::format_changed(&root, changed), "変更を検知 → 再ビルド");
         match watcher.rebuild() {
             // 通知は必ず再ビルド成功後（失敗時に通知すると壊れた dist を読ませる）
@@ -79,10 +79,7 @@ fn open_url(base_url: &str, host: IpAddr, port: u16) -> String {
     } else {
         host
     };
-    format!(
-        "http://{open_host}:{port}{}",
-        setoka_server::base_path(base_url)
-    )
+    format!("http://{open_host}:{port}{}", jabara::base_path(base_url))
 }
 
 /// serve() が bind を終えるのを TCP 接続で確認してから既定ブラウザを開く。

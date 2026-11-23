@@ -76,7 +76,7 @@ fn main() -> ExitCode {
 /// panic の内容は hook が出し済みなので、ここでは何も書かない。
 ///
 /// `dev` / `build --watch` の監視スレッドの panic はここへ届かない。監視側
-/// （`setoka_server::watch`）が受けて配信を止め、`serve` の Err として戻ってくる
+/// （`jabara::watch`）が受けて配信を止め、`serve` の Err として戻ってくる
 fn run_catching(f: impl FnOnce() -> anyhow::Result<ExitCode>) -> ExitCode {
     match catch_unwind(AssertUnwindSafe(f)) {
         Ok(Ok(code)) => code,

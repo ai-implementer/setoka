@@ -94,15 +94,15 @@ cargo build -p setoka-cli
 ワークスペース構成と依存方向は**凍結**（逆方向依存を作らない）:
 
 ```
-setoka-cli → {setoka-server, setoka-render, setoka-index, setoka-core, setoka-config}
+setoka-cli → {jabara, setoka-render, setoka-index, setoka-core, setoka-config}
 setoka-render → setoka-core, setoka-config, setoka-theme, tankan, amanatsu
 setoka-index → setoka-core, mikan       mikan-wasm → mikan
 setoka-core → shikuwasa, hebesu          amanatsu → shikuwasa（json）
 setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
-tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu は他の setoka crate 非依存の汎用ライブラリ
-（tankan・mikan・kabosu・shikuwasa・amanatsu は crates.io で公開済み。hebesu は v0.22 Phase 104 で切り出し、未公開。検索スタックの書き側集約は
+tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu・jabara は他の setoka crate 非依存の汎用ライブラリ
+（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu は crates.io で公開済み。jabara は v0.22 Phase 105 で setoka-server を改名して切り出し、未公開。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
 setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
@@ -289,7 +289,7 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   フラグ・`--format json` のキー・診断ルールの名前を消す・改名する変更はマイナー版だけで、
   `--format json` のキーはマイナー版でも消さない。リリースノートの「非互換と注意」はこのページの
   対象を見て書く（`release` スキル）
-- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu）** — setoka のリリースと非同期。手順は
+- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu / jabara）** — setoka のリリースと非同期。手順は
   **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須。amanatsu は crates.io の
   shikuwasa に依存するので、shikuwasa の版を上げたら先に shikuwasa を publish する）
   - fuzz.yml は 4 crate の対象（kabosu 3・mikan のシャード・shikuwasa の `parse`・tankan の `render_svg`）を
@@ -360,7 +360,7 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   参照先が content 外にもあるため）
   - **出力ディレクトリの除外は必須** = 外すと「再ビルド → 変更検知 → 再ビルド」の
     無限ループになる
-  - 隠しディレクトリと `build.watch_ignore` の glob も除外する（`setoka-server/src/watch.rs` の
+  - 隠しディレクトリと `build.watch_ignore` の glob も除外する（`jabara/src/watch.rs` の
     `WatchIgnore`。glob 判定は setoka-core の `IgnoreMatcher` を**述語で**渡す =
     server は setoka-core を知らない）
   - **除外はイベントのフィルタで監視登録は減らない**（notify にパス単位の除外が無い）
@@ -382,13 +382,19 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     （`preview::serve_dist`。dev / preview / build --watch が共有）はこの値から組み、
     `pin_restart_only` の分割代入はワイルドカード無しなので、差し戻しを書くまでコンパイルが止まる
   - `dev.host` / `--host` は `setoka_config::BindAddr`（IP アドレスだけ。読み込みの時点で検証）
-- **dev / preview の Host / Origin の検査は IP アドレスを通すのが仕様**（`setoka-server/src/host.rs`。
+- **dev / preview の Host / Origin の検査は IP アドレスを通すのが仕様**（`jabara/src/host.rs`。
   Phase 83）。DNS リバインディングはドメイン名を使うので、拒否するのは `localhost`・
   `*.localhost`・IP 以外で `dev.allowed_hosts` に無いホスト名だけ（`dev.host = "0.0.0.0"` で
   LAN の IP から開く使い方を壊さない。Vite と同じ考え方）。検査は Router の最後の
   `layer` で全経路に掛けるので、**経路を足すときは layer より前に足す**。WebSocket は
   Origin も照合し、Origin の無い接続（ブラウザ以外・テスト）は通す
-- setoka-server の serve テスト・setoka-cli の `commands/extlink.rs` のテスト（ローカルにサーバを立てる）・
+- **配信と監視は crate jabara**（v0.22 Phase 105 で setoka-server を改名して切り出した）。jabara の文言は setoka の
+  コマンドや設定に触れないので、setoka の案内は setoka-cli の `commands/preview.rs` の `serve_dist` が足す:
+  403 の応答の案内（`ServeOptions::forbidden_hint` = `setoka.toml` の `[dev] allowed_hosts`）と、ポートが使用中の
+  ときの `--port` の案内（`ServerError::PortInUse` を setoka の文言に変える）。どちらも v0.22 Phase 105 より前と
+  同じ文言。ライブリロードの経路はテーマの `livereload.js` が繋ぐ jabara の既定（`/__livereload`）のまま。
+  `ServeOptions` は `ServeOptions::new` で作る（`#[non_exhaustive]`）
+- jabara（旧 setoka-server）の serve テスト・setoka-cli の `commands/extlink.rs` のテスト（ローカルにサーバを立てる）・
   setoka-cli の `tests/serve.rs` は TCP バインドするため、サンドボックス内では PermissionDenied で落ちる
   （コード起因ではない。verify スキルのテストの手順はサンドボックスの内と外に分けてある）
 - **CLI の結合テストは `crates/setoka-cli/tests/`**（v0.22 Phase 101。ビルドした setoka を子プロセスで動かす。
@@ -398,7 +404,7 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     中に置くとログを書くたびに再ビルドが続く
   - 再ビルドは dist や配信の中身が変わるまで上限付きで待つ（固定の時間で待たない。ログの文言で判定しない）。
     配信が始まった時点で監視は始まっている（`dev` / `build --watch` は notify への登録を終えてから待ち受ける。
-    `setoka_server::watch` は登録を済ませてから返る）
+    `jabara::watch` は登録を済ませてから返る）
 - **監視の隠しディレクトリ判定は監視ルートからの相対パスで行う**（`WatchIgnore::is_ignored`）。
   イベントは絶対パスで届くので、全構成要素を見るとルートの祖先（`~/.config/notes/`・
   `.claude/worktrees/…`・`tempfile::tempdir()` の `.tmpXXXX`）に `.` 始まりがあるだけで

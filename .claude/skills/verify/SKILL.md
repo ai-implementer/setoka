@@ -29,29 +29,29 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
 ## 2. テスト
 
 ```bash
-cargo test --locked --workspace --exclude setoka-server --exclude setoka-cli
+cargo test --locked --workspace --exclude jabara --exclude setoka-cli
 cargo test --locked -p setoka-cli --test commands
 # ↓ サンドボックス外で実行する（TCP で待ち受ける）
-cargo test --locked -p setoka-server
+cargo test --locked -p jabara
 cargo test --locked -p setoka-cli --bins --test serve
 ```
 
-- **TCP で待ち受けるテストはサンドボックス外必須**: setoka-server の serve テスト・setoka-cli の単体テスト（`--bins`。`commands/extlink.rs` の外部リンク検査の 3 本がローカルにサーバを立てる）・setoka-cli の結合テスト `crates/setoka-cli/tests/serve.rs`（`build --watch`・`dev`・`preview` を起動して HTTP で取る。v0.22 Phase 101）は、サンドボックス内では PermissionDenied で落ちる（コード起因ではない）。CI はまとめて `cargo test --workspace` で動かす。
+- **TCP で待ち受けるテストはサンドボックス外必須**: jabara（旧 setoka-server）の serve テスト・setoka-cli の単体テスト（`--bins`。`commands/extlink.rs` の外部リンク検査の 3 本がローカルにサーバを立てる）・setoka-cli の結合テスト `crates/setoka-cli/tests/serve.rs`（`build --watch`・`dev`・`preview` を起動して HTTP で取る。v0.22 Phase 101）は、サンドボックス内では PermissionDenied で落ちる（コード起因ではない）。CI はまとめて `cargo test --workspace` で動かす。
 - **insta スナップショット差分が出たら**: 差分が意図どおりか必ず目視 → `INSTA_UPDATE=always cargo test -p <crate>` で更新 → `git diff` で更新内容を再確認。意図しない差分は変更側のバグを疑う。CI は `INSTA_UPDATE=no` で未承認を失敗にする。
 
 ## 3. ビルドと crates.io パッケージ検証
 
 ```bash
 cargo build --locked --workspace
-cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa -p amanatsu -p hebesu
+cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa -p amanatsu -p hebesu -p jabara
 scripts/third-party-licenses.sh check
 scripts/build-search-wasm.sh --check   # 検索 wasm の作り直し忘れ（Phase 89。ビルドのツールは要らない）
 git grep -n -i 'y[u]zu' -- . ':!ROADMAP.md' ':!ROADMAP-history.md'   # 旧名の残り（v0.21 Phase 94。何も出なければよい）
 scripts/check-doc-refs.sh              # 文書とコメントが指すパス・スキル・ROADMAP / CLAUDE.md の節が実在するか（Phase 93）
 ```
 
-- `cargo package` は公開対象 6 crate のメタデータ・同梱内容の回帰を検出する（CI にもある）。
-  CI は加えて `cargo package --list` で 6 crate とも `LICENSE-MIT` / `LICENSE-APACHE` を含み、
+- `cargo package` は公開対象 7 crate のメタデータ・同梱内容の回帰を検出する（CI にもある）。
+  CI は加えて `cargo package --list` で 7 crate とも `LICENSE-MIT` / `LICENSE-APACHE` を含み、
   tankan に `tests/corpus` が入らないことを見る。
 - `third-party-licenses.sh check` は two-face の一覧の版（Phase 81）に加えて、使ってよい
   ライセンスの一覧が `licenses/about.toml` と `deny.toml` で同じか、検索 wasm の通知に載った

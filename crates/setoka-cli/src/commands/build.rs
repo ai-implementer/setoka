@@ -22,26 +22,27 @@ pub(crate) const DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// 監視除外（build --watch / dev 共通）。
 /// **出力ディレクトリの除外は必須**（含めると再ビルド → 変更検知の無限ループ）。
-/// `.setoka` / `.git` 等の隠しディレクトリは setoka_server 側で常に無視される。
+/// `.setoka` / `.git` 等の隠しディレクトリは jabara 側で常に無視される。
 ///
 /// これに加えて `build.watch_ignore` の glob をプロジェクトルート相対で評価する
 /// （既定は `target/` と `node_modules/`。ビルド生成物の大量イベントで
 /// 再ビルドが暴発するのを防ぐ）。glob の解釈は `input.ignore` と同じ
 /// setoka-core の [`IgnoreMatcher`] を通す
-pub(crate) fn watch_ignore(rc: &ResolvedConfig) -> anyhow::Result<setoka_server::WatchIgnore> {
+pub(crate) fn watch_ignore(rc: &ResolvedConfig) -> anyhow::Result<jabara::WatchIgnore> {
     let matcher = IgnoreMatcher::new(&rc.config.build.watch_ignore)
         .context("build.watch_ignore のパターンが不正です")?;
     let root = rc.root.clone();
     Ok(
-        setoka_server::WatchIgnore::new(vec![rc.output_dir.clone(), rc.root.join(".setoka")])
-            .with_extra(move |path| {
+        jabara::WatchIgnore::new(vec![rc.output_dir.clone(), rc.root.join(".setoka")]).with_extra(
+            move |path| {
                 // 監視イベントは絶対パスで来る。ルート外（シンボリックリンク先など）は
                 // 相対化できないので除外しない。
                 // 祖先まで見るのは、ディレクトリ作成イベント（`target` そのもの）と
                 // その配下のファイルを 1 つのパターンで扱うため
                 path.strip_prefix(&root)
                     .is_ok_and(|rel| matcher.is_match_or_ancestor(rel))
-            }),
+            },
+        ),
     )
 }
 
@@ -148,7 +149,7 @@ pub fn run(
     //（キャッシュ・テンプレート Env・ハイライタ・トークナイザ）
     let mut watcher = WatchBuild::new(rc.clone(), overrides, mode, drafts, session);
     let root = rc.root.clone();
-    let mut watch_handle = setoka_server::watch(&paths, ignore, DEBOUNCE, move |changed| {
+    let mut watch_handle = jabara::watch(&paths, ignore, DEBOUNCE, move |changed| {
         tracing::info!(changed = %format_changed(&root, changed), "変更を検知 → 再ビルド");
         if let Err(e) = watcher.rebuild() {
             // 執筆中の一時的な構文エラー等でプロセスは落とさない

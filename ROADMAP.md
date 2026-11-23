@@ -376,7 +376,25 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   動かし方は今のまま
 - 判断点: 公開 API の形（`ServeOptions`・`watch` の引数）/ setoka の都合で決めた名前（`/__livereload` など）を
   どこまで設定にするか
-- 非互換と注意: なし（dev / preview の動きを変えない）
+- 非互換と注意: なし（dev / preview の動きを変えない。403 の応答の本文とポートが使用中のときの文言も前と同じ）
+- 決定（11-23。ユーザが推奨案で決めた）
+  - 公開 API は今の形（`serve`・`ServeOptions`・`watch`・`WatchIgnore`・`WatchHandle`・`WatchFailure`・`ReloadNotifier`・
+    `base_path`・`PathGuard`・`ServerError`）に、`ServeOptions::new(dir, host, port)` を足す（`#[non_exhaustive]` にして、
+    後で項目を足しても使う側が壊れないようにした）
+  - setoka の都合の名前で設定にするのはライブリロードの経路だけ（`ServeOptions::live_reload_path`。既定は `/__livereload` で、
+    setoka は既定のまま）。404.html を返すことと base の扱いは今のまま README に書いた
+  - 文言は日本語のまま。setoka のコマンドや設定への案内は setoka-cli が足す（下）
+- やったこと
+  - `crates/setoka-server` を `git mv` で `crates/jabara`（0.1.0。公開する）にし、README・LICENSE 2 つを足した
+  - `ServeOptions` に `new` と `live_reload_path` と `forbidden_hint`（Host / Origin で断ったときの 403 の応答に添える案内）を
+    足した。403 の本文と `ServerError::PortInUse` の文言から setoka の案内（`setoka.toml` の `[dev] allowed_hosts`・`--port`）を
+    外し、setoka-cli の `serve_dist`（`commands/preview.rs`）が同じ文言を渡す・足すようにした
+  - テスト: ライブリロードの経路を変えられる・`ServeOptions::new` の既定値の 2 本を足した（jabara は 36 本）
+  - 依存の向き（`setoka-cli → jabara`）と、CLAUDE.md・verify・release・publish-crate スキル・`.devcontainer/README.md`・
+    docs の「開発者向け」（crate の一覧・依存の図・監視の説明）・ci.yml の package の検査を直した。hebesu を「公開済み 0.1.0」にした
+- 確かめたこと: `cargo test --workspace`（1194 本。setoka-cli の `build --watch`・`dev`・`preview` の結合テストを含む）・clippy・
+  ポートが使用中のときの `setoka preview` の文言と終了コード 2・Host を偽った要求への 403 の本文が main のバイナリとバイト単位で
+  同じ・`cargo package -p jabara`（13 ファイル）・`cargo doc -p jabara` に警告なし・README の例をスクラッチの crate でビルドした
 - 工数: 小〜中
 
 ### 106 kunenbo（出力先への安全な書き込み） ⬜
