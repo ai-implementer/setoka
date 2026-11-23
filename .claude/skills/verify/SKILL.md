@@ -97,7 +97,7 @@ cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の�
 - `docs/setoka.toml` の `[markdown]` から `[markdown.glossary.terms]` の終わりまでは、`docs/content/guide/code-and-math.md`
   の `lines=` で引用されている。スクリプトが `lines=` の範囲を原稿から読み、その範囲が今もこのブロックを指しているかを
   確かめるので、`docs/setoka.toml` の行を動かしたら、止まったときの文言に従って `lines=`（引用の 2 か所と、説明の文の例）を直す
-- 終わったときの `docs/dist` は既定の base で作り直してある（`run` スキルで開ける）
+- 終わったときの `docs/dist/` は既定の base で作り直してある（`run` スキルで開ける）
 
 ## 6. e2e（CLI 実機）
 
