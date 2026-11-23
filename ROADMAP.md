@@ -363,7 +363,7 @@ JS なしの静的 HTML にする。
     置き換える必要がある、と `Finding::range` と README に書いた（setoka の `apply_fixes` はこの選別をしている）
 - 工数: 中〜大（CLI は延期可）
 
-### 105 jabara（開発サーバ） ⬜
+### 105 jabara（開発サーバ） ✅
 
 **概要**: setoka-server を crate jabara に置き換える。静的ファイルの配信・ライブリロード・ファイルの監視・
 Host / Origin の検査・シンボリックリンクの遮断を、ほかの静的サイトの道具からも使えるようにする。
