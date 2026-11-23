@@ -20,6 +20,8 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
 # frontmatter の YAML の読み込み（v0.22 Phase 102 で yaml.rs から切り出した）
 shikuwasa = { workspace = true }
+# 日本語の表記ゆれの検査（v0.22 Phase 104 で lint.rs から切り出した）
+hebesu = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

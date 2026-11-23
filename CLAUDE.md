@@ -97,12 +97,12 @@ cargo build -p setoka-cli
 setoka-cli → {setoka-server, setoka-render, setoka-index, setoka-core, setoka-config}
 setoka-render → setoka-core, setoka-config, setoka-theme, tankan, amanatsu
 setoka-index → setoka-core, mikan       mikan-wasm → mikan
-setoka-core → shikuwasa                  amanatsu → shikuwasa（json）
+setoka-core → shikuwasa, hebesu          amanatsu → shikuwasa（json）
 setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
-tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu は他の setoka crate 非依存の汎用ライブラリ
-（tankan・mikan・kabosu・shikuwasa は crates.io で公開済み。amanatsu は v0.22 Phase 103 で切り出し、未公開。検索スタックの書き側集約は
+tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu は他の setoka crate 非依存の汎用ライブラリ
+（tankan・mikan・kabosu・shikuwasa・amanatsu は crates.io で公開済み。hebesu は v0.22 Phase 104 で切り出し、未公開。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
 setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
@@ -289,7 +289,7 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   フラグ・`--format json` のキー・診断ルールの名前を消す・改名する変更はマイナー版だけで、
   `--format json` のキーはマイナー版でも消さない。リリースノートの「非互換と注意」はこのページの
   対象を見て書く（`release` スキル）
-- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu）** — setoka のリリースと非同期。手順は
+- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu）** — setoka のリリースと非同期。手順は
   **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須。amanatsu は crates.io の
   shikuwasa に依存するので、shikuwasa の版を上げたら先に shikuwasa を publish する）
   - fuzz.yml は 4 crate の対象（kabosu 3・mikan のシャード・shikuwasa の `parse`・tankan の `render_svg`）を
@@ -528,6 +528,11 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 - fmt / lint / check は **draft ページも対象**（build_source_pages）。build_site_model は
   従来どおり draft を除外する
   - nav を作らないので `crossref.numbering: "site"` でも診断時のラベル番号はページ内番号のまま
+- **表記ゆれの検査（全角英数・半角カナ・長音符・用語辞書）は crate hebesu**（v0.22 Phase 104 で lint.rs から
+  切り出した。依存ゼロ）。setoka-core の `lint.rs` は Markdown からテキストを取り出して渡し、結果を診断（位置・文言・
+  `fix`）に変えるだけ（`wording_diagnostic`）。文言は hebesu のもので、`term-variant` だけ「（lint.terms）」を足す。
+  ルールの名前は hebesu の `Rule::name` と同じ（lint.rs のテストが縛る）。長音符のゆれは `ChoonTally` に全ページの
+  テキストを足して集計する
 
 ### docs サイトと CI
 

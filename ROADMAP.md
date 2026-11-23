@@ -91,7 +91,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 
 - **時間が足りなければ v0.23 へ移すもの**: 101 の ci.yml のシェルの e2e を Windows でも動かすこと（11-23 に
   延期を確定。Windows では結合テストが動く）/ 104 の CLI（hebesu を単独の
-  コマンドとして出す部分）。100〜103・105〜107 と 104 のライブラリの部分は移さない
+  コマンドとして出す部分。11-23 に延期を決めた）。100〜103・105〜107 と 104 のライブラリの部分は移さない
 
 ### 現状の確認（11-17）
 
@@ -333,6 +333,26 @@ JS なしの静的 HTML にする。
 - 判断点: API の形（1 つの文字列ごとか、文書の集まりか）/ 単独の CLI を出すか（出すなら Markdown を読むために
   comrak に依存する）/ ルールの名前（setoka の `fullwidth-alphanumeric` などとそろえるか）
 - 非互換と注意: なし（診断と自動修正の結果を変えない）
+- 決定（11-23。ユーザが推奨案で決めた）
+  - API はテキストごとの関数と集計器: 全角英数（`fullwidth_alphanumeric`）・半角カナ（`halfwidth_kana`）・用語辞書
+    （`term_variants`）は文字列を受けて `Finding`（バイトの範囲・見つけた表記・候補・日本語の説明）を返す。長音符のゆれは
+    `ChoonTally` にテキストを位置の印（使う側が決める型）と一緒に足していき、`finish` で少数派の出現を受け取る。
+    setoka は hebesu の文言を使い、`term-variant` だけ「（lint.terms）」を足す
+  - 単独の CLI は v0.23 へ延期（Markdown を読むために comrak に依存し、コードブロックを除く等の決めごとも要る）
+  - ルールの名前は setoka の診断の名前とそろえる（`Rule::name` = `fullwidth-alphanumeric` など）
+- やったこと
+  - `crates/hebesu/`（0.1.0。依存ゼロ。`lib.rs`・`tests.rs`・README・LICENSE 2 つ）。中身は setoka-core の `lint.rs` の
+    `check_char_classes`・`check_katakana_choon`・`check_terms`・`char_class_runs`・`to_fullwidth_kana` を、Markdown と
+    診断から切り離して移したもの（判定と並び順は変えない）
+  - setoka-core の `lint.rs` は Markdown からテキストを取り出して hebesu に渡し、`wording_diagnostic` で診断に変える
+    だけにした。ルールの名前が hebesu と同じことのテストを足した
+  - ci.yml: package の検査に hebesu を足し、kabosu の依存ゼロの検査を hebesu にも掛けた
+  - publish-crate・verify・release スキル・CLAUDE.md（依存の向きの図・汎用ライブラリ・「fmt と診断」の節）・docs の
+    「開発者向け」（crate の一覧・依存の図）を直した。amanatsu を「公開済み 0.1.0」にした
+- 確かめたこと: `cargo test --workspace`（1192 本。setoka-core の lint のテスト = Markdown から診断と `fix` までを
+  書き換えずに通した）・clippy・main の setoka と比べて、4 つのルールを含む原稿の `lint --format json`・`lint --fix` で
+  直した結果・docs の `check --format json` が同じ・`cargo package -p hebesu`（9 ファイル。package 後の manifest に依存が
+  無い）・README の例をスクラッチの crate で動かした
 - 工数: 中〜大（CLI は延期可）
 
 ### 105 jabara（開発サーバ） ⬜
@@ -433,6 +453,9 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
 
 ### その他の候補
 
+- **hebesu を単独のコマンドとして出す**（v0.23 の予定。v0.22 Phase 104 で延期を決めた）— Markdown（や素のテキスト）を
+  読んで表記ゆれを報告・自動修正する CLI。Markdown を読むなら comrak に依存し、コードブロック・URL を除く決めごと
+  （setoka-core の `extract_text_spans` と同じにするか）と、用語辞書の書き方（設定ファイル）を決める
 - **API 仕様の検査（`setoka check` / amanatsu の `check`）で文書の中の参照も見る**（v0.22 Phase 103 のレビューで
   分かった）— 今は別ファイルへの `$ref` の読み込みとパースまでで、`#/components/schemas/Nope` のように指す先が無い
   参照や循環は、描画で注記になるだけで check は何も言わない。足すと check の出力が増える（新しい診断）。参照ファイルの
