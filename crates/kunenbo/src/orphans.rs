@@ -331,8 +331,14 @@ mod tests {
         })
         .unwrap();
         assert!(warnings.is_empty(), "{warnings:?}");
+        // 大文字小文字を区別しない FS（macOS・Windows）では旧表記でも exists() が true になるので、
+        // ディレクトリの列挙で実際の名前を見る（PR #112 の再レビューの指摘）
+        let names: Vec<String> = fs::read_dir(root)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, std::slice::from_ref(&new));
         assert!(root.join(&new).join("index.html").is_file());
-        assert!(!root.join(&old).exists());
     }
 
     #[test]

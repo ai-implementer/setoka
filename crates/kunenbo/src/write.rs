@@ -94,9 +94,16 @@ pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Resul
 /// `path` と同じディレクトリに一時ファイルを排他的に作る（[`write_atomic_under`] 用）
 fn create_temp_beside(path: &Path) -> std::io::Result<(PathBuf, fs::File)> {
     // 名前に出力のファイル名を含めない（含めると、上限に近い長さの名前で一時ファイルだけが作れなくなる。
-    // PR #112 の再レビューの指摘）。同じディレクトリのほかの書き込みとは create_new で分かれる
+    // PR #112 の再レビューの指摘）。同じディレクトリのほかの書き込みとは create_new で分かれる。
+    // 出力先そのものの名前は使わない（出力先がまだ無いと、一時ファイルのつもりで出力先へ直に書き、書き終わる前の
+    // 中身が見える）。大文字小文字を区別しない FS も考えて、大文字小文字を畳んで比べる
+    let dest = path.file_name().map(|n| n.to_string_lossy().to_lowercase());
     for n in 0..100 {
-        let tmp = path.with_file_name(format!(".kunenbo-tmp-{n}"));
+        let name = format!(".kunenbo-tmp-{n}");
+        if dest.as_deref() == Some(name.as_str()) {
+            continue;
+        }
+        let tmp = path.with_file_name(&name);
         match fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -285,6 +292,24 @@ mod tests {
         write_atomic_under(&root, "global.json", b"new").unwrap();
         assert_eq!(fs::read(root.join("global.json")).unwrap(), b"new");
         assert_eq!(fs::read(&outside).unwrap(), b"keep", "リンク先へ書かない");
+    }
+
+    /// 出力先が一時名と同じ名前（大文字小文字だけ違うものも）でも、出力先とは別の一時ファイルに書く。同じだと
+    /// 出力先へ直に書き、書き終わる前の中身が見える（PR #112 の再レビューの指摘）
+    #[test]
+    fn 一時ファイルに出力先と同じ名前を使わない() {
+        let dir = tempfile::tempdir().unwrap();
+        for dest in [".kunenbo-tmp-0", ".KUNENBO-TMP-0"] {
+            let path = dir.path().join(dest);
+            let (tmp, file) = create_temp_beside(&path).unwrap();
+            drop(file);
+            let tmp_name = tmp.file_name().unwrap().to_string_lossy().to_lowercase();
+            assert_ne!(tmp_name, dest.to_lowercase(), "{dest}");
+            fs::remove_file(&tmp).unwrap();
+        }
+        write_atomic_under(dir.path(), ".kunenbo-tmp-0", b"x").unwrap();
+        assert_eq!(names(dir.path()), [".kunenbo-tmp-0"]);
+        assert_eq!(fs::read(dir.path().join(".kunenbo-tmp-0")).unwrap(), b"x");
     }
 
     /// 一時ファイルの名前が出力のファイル名に依らないので、上限（多くの FS で 255 バイト）に近い名前でも書ける
