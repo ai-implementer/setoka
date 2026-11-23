@@ -80,6 +80,36 @@ pub fn ensure_no_symlink_under(root: &Path, target: &Path) -> std::io::Result<()
     ensure_symlink_free(root, target)
 }
 
+/// kunenbo が一時ディレクトリに使う名前（`.kunenbo-tmp-` に数字が続くもの）か。
+///
+/// Windows の通常のパスの解決（Win32）は、大文字小文字を区別せず、名前の末尾のピリオドと空白を落とす
+/// （`.kunenbo-tmp-0.` と `.KUNENBO-TMP-0 ` は `.kunenbo-tmp-0` と同じものを指す）ので、同じように畳んでから比べる。
+/// ほかの OS では別の名前だが、規則を 1 つにするために同じく一時ディレクトリの名前とみなす。
+/// Windows の 8.3 形式の短い名前（`KUNENB~1`）や代替データストリーム（`名前:ストリーム`）で同じ
+/// ディレクトリを指す書き方は見分けない（名前の文字列で判定しているため）
+pub(crate) fn is_temp_name(seg: &str) -> bool {
+    seg.trim_end_matches(['.', ' '])
+        .to_lowercase()
+        .strip_prefix(".kunenbo-tmp-")
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// `rel` が一時ディレクトリの名前（[`is_temp_name`]）を含んでいれば断る（書き込み中の一時ファイルを、別の書き込みや
+/// 掃除が上書き・置き換え・削除しないように。[`write_under`](crate::write_under)・
+/// [`write_atomic_under`](crate::write_atomic_under)・[`remove_orphans`](crate::remove_orphans)・
+/// [`list_files_under`](crate::list_files_under) 用）
+pub(crate) fn reject_temp_name(rel: &str) -> std::io::Result<()> {
+    if rel.split('/').any(is_temp_name) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "出力先として使えない相対パスです（.kunenbo-tmp- に数字が続く名前は一時ディレクトリに使います）: {rel}"
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// 構成要素から組み直したパス（末尾の区切りを落とす。`dist/` → `dist`）。末尾に区切りがあると、
 /// `symlink_metadata` や `remove_file` はリンクを辿ってリンク先を見る（POSIX のパスの解決）
 pub(crate) fn without_trailing_separator(path: &Path) -> PathBuf {

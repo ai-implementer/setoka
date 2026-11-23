@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::guard::{
-    ensure_no_symlink_above, ensure_no_symlink_under, resolve_output_rel,
+    ensure_no_symlink_above, ensure_no_symlink_under, reject_temp_name, resolve_output_rel,
     without_trailing_separator,
 };
 
@@ -124,25 +124,6 @@ fn create_temp_dir_beside(path: &Path) -> std::io::Result<PathBuf> {
         std::io::ErrorKind::AlreadyExists,
         "使える一時ディレクトリの名前がありません（同じ名前のものが 100 個あります）",
     ))
-}
-
-/// `rel` が一時ディレクトリの名前（`.kunenbo-tmp-` に数字が続くもの）を含んでいれば断る。大文字小文字を
-/// 区別しない FS も考えて、大文字小文字を畳んで比べる（[`write_under`]・[`write_atomic_under`] 用）
-fn reject_temp_name(rel: &str) -> std::io::Result<()> {
-    let reserved = rel.split('/').any(|seg| {
-        seg.to_lowercase()
-            .strip_prefix(".kunenbo-tmp-")
-            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
-    });
-    if reserved {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!(
-                "出力先として使えない相対パスです（.kunenbo-tmp- に数字が続く名前は一時ディレクトリに使います）: {rel}"
-            ),
-        ));
-    }
-    Ok(())
 }
 
 /// [`ensure_no_symlink_under`] で経路を確認してから、`dir` までのディレクトリを作る。
@@ -330,6 +311,11 @@ mod tests {
             ".KUNENBO-TMP-12",
             ".kunenbo-tmp-0/data",
             "a/.kunenbo-tmp-3/b.json",
+            // Windows の通常のパスの解決は名前の末尾のピリオドと空白を落とすので、`.kunenbo-tmp-0` と同じものを指す
+            // （PR #112 の再レビューの指摘）
+            ".kunenbo-tmp-0./data",
+            ".kunenbo-tmp-0 /data",
+            ".KUNENBO-TMP-0. ./data",
         ] {
             let err = write_atomic_under(root, rel, b"x").unwrap_err();
             assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{rel}");

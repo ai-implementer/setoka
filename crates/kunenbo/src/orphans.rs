@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::guard::{ensure_no_symlink_under, resolve_output_rel};
+use crate::guard::{ensure_no_symlink_under, is_temp_name, reject_temp_name, resolve_output_rel};
 
 /// 2 つのパスが同じファイルか（Unix は dev / inode、Windows はファイル ID。読めなければ別物）。
 ///
@@ -20,7 +20,7 @@ pub fn is_same_file(a: &Path, b: &Path) -> bool {
 #[non_exhaustive]
 pub enum OrphanWarning {
     /// 前回の一覧の相対パスが使えない（[`resolve_output_rel`] が断った）か、経路にシンボリックリンクが
-    /// ある（[`ensure_no_symlink_under`] が断った）ので消さなかった
+    /// ある（[`ensure_no_symlink_under`] が断った）か、一時ディレクトリ（`.kunenbo-tmp-{n}`）の下なので消さなかった
     Skipped { rel: String, error: std::io::Error },
     /// 今回と同じファイルだった前回のパスについて、ディスク上の名前の大文字小文字を今回に合わせられなかった
     /// （今回の出力は残っている。名前の大文字小文字が前回のままなだけ）
@@ -41,18 +41,26 @@ impl std::fmt::Display for OrphanWarning {
 }
 
 /// `root` の下の `rel_dir` にある通常ファイルを、`root` 相対の `/` 区切りで列挙する。
-/// `rel_dir` が無ければ空。シンボリックリンクは辿らず、リンク自体も挙げない。
+/// `rel_dir` が無ければ空。シンボリックリンクは辿らず、リンク自体も挙げない。一時ディレクトリ（`.kunenbo-tmp-{n}`。
+/// [`write_atomic_under`](crate::write_atomic_under) が書き込みの途中に使う）の中も挙げない。
 ///
 /// [`remove_orphans`] に渡して「今回書かなかったものだけ消す」ために使う（出力をやめた
 /// ディレクトリを丸ごと消すと、利用者が同じ場所へ置いたファイルまで消えてしまう）
 pub fn list_files_under(root: &Path, rel_dir: &str) -> std::io::Result<BTreeSet<String>> {
+    reject_temp_name(rel_dir)?;
     let dir = resolve_output_rel(root, rel_dir)?;
     ensure_no_symlink_under(root, &dir)?;
     let mut files = BTreeSet::new();
     if !dir.is_dir() {
         return Ok(files);
     }
-    for entry in walkdir::WalkDir::new(&dir).follow_links(false) {
+    // 一時ディレクトリ（`.kunenbo-tmp-{n}`）の中は、同時に動く書き込みの途中のファイルなので挙げない
+    // （挙げると remove_orphans が消し、その書き込みが NotFound で失敗する。PR #112 の再レビューの指摘）
+    let walk = walkdir::WalkDir::new(&dir)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| e.depth() == 0 || !is_temp_name(&e.file_name().to_string_lossy()));
+    for entry in walk {
         let entry = entry.map_err(std::io::Error::other)?;
         if !entry.file_type().is_file() {
             continue;
@@ -74,7 +82,8 @@ pub fn list_files_under(root: &Path, rel_dir: &str) -> std::io::Result<BTreeSet<
 /// 削除し、空になったディレクトリを `root` の手前まで剪定する。削除件数を返す。
 ///
 /// 前回の一覧は書き換えられうる記録から読むものとして、消す前にパスを検証する。使えない相対パスと、
-/// 経路にシンボリックリンクがあるパス（`dist/guide -> /outside` を経由してリンク先を消さない）は
+/// 経路にシンボリックリンクがあるパス（`dist/guide -> /outside` を経由してリンク先を消さない）と、一時ディレクトリ
+/// （`.kunenbo-tmp-{n}`）の下のパス（同時に動く書き込みの途中のファイルを消さない）は
 /// 消さずに飛ばし、`on_warning` に [`OrphanWarning::Skipped`] を渡して続ける。
 ///
 /// **大文字小文字を区別しない FS（macOS・Windows の既定）**: `Guide.md` を `guide.md` に
@@ -118,7 +127,9 @@ fn remove_orphans_with(
         // 経路のリンク検査も込み（`dist/guide -> /outside` を経由して
         // リンク先のファイルを消さないため）。
         // 不正な rel は掃除を止めず読み飛ばす（掃除できないだけで害はない）
-        let path = match resolve_output_rel(root, rel)
+        // 一時ディレクトリ（`.kunenbo-tmp-{n}`）の下は、同時に動く書き込みの途中のファイルなので消さない
+        let path = match reject_temp_name(rel)
+            .and_then(|()| resolve_output_rel(root, rel))
             .and_then(|path| ensure_no_symlink_under(root, &path).map(|()| path))
         {
             Ok(path) => path,
@@ -407,6 +418,44 @@ mod tests {
         );
         assert!(list_files_under(root, "missing").unwrap().is_empty());
         assert!(list_files_under(root, "../x").is_err());
+    }
+
+    /// 書き込みの途中の一時ディレクトリ（`.kunenbo-tmp-{n}`）の中は列挙せず、掃除でも消さない。列挙して掃除に渡すと、
+    /// 同時に動く書き込みの一時ファイルが消え、その書き込みが NotFound で失敗した（PR #112 の再レビューの指摘）
+    #[test]
+    fn 一時ディレクトリの中は列挙せず掃除でも消さない() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write_under(root, "_search/manifest.json", b"{}").unwrap();
+        // 書き込みの途中を再現する（Windows で同じものを指す末尾のピリオドの表記も）
+        for tmp in ["_search/.kunenbo-tmp-0", "_search/index/.KUNENBO-TMP-1."] {
+            fs::create_dir_all(root.join(tmp)).unwrap();
+            fs::write(root.join(tmp).join("data"), b"A").unwrap();
+        }
+
+        let listed = list_files_under(root, "_search").unwrap();
+        assert_eq!(listed, set(&["_search/manifest.json"]));
+        assert!(list_files_under(root, "_search/.kunenbo-tmp-0").is_err());
+
+        // 前回の一覧に一時ディレクトリの下が入っていても消さずに飛ばす
+        let previous = set(&[
+            "_search/manifest.json",
+            "_search/.kunenbo-tmp-0/data",
+            "_search/index/.KUNENBO-TMP-1./data",
+        ]);
+        let mut warnings = Vec::new();
+        let removed =
+            remove_orphans(root, &previous, &BTreeSet::new(), |w| warnings.push(w)).unwrap();
+        assert_eq!(removed, 1, "manifest.json だけ");
+        assert_eq!(warnings.len(), 2, "{warnings:?}");
+        assert_eq!(
+            fs::read(root.join("_search/.kunenbo-tmp-0/data")).unwrap(),
+            b"A"
+        );
+        assert_eq!(
+            fs::read(root.join("_search/index/.KUNENBO-TMP-1./data")).unwrap(),
+            b"A"
+        );
     }
 
     #[test]
