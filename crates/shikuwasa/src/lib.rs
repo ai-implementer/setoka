@@ -32,7 +32,7 @@
 //! assert_eq!((e.line, e.col), (2, 1));
 //! ```
 //!
-//! feature `json` で、YAML（JSON を含む）を `serde_json::Value` へ写す [`to_json`] が使える。
+//! feature `json` で、YAML（JSON を含む）を `serde_json::Value` へ写す `to_json` が使える。
 
 #![forbid(unsafe_code)]
 
@@ -100,7 +100,7 @@ pub enum Kind {
     /// キーと値の組（書いた順。同名のキーは読み込みがエラーにしている）
     Mapping(Vec<(Node, Node)>),
     /// saphyr が値を作れなかったもの（作っている途中のアンカーを指す循環した別名 `&a [*a]` の `*a` など）。
-    /// 値なし（null）とは区別する。[`to_json`] では null になる
+    /// 値なし（null）とは区別する。`to_json`（feature `json`）では null になる
     Unresolved,
 }
 
