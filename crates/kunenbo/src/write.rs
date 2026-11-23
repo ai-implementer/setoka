@@ -42,12 +42,16 @@ pub fn write_if_changed(path: &Path, data: &[u8]) -> std::io::Result<WriteOutcom
 ///    出力ルートまでを検査しても、`dist/guide -> /outside` のような
 ///    **出力ツリー内部**のリンクは別途見ないと書き込みが外へ抜ける
 /// 3. 親ディレクトリの作成 ＋ 内容が同じなら書かない（[`write_if_changed`]。更新時刻を変えない）
+///
+/// `.kunenbo-tmp-` に数字が続く名前（大文字小文字は区別しない）を含む `rel` は断る（[`write_atomic_under`] が
+/// 一時ディレクトリに使う名前。書き込み中の一時ファイルを別の書き込みが上書き・置き換えできないようにする）
 pub fn write_under(
     root: &Path,
     rel: &str,
     data: &[u8],
 ) -> std::io::Result<(PathBuf, WriteOutcome)> {
     let path = resolve_output_rel(root, rel)?;
+    reject_temp_name(rel)?;
     ensure_no_symlink_under(root, &path)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -64,19 +68,21 @@ pub fn write_under(
 ///
 /// 3 つの防御（字句検証・経路のリンク検査・親ディレクトリの作成）は [`write_under`]
 /// と同じものを通す。一時ファイルは、出力先と同じディレクトリに**排他的に**作った一時ディレクトリ
-/// （`.kunenbo-tmp-{n}`。既にある名前は、ファイルでもリンクでも使わずに次の名前へ進む。出力先と同じ名前も使わない）の
-/// 中に作り、書き終えたら出力先へ rename して、一時ディレクトリを消す。
+/// （`.kunenbo-tmp-{n}`。既にある名前は、ファイルでもリンクでも使わずに次の名前へ進む）の
+/// 中に作り、書き終えたら出力先へ rename して、一時ディレクトリを消す。この名前（`.kunenbo-tmp-` に数字が続くもの。
+/// 大文字小文字は区別しない）は一時ディレクトリ専用で、それを含む `rel` は [`write_under`] とこの関数が断る。
 ///
 /// - 固定名の一時ファイルへ書くと、たまたま同じ名前の別のファイルを上書きして消し、そこに置かれたリンクを辿る
 /// - 一時名に出力のファイル名を含めないので、名前の長さの上限に近い出力でも書ける
 /// - 一時ファイルを同じディレクトリに直に置くと、同時に動く別の書き込みがその名前を出力先にしたとき、rename で
-///   一時ファイルを置き換えられ、どちらも成功したまま中身が入れ替わる。中身の入った一時ディレクトリはファイルの
-///   rename では置き換えられないので、そのときは後の書き込みがエラーになる（PR #112 の再レビューの指摘）
+///   一時ファイルを置き換えられ、どちらも成功したまま中身が入れ替わる。一時ディレクトリの名前とその下は出力先に
+///   できないので、別の書き込みが書き込み中の一時ファイルを置き換えることはない（PR #112 の再レビューの指摘）
 ///
 /// 書き込みか置き換えに失敗したら、作った一時ファイルと一時ディレクトリを消す。
 /// 内容が同じでも書き直す（原子性のため）ので、更新時刻を変えたくない出力には使わない
 pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Result<PathBuf> {
     let path = resolve_output_rel(root, rel)?;
+    reject_temp_name(rel)?;
     ensure_no_symlink_under(root, &path)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -104,15 +110,9 @@ pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Resul
 
 /// `path` と同じディレクトリに一時ディレクトリを排他的に作る（[`write_atomic_under`] 用）
 fn create_temp_dir_beside(path: &Path) -> std::io::Result<PathBuf> {
-    // 出力先そのものの名前は使わない（出力先がまだ無いと、出力先の名前でディレクトリを作ってしまう）。
-    // 大文字小文字を区別しない FS も考えて、大文字小文字を畳んで比べる
-    let dest = path.file_name().map(|n| n.to_string_lossy().to_lowercase());
+    // 出力先はこの名前を含まない（write_atomic_under が reject_temp_name で断っている）
     for n in 0..100 {
-        let name = format!(".kunenbo-tmp-{n}");
-        if dest.as_deref() == Some(name.as_str()) {
-            continue;
-        }
-        let dir = path.with_file_name(&name);
+        let dir = path.with_file_name(format!(".kunenbo-tmp-{n}"));
         // create_dir は既にある名前（ファイル・ディレクトリ・リンク）では AlreadyExists で失敗し、リンクを辿らない
         match fs::create_dir(&dir) {
             Ok(()) => return Ok(dir),
@@ -124,6 +124,25 @@ fn create_temp_dir_beside(path: &Path) -> std::io::Result<PathBuf> {
         std::io::ErrorKind::AlreadyExists,
         "使える一時ディレクトリの名前がありません（同じ名前のものが 100 個あります）",
     ))
+}
+
+/// `rel` が一時ディレクトリの名前（`.kunenbo-tmp-` に数字が続くもの）を含んでいれば断る。大文字小文字を
+/// 区別しない FS も考えて、大文字小文字を畳んで比べる（[`write_under`]・[`write_atomic_under`] 用）
+fn reject_temp_name(rel: &str) -> std::io::Result<()> {
+    let reserved = rel.split('/').any(|seg| {
+        seg.to_lowercase()
+            .strip_prefix(".kunenbo-tmp-")
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+    });
+    if reserved {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "出力先として使えない相対パスです（.kunenbo-tmp- に数字が続く名前は一時ディレクトリに使います）: {rel}"
+            ),
+        ));
+    }
+    Ok(())
 }
 
 /// [`ensure_no_symlink_under`] で経路を確認してから、`dir` までのディレクトリを作る。
@@ -300,26 +319,39 @@ mod tests {
         assert_eq!(fs::read(&outside).unwrap(), b"keep", "リンク先へ書かない");
     }
 
-    /// 出力先が一時名と同じ名前（大文字小文字だけ違うものも）でも、出力先とは別の一時ディレクトリを使う。同じだと
-    /// 出力先の名前でディレクトリを作ってしまう（PR #112 の再レビューの指摘）
+    /// 一時ディレクトリの名前（`.kunenbo-tmp-` に数字が続くもの。大文字小文字は区別しない）とその下は出力先にできない
+    /// （PR #112 の再レビューの指摘）
     #[test]
-    fn 一時ディレクトリに出力先と同じ名前を使わない() {
+    fn 一時ディレクトリの名前とその下は出力先にできない() {
         let dir = tempfile::tempdir().unwrap();
-        for dest in [".kunenbo-tmp-0", ".KUNENBO-TMP-0"] {
-            let path = dir.path().join(dest);
-            let tmp = create_temp_dir_beside(&path).unwrap();
-            let tmp_name = tmp.file_name().unwrap().to_string_lossy().to_lowercase();
-            assert_ne!(tmp_name, dest.to_lowercase(), "{dest}");
-            fs::remove_dir(&tmp).unwrap();
+        let root = dir.path();
+        for rel in [
+            ".kunenbo-tmp-0",
+            ".KUNENBO-TMP-12",
+            ".kunenbo-tmp-0/data",
+            "a/.kunenbo-tmp-3/b.json",
+        ] {
+            let err = write_atomic_under(root, rel, b"x").unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{rel}");
+            let err = write_under(root, rel, b"x").unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{rel}");
         }
-        write_atomic_under(dir.path(), ".kunenbo-tmp-0", b"x").unwrap();
-        assert_eq!(names(dir.path()), [".kunenbo-tmp-0"]);
-        assert_eq!(fs::read(dir.path().join(".kunenbo-tmp-0")).unwrap(), b"x");
+        assert!(names(root).is_empty(), "何も作らない");
+        // 数字が続かないものは普通の名前
+        for rel in [
+            ".kunenbo-tmp-",
+            ".kunenbo-tmp-x",
+            ".kunenbo-tmp-0a",
+            "kunenbo-tmp-0",
+        ] {
+            write_atomic_under(root, rel, b"x").unwrap();
+            write_under(root, rel, b"y").unwrap();
+        }
     }
 
-    /// 書き込みの途中（一時ディレクトリ `.kunenbo-tmp-0` に中身がある）に、別の書き込みがその名前を出力先にしても、
-    /// 途中の一時ファイルを置き換えずにエラーになる（PR #112 の再レビューの指摘。一時ファイルを直に置いていたときは、
-    /// どちらも成功したまま中身が入れ替わった）
+    /// 書き込みの途中（一時ディレクトリ `.kunenbo-tmp-0` に中身がある）に、別の書き込みがその名前やその下を出力先に
+    /// しても、途中の一時ファイルを置き換えずにエラーになる（PR #112 の再レビューの指摘。一時ファイルを直に置いて
+    /// いたとき・一時ディレクトリの下を出力先にできたときは、どちらも成功したまま中身が入れ替わった）
     #[test]
     fn 書き込み中の一時ディレクトリは別の書き込みに置き換えられない() {
         let dir = tempfile::tempdir().unwrap();
@@ -328,17 +360,43 @@ mod tests {
         fs::create_dir(root.join(".kunenbo-tmp-0")).unwrap();
         fs::write(root.join(".kunenbo-tmp-0/data"), b"A").unwrap();
 
-        // 書き込み B: 出力先が A の一時ディレクトリの名前
-        assert!(write_atomic_under(root, ".kunenbo-tmp-0", b"B").is_err());
+        // 書き込み B: 出力先が A の一時ディレクトリの名前か、その下
+        for rel in [".kunenbo-tmp-0", ".kunenbo-tmp-0/data"] {
+            assert!(write_atomic_under(root, rel, b"B").is_err(), "{rel}");
+            assert!(write_under(root, rel, b"B").is_err(), "{rel}");
+        }
         assert_eq!(fs::read(root.join(".kunenbo-tmp-0/data")).unwrap(), b"A");
         assert_eq!(
             names(root),
             [".kunenbo-tmp-0"],
             "B の一時ディレクトリは残らない"
         );
-        // 同じ名前への通常の書き込みもリンクの検査の後でエラーになる（ディレクトリへは書けない）
-        assert!(write_under(root, ".kunenbo-tmp-0", b"B").is_err());
-        assert_eq!(fs::read(root.join(".kunenbo-tmp-0/data")).unwrap(), b"A");
+    }
+
+    /// 2 つのスレッドで同時に書く（A は `report.json`、B は A が使う一時ディレクトリの下）。B は必ず断られ、
+    /// `report.json` には A の中身が入る（PR #112 の再レビューの指摘の回帰テスト）
+    #[test]
+    fn 同時に書いても一時ファイルを置き換えられない() {
+        let a_data = vec![b'A'; 256 * 1024];
+        for _ in 0..20 {
+            let dir = tempfile::tempdir().unwrap();
+            let barrier = std::sync::Barrier::new(2);
+            let (a, b) = std::thread::scope(|s| {
+                let a = s.spawn(|| {
+                    barrier.wait();
+                    write_atomic_under(dir.path(), "report.json", &a_data)
+                });
+                let b = s.spawn(|| {
+                    barrier.wait();
+                    write_atomic_under(dir.path(), ".kunenbo-tmp-0/data", b"B")
+                });
+                (a.join().unwrap(), b.join().unwrap())
+            });
+            a.unwrap();
+            assert!(b.is_err());
+            assert_eq!(fs::read(dir.path().join("report.json")).unwrap(), a_data);
+            assert_eq!(names(dir.path()), ["report.json"]);
+        }
     }
 
     /// 一時ファイルの名前が出力のファイル名に依らないので、上限（多くの FS で 255 バイト）に近い名前でも書ける
