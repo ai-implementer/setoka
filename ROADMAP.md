@@ -7,7 +7,8 @@ setoka の開発計画（今の版の Phase・候補）と、これまでの版�
 
 ## 現在: v0.22（Phase 100〜107）
 
-**v0.21.0 まで公開済み**。kabosu 0.2.1 / tankan 0.2.2 / mikan 0.3.0 は crates.io で公開済み（setoka の
+**v0.21.0 まで公開済み**。kabosu 0.2.1 / tankan 0.2.2 / mikan 0.3.0 と、v0.22 で切り出した shikuwasa / amanatsu / hebesu / jabara /
+kunenbo（どれも 0.1.0）は crates.io で公開済み（setoka の
 リリースとは非同期。手順は `publish-crate` スキル）。v0.21 の計画と各 Phase の記録（リリース後の作業を
 当面しないと決めた記録を含む）は ROADMAP-history.md の「完了済み: v0.21（Phase 94〜99）の内訳」。
 
@@ -412,7 +413,7 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
     jabara の README に書いた（リリースノートに載せる）
 - 工数: 小〜中
 
-### 106 kunenbo（出力先への安全な書き込み） ⬜
+### 106 kunenbo（出力先への安全な書き込み） ✅
 
 **概要**: setoka-core の `output.rs` から、出力先への安全な書き込み（相対パスの検証・シンボリックリンクの
 検査・変わったときだけ書く・一時ファイルからの置き換え・残ったファイルの掃除）を crate kunenbo に切り出す。

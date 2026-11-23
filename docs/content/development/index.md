@@ -24,7 +24,7 @@ crate を分けています。
     ├─ amanatsu     # OpenAPI / JSON Schema → 静的 HTML（setoka 非依存・crates.io 公開）
     ├─ hebesu       # 日本語の表記ゆれの検査（依存ゼロ・setoka 非依存・crates.io 公開）
     ├─ jabara       # 開発サーバ（配信・ライブリロード・監視・Host の検査。setoka 非依存・crates.io 公開）
-    ├─ kunenbo      # 出力先への安全な書き込み（パスの検証・リンクの検査・掃除。setoka 非依存）
+    ├─ kunenbo      # 出力先への安全な書き込み（パスの検証・リンクの検査・掃除。setoka 非依存・crates.io 公開）
     ├─ setoka-theme   # デフォルトテーマ（rust-embed: テンプレ + CSS + JS + mermaid.js）
     ├─ setoka-cli     # CLI（bin: setoka）
     ├─ setoka-index   # 検索インデクサ（ページ抽出・ファイル I/O・wasm 成果物の同梱）
