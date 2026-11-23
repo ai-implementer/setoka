@@ -56,17 +56,24 @@ pub fn write_under(
     Ok((path, outcome))
 }
 
-/// [`write_under`] の原子的版（同じディレクトリの一時ファイルへ書いて rename で置き換える）。
+/// [`write_under`] の原子的版（同じディレクトリに作った一時ディレクトリの中へ書いて、rename で置き換える）。
 ///
 /// 使いどころは「**書き込みの途中で止まると、次に読む側が壊れた内容を
 /// 掴む**」ファイルだけ（キャッシュの目次のように、それが健全なら残りも整合しているとみなす
 /// ファイルなど）。
 ///
 /// 3 つの防御（字句検証・経路のリンク検査・親ディレクトリの作成）は [`write_under`]
-/// と同じものを通す。一時ファイルは同じディレクトリに、まだ何も無い名前
-/// （`.kunenbo-tmp-{n}`。出力のファイル名を含めないので、名前の長さの上限に近い出力でも作れる）で**排他的に**作る（`create_new`。既にあるファイルや
-/// シンボリックリンクは開かずに次の名前へ進む）。固定名へ書くと、たまたま同じ名前の別のファイルを
-/// 上書きして消し、そこに置かれたリンクを辿る。書き込みか置き換えに失敗したら、作った一時ファイルを消す。
+/// と同じものを通す。一時ファイルは、出力先と同じディレクトリに**排他的に**作った一時ディレクトリ
+/// （`.kunenbo-tmp-{n}`。既にある名前は、ファイルでもリンクでも使わずに次の名前へ進む。出力先と同じ名前も使わない）の
+/// 中に作り、書き終えたら出力先へ rename して、一時ディレクトリを消す。
+///
+/// - 固定名の一時ファイルへ書くと、たまたま同じ名前の別のファイルを上書きして消し、そこに置かれたリンクを辿る
+/// - 一時名に出力のファイル名を含めないので、名前の長さの上限に近い出力でも書ける
+/// - 一時ファイルを同じディレクトリに直に置くと、同時に動く別の書き込みがその名前を出力先にしたとき、rename で
+///   一時ファイルを置き換えられ、どちらも成功したまま中身が入れ替わる。中身の入った一時ディレクトリはファイルの
+///   rename では置き換えられないので、そのときは後の書き込みがエラーになる（PR #112 の再レビューの指摘）
+///
+/// 書き込みか置き換えに失敗したら、作った一時ファイルと一時ディレクトリを消す。
 /// 内容が同じでも書き直す（原子性のため）ので、更新時刻を変えたくない出力には使わない
 pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Result<PathBuf> {
     let path = resolve_output_rel(root, rel)?;
@@ -75,48 +82,47 @@ pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Resul
         fs::create_dir_all(parent)?;
     }
     // 同一ディレクトリへ置く（rename が同一ファイルシステム内で完結する）
-    let (tmp, file) = create_temp_beside(&path)?;
+    let tmp_dir = create_temp_dir_beside(&path)?;
+    let tmp = tmp_dir.join("data");
     let written = (|| {
-        let mut file = file;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
         file.write_all(data)?;
         // Windows は開いたままのファイルを rename できないので先に閉じる
         drop(file);
         fs::rename(&tmp, &path)
     })();
-    if let Err(e) = written {
-        // 消すのは自分で作った一時ファイルだけ
+    // 消すのは自分で作った一時ファイルと一時ディレクトリだけ（rename できていれば一時ファイルはもう無い）
+    if written.is_err() {
         let _ = fs::remove_file(&tmp);
-        return Err(e);
     }
-    Ok(path)
+    let _ = fs::remove_dir(&tmp_dir);
+    written.map(|()| path)
 }
 
-/// `path` と同じディレクトリに一時ファイルを排他的に作る（[`write_atomic_under`] 用）
-fn create_temp_beside(path: &Path) -> std::io::Result<(PathBuf, fs::File)> {
-    // 名前に出力のファイル名を含めない（含めると、上限に近い長さの名前で一時ファイルだけが作れなくなる。
-    // PR #112 の再レビューの指摘）。同じディレクトリのほかの書き込みとは create_new で分かれる。
-    // 出力先そのものの名前は使わない（出力先がまだ無いと、一時ファイルのつもりで出力先へ直に書き、書き終わる前の
-    // 中身が見える）。大文字小文字を区別しない FS も考えて、大文字小文字を畳んで比べる
+/// `path` と同じディレクトリに一時ディレクトリを排他的に作る（[`write_atomic_under`] 用）
+fn create_temp_dir_beside(path: &Path) -> std::io::Result<PathBuf> {
+    // 出力先そのものの名前は使わない（出力先がまだ無いと、出力先の名前でディレクトリを作ってしまう）。
+    // 大文字小文字を区別しない FS も考えて、大文字小文字を畳んで比べる
     let dest = path.file_name().map(|n| n.to_string_lossy().to_lowercase());
     for n in 0..100 {
         let name = format!(".kunenbo-tmp-{n}");
         if dest.as_deref() == Some(name.as_str()) {
             continue;
         }
-        let tmp = path.with_file_name(&name);
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp)
-        {
-            Ok(file) => return Ok((tmp, file)),
+        let dir = path.with_file_name(&name);
+        // create_dir は既にある名前（ファイル・ディレクトリ・リンク）では AlreadyExists で失敗し、リンクを辿らない
+        match fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(e),
         }
     }
     Err(std::io::Error::new(
         std::io::ErrorKind::AlreadyExists,
-        "使える一時ファイルの名前がありません（同じ名前の一時ファイルが 100 個あります）",
+        "使える一時ディレクトリの名前がありません（同じ名前のものが 100 個あります）",
     ))
 }
 
@@ -294,22 +300,45 @@ mod tests {
         assert_eq!(fs::read(&outside).unwrap(), b"keep", "リンク先へ書かない");
     }
 
-    /// 出力先が一時名と同じ名前（大文字小文字だけ違うものも）でも、出力先とは別の一時ファイルに書く。同じだと
-    /// 出力先へ直に書き、書き終わる前の中身が見える（PR #112 の再レビューの指摘）
+    /// 出力先が一時名と同じ名前（大文字小文字だけ違うものも）でも、出力先とは別の一時ディレクトリを使う。同じだと
+    /// 出力先の名前でディレクトリを作ってしまう（PR #112 の再レビューの指摘）
     #[test]
-    fn 一時ファイルに出力先と同じ名前を使わない() {
+    fn 一時ディレクトリに出力先と同じ名前を使わない() {
         let dir = tempfile::tempdir().unwrap();
         for dest in [".kunenbo-tmp-0", ".KUNENBO-TMP-0"] {
             let path = dir.path().join(dest);
-            let (tmp, file) = create_temp_beside(&path).unwrap();
-            drop(file);
+            let tmp = create_temp_dir_beside(&path).unwrap();
             let tmp_name = tmp.file_name().unwrap().to_string_lossy().to_lowercase();
             assert_ne!(tmp_name, dest.to_lowercase(), "{dest}");
-            fs::remove_file(&tmp).unwrap();
+            fs::remove_dir(&tmp).unwrap();
         }
         write_atomic_under(dir.path(), ".kunenbo-tmp-0", b"x").unwrap();
         assert_eq!(names(dir.path()), [".kunenbo-tmp-0"]);
         assert_eq!(fs::read(dir.path().join(".kunenbo-tmp-0")).unwrap(), b"x");
+    }
+
+    /// 書き込みの途中（一時ディレクトリ `.kunenbo-tmp-0` に中身がある）に、別の書き込みがその名前を出力先にしても、
+    /// 途中の一時ファイルを置き換えずにエラーになる（PR #112 の再レビューの指摘。一時ファイルを直に置いていたときは、
+    /// どちらも成功したまま中身が入れ替わった）
+    #[test]
+    fn 書き込み中の一時ディレクトリは別の書き込みに置き換えられない() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        // 書き込み A の途中を再現する
+        fs::create_dir(root.join(".kunenbo-tmp-0")).unwrap();
+        fs::write(root.join(".kunenbo-tmp-0/data"), b"A").unwrap();
+
+        // 書き込み B: 出力先が A の一時ディレクトリの名前
+        assert!(write_atomic_under(root, ".kunenbo-tmp-0", b"B").is_err());
+        assert_eq!(fs::read(root.join(".kunenbo-tmp-0/data")).unwrap(), b"A");
+        assert_eq!(
+            names(root),
+            [".kunenbo-tmp-0"],
+            "B の一時ディレクトリは残らない"
+        );
+        // 同じ名前への通常の書き込みもリンクの検査の後でエラーになる（ディレクトリへは書けない）
+        assert!(write_under(root, ".kunenbo-tmp-0", b"B").is_err());
+        assert_eq!(fs::read(root.join(".kunenbo-tmp-0/data")).unwrap(), b"A");
     }
 
     /// 一時ファイルの名前が出力のファイル名に依らないので、上限（多くの FS で 255 バイト）に近い名前でも書ける
