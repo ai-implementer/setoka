@@ -261,7 +261,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   `cargo package -p amanatsu` は crates.io の shikuwasa で通った
 - 工数: 小〜中
 
-### 103 amanatsu（API 仕様の HTML 化） ⬜
+### 103 amanatsu（API 仕様の HTML 化） ✅
 
 **概要**: setoka-render の `apispec` を crate amanatsu に切り出す。OpenAPI 3.x / Swagger 2.0 / JSON Schema を、
 JS なしの静的 HTML にする。
@@ -275,7 +275,7 @@ JS なしの静的 HTML にする。
 - 非互換と注意: なし（HTML を変えない）。ログ（stderr）だけ変わる: build の API 仕様の警告に `page=` が付き、
   パースの失敗の理由が文の中に入る（以前は `error=` の欄）。check では `$ref` 先を読めないときの WARN の行が
   出なくなる（同じ内容を `spec-error` の診断で出している）
-- 決定（11-23。判断点への応答が無かったので推奨案で**仮決め**）
+- 決定（11-23 に判断点への応答が無かったので推奨案で仮決めし、同じ日にユーザがそのまま確定した）
   - 出力の文言は日本語のまま（tankan・shikuwasa と同じ。README に書いた）
   - CSS は setoka のテーマに残し、出力のクラスの一覧と構造を amanatsu の README に書く（CSS を 2 か所に持たない）
   - 公開 API は今の形: `render`（`Rendered` = HTML と警告）・`check`（`Issue` の一覧）・`SpecKind`・`SpecFiles`
