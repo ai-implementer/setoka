@@ -564,7 +564,37 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   Bash 3.2 で動くように書く。CLAUDE.md の依存の向きの図・`publish-crate` スキルの表・docs の
   `development/index.md` の crate の図を 5 つの crate を含めて直す
 - 判断点: スクリプトの名前と、e2e の確認も同じスクリプトにまとめるか
-- 非互換と注意: なし
+- 非互換と注意: なし（setoka の動きは変えない。検証の手順だけ）
+- 決定（11-23。ユーザが推奨案で決めた）
+  - スクリプトの名前は `scripts/docs-gates.sh`
+  - まとめるのは docs ゲートだけ。e2e（ci.yml の約 550 行）は ci.yml に残し、v0.23 で Windows の e2e とあわせて扱う
+    （GNU の `sed -i` や inotify を前提にした確認が多く、macOS 標準の Bash 3.2 で動かすには書き直しが要る）
+  - `docs/setoka.toml` の引用の行番号（27-47）は直書きをやめ、スクリプトが原稿の `lines=` から読んで確かめる。
+    CLAUDE.md とスキルからは行番号を消し、何を見ればよいかを書く（F6 の対処案）
+- 実装で決めたこと（判断点ではない。変えるならレビューで）
+  - 公開する crate（`publish = false` の無いもの）が、docs の「開発者向け」・CLAUDE.md の汎用ライブラリの一覧・
+    `publish-crate` スキルの表・ci.yml の package の検査にそろって載っているかをスクリプトで照合する（リリース判定の
+    「5 つの crate を含む」を、手で見るのでなくゲートにした。名前は区切りまで照合する = mikan と mikan-wasm を取り違えない）
+  - `setoka check` は GitHub Actions の中では `--format github`（注釈）、手元では人が読む形で出す
+  - 止まった行と文言を出す（`grep -q` は何も言わずに止まるので、ERR の trap で行番号とコマンドを出す）
+  - 最後の `--base-url /setoka/` のビルドの後に、既定の base で作り直す（verify の後に docs/dist を開けるように）
+- やったこと
+  - `scripts/docs-gates.sh`（Bash 3.2 で動く）に ci.yml の docs ステップの中身（check・build・配信ゲート・検索の照合・
+    SSR フォールバックの検出・サブパスの favicon）を移した。ci.yml の docs ステップは、`&&` の混入の検査とスクリプトの
+    呼び出しの 8 行になった（235 行 → 8 行）。verify スキルの 5 節は、手で写していたゲート（約 70 行）を消して
+    スクリプトを呼ぶようにした
+  - **見つけた既存の穴**: ci.yml の docs ステップの `grep -q A && grep -q B` の形の 10 行は、`bash -e` が && の左の失敗で
+    止まらないので、A の側がゲートになっていなかった。1 行に 1 つへ分け、
+    ci.yml がスクリプトへの `&&` の混入を検査する。分けた 10 個は今の原稿ですべて通った。CLAUDE.md の「`! cmd` を
+    書かない」の節に、`&&` の注意を足した
+  - `add-markdown-feature` スキルに `docs/setoka.toml` の 25-45 行目という古い行番号が残っていた（今は 27-47）。行番号を
+    書かない形に直した。CLAUDE.md・verify・`add-markdown-feature`・`add-theme-asset` スキルの「ci.yml に grep を 1 行」は
+    「`scripts/docs-gates.sh` に 1 行」に直した（例のパスも `docs/dist/…` に直した）
+- 確かめたこと: スクリプトを今の原稿で実行してすべて通った・ci.yml から移した本体との差分が、`&&` の分割・`lines=` の
+  検査・check の出力形式・crate の一覧の照合・最後の作り直しだけ・壊すと止まること（`&&` を分けた左のゲートの文字列・
+  `lines=` を 1 行ずらす・範囲の終わりを途中にする・`publish-crate` スキルの表から kunenbo を外す。どれも止まった行か
+  直す場所の文言が出た）・`bash -n` と ci.yml の「scripts の Bash 3.2 互換」と同じ grep。macOS のホスト（Bash 3.2）では
+  実行していない
 - 工数: 小〜中
 
 ## 今後の候補
@@ -636,6 +666,8 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
   Windows・macOS の CLI の確認は setoka-cli の結合テスト（`crates/setoka-cli/tests/`）だけで、ci.yml の e2e（bash。
   Linux だけ）が見ている build の報告・リンクの遮断・外部リンク検査などは Windows で動かしていない。パスと改行の
   違いで直す所が多い
+  - あわせて、e2e を docs ゲート（`scripts/docs-gates.sh`）と同じくスクリプトにして、ci.yml と verify スキルから呼ぶか
+    決める（v0.22 Phase 107 で延期した。verify スキルの 6 節は今も ci.yml の e2e の一部を手で写している）
 - **client 描画の Mermaid の書き間違いを check で報告する**（v0.23 の予定。setoka-core は tankan に依存できないので、検査は setoka-render 側に置き `rules::CHECK_ONLY` に足す。mermaid の版の判断の後）（v0.19 Phase 85 から回した）— 今は
   既定の client では build も check も何も言わない。tankan のパースだけ通し、未対応
   （`is_unsupported`）以外の構文エラーを抑制できる warning で報告する案。tankan が未対応の
@@ -720,7 +752,8 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
   - ⬜ **F2 判断点が応答の無いまま推奨案で出荷されている**（工数: 小）
   - ⬜ **F3 レビューの記録が GitHub に残らない**（工数: 小）
   - ⬜ **F5 性能と、リリース後の不具合件数の推移を測っていない**（工数: 小〜中）
-  - ~~**F6 文書と CI のゲートを二重・三重に管理している**~~ → v0.22 Phase 107
+  - ~~**F6 文書と CI のゲートを二重・三重に管理している**~~ → v0.22 Phase 107（11-23。docs ゲートは `scripts/docs-gates.sh` の 1 か所にし、
+    行番号の直書きをやめた。e2e は ci.yml に残した）
   - ⬜ **F8 docs の URL が独自ドメインと org 側のリポジトリに依存し、雛形に焼き込まれている**（工数: 小。v0.21 Phase 94 で URL は `/setoka/` に変えたが、利用者がユーザだけなので保有者・更新日の記録は扱わなかった）
 - 10-12 レビュー（R6・R7・R8・R10）と v0.10.1 レビュー（中身ごと写したもの）
 

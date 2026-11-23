@@ -565,10 +565,13 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     docs-links.yml・`verify` スキルすべて。出力は `docs/dist/`）。cwd からの上方向探索の
     経路は scaffold の e2e が検証する
   - 原稿は `setoka fmt` の正規形・表記は長音符なし（`lint.terms` 準拠）で書く
-- **ci.yml の docs ゲートは docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用）
-  - 特に `docs/setoka.toml` の 27-47 行目（`[markdown]` ブロック）はインクルードの `lines=` で
-    引用されているので、この範囲を動かすと原稿の中身と CI が同時に壊れる
-    （`verify` スキルに直す箇所の一覧あり）
+- **docs のゲートは `scripts/docs-gates.sh` にまとめてあり、docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用。
+  ci.yml の docs ステップと `verify` スキルはこのスクリプトを呼ぶだけ = ゲートはスクリプトにだけ書く。v0.22 Phase 107）
+  - `docs/setoka.toml` の `[markdown]` から `[markdown.glossary.terms]` の終わりまでは、原稿
+    （`docs/content/guide/code-and-math.md`）がインクルードの `lines=` で引用している。スクリプトは `lines=` の範囲を
+    原稿から読み、その範囲が今もこのブロックを指しているかを確かめる（行を動かすと、止まった文言が直す場所を示す）
+  - 公開する crate（`publish = false` の無いもの）が docs の「開発者向け」・この CLAUDE.md の汎用ライブラリの一覧・
+    `publish-crate` スキルの表・ci.yml の package の検査にそろって載っていることも、このスクリプトが照合する
   - **雛形 deploy.yml を変えたら `docs/snippets/deploy.yml` へ写す**（docs は雛形を docs のルートの
     外から `file=` で取り込めないので写しを置いている。v0.20 Phase 91）。ci.yml の `scaffold actions pins` が
     バイト一致と、PR 検証の例 `docs/snippets/pr-check.yml` の actions の SHA・setoka のインストール手順
@@ -595,6 +598,9 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   - GitHub Actions の `bash -e` でも `!` で反転したコマンドは errexit の対象外で、失敗しても
     次の行へ進む（= ゲートになっていない）
   - `if cmd; then echo "…" >&2; exit 1; fi` の形で明示的に落とす
+  - **ゲートを `&&` で繋がない** — `bash -e` は `A && B` の A の失敗では止まらない（&& の左は errexit の対象外）。
+    docs ステップの `grep -q A && grep -q B` の 10 行は、A の側がゲートになっていなかった（v0.22 Phase 107 で見つけて
+    1 行に 1 つへ分けた）。ci.yml が `scripts/docs-gates.sh` への混入を検査する
 - **ci.yml の `run:` に GitHub Actions の式の開始記号（`$` と `{{`）を書かない**
   - 雛形 deploy.yml の中身を grep で縛るときなどに、`${{ steps… }}` を文字列として
     書くと Actions が bash より先に評価して空文字に置き換え、照合が別物になる。

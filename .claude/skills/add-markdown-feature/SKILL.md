@@ -76,14 +76,15 @@ INSTA_UPDATE=always cargo test -p setoka-core    # body_snapshot.rs にケース
 - `docs/content/guide/*.md` に説明を書く（**dogfooding**。表記は長音符なし・`setoka fmt` の正規形）
 - `ROADMAP.md` の Phase 行（README は入口専用なので触らない）
 
-### 9. ci.yml へ grep ゲートを 1 行（**毎回やる**）
+### 9. docs のゲートを 1 行（**毎回やる**）
 
-`.github/workflows/ci.yml` の docs ステップに、生成物を照合する行を足す。
-Phase 42〜45 すべてが実施している:
+`scripts/docs-gates.sh` に、生成物を照合する行を足す（ci.yml の docs ステップと `verify` スキルがこのスクリプトを
+呼ぶ。v0.22 Phase 107 までは ci.yml に直接書いていた）。Phase 42〜45 すべてが実施している。1 行に 1 つのゲートにし、
+`&&` で繋がない（`bash -e` は && の左の失敗では止まらない）:
 
-```yaml
-          # 図表番号: キャプションの採番と参照リンクの自動補完
-          grep -q 'id="fig:deps"' dist/development/index.html
+```bash
+# 図表番号: キャプションの採番と参照リンクの自動補完
+grep -q 'id="fig:deps"' docs/dist/development/index.html
 ```
 
 ## `setoka.toml` に設定キーを足す場合（5 手）
@@ -107,7 +108,7 @@ frontmatter のキーを足す場合は `crates/setoka-core/src/frontmatter.rs` 
 - **doc コメント内でフェンスを入れ子にすると doctest がコンパイルされて失敗する**（インデント記法も同様）。散文で書く
 - **アンカー採番は extract_meta / HTML 化 / extract_plain_sections の 3 経路とも全見出しを文書順に** Anchorizer へ通す。片方で飛ばすと id がずれる
 - `comrak_options_keep_footnotes` は fmt / normalize / linkcheck 専用。HTML レンダと extract_meta に使うと壊れる
-- **`docs/setoka.toml` の 25-45 行目**（`[markdown]` ブロック）はインクルードの `lines=` で引用されている。この範囲を動かすと docs の原稿と ci.yml のゲートが同時に壊れる
+- **`docs/setoka.toml` の `[markdown]` ブロック**（`[markdown]` から `[markdown.glossary.terms]` の終わりまで）は、`docs/content/guide/code-and-math.md` がインクルードの `lines=` で引用している。キーを足してこのブロックの行が動いたら `lines=` も直す（`scripts/docs-gates.sh` が範囲のずれを見つけて、直す場所を出す）
 
 ## 仕上げ
 
