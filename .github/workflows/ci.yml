@@ -188,19 +188,30 @@ jobs:
           fi
 
       # kabosu と hebesu（v0.22 Phase 104）の依存ゼロ検査: package 後の正規化 manifest に通常依存・
-      # build 依存・ターゲット固有依存のセクションが無いことを縛る（dev 依存だけは許可）
+      # build 依存・ターゲット固有依存のセクションが無いことを縛る（dev 依存だけは許可）。
+      # 正規化された manifest では依存が 1 つずつ `[dependencies.serde]` の個別のテーブルになるので、
+      # `[dependencies]` だけでなく `[dependencies.` で始まる見出しも見る（`[dependencies]` の完全一致だけを
+      # 見ていたので、依存を足しても通っていた。PR #110 のレビュー指摘）
       - name: dependency-free check (kabosu, hebesu)
         run: |
+          deps='^\[(dependencies|build-dependencies)(\]|\.)|^\[target\.'
           for c in kabosu hebesu; do
             version=$(grep '^version = ' "crates/$c/Cargo.toml" | head -1 | cut -d'"' -f2)
             manifest="target/package/$c-$version/Cargo.toml"
             test -f "$manifest" || { echo "package 済み manifest が見つからない: $manifest" >&2; exit 1; }
-            if grep -qE '^\[(dependencies|build-dependencies)\]|^\[target\.' "$manifest"; then
+            if grep -qE "$deps" "$manifest"; then
               echo "$c に通常依存が入っている（依存ゼロを維持する）:" >&2
-              grep -E '^\[(dependencies|build-dependencies)\]|^\[target\.' "$manifest" >&2
+              grep -E "$deps" "$manifest" >&2
               exit 1
             fi
           done
+          # 検査そのものの確認: 依存のある shikuwasa の manifest では見つかること（見出しの形が変わって
+          # 何も拾わなくなったら、ここで気付く）
+          version=$(grep '^version = ' crates/shikuwasa/Cargo.toml | head -1 | cut -d'"' -f2)
+          if ! grep -qE "$deps" "target/package/shikuwasa-$version/Cargo.toml"; then
+            echo "依存ゼロの検査が shikuwasa の依存を見つけられない（正規表現が manifest の形と合っていない）" >&2
+            exit 1
+          fi
 
       # target/package（cargo package が展開したソースと .crate。検証ビルドの成果物は target/ の
       # 通常の場所に入る）をキャッシュに残さない。Swatinem/rust-cache（v2.9.2・上流の main も同じ）の

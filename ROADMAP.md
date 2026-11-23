@@ -353,6 +353,14 @@ JS なしの静的 HTML にする。
   書き換えずに通した）・clippy・main の setoka と比べて、4 つのルールを含む原稿の `lint --format json`・`lint --fix` で
   直した結果・docs の `check --format json` が同じ・`cargo package -p hebesu`（9 ファイル。package 後の manifest に依存が
   無い）・README の例をスクラッチの crate で動かした
+- レビュー指摘 2 件（PR #110）
+  - [P2] ci.yml の依存ゼロの検査が `[dependencies]` の見出しの完全一致だけを見ていた。package 後の正規化された
+    manifest では依存が `[dependencies.serde]` の個別のテーブルになるので、依存を足しても通っていた（kabosu で v0.14 から
+    使ってきた検査の穴）。`[dependencies.` で始まる見出しも見るようにし、依存のある shikuwasa の manifest で見つかる
+    ことも確かめる行を足した（正規表現が manifest の形と合わなくなったら気付く）。手元で偽の依存を足して止まることを
+    確かめた
+  - [P3] hebesu の結果の範囲は重なることがある（複数の辞書の項目など）ので、自動修正では重なる候補を選別してから後ろから
+    置き換える必要がある、と `Finding::range` と README に書いた（setoka の `apply_fixes` はこの選別をしている）
 - 工数: 中〜大（CLI は延期可）
 
 ### 105 jabara（開発サーバ） ⬜
