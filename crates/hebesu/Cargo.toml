@@ -1,0 +1,16 @@
+[package]
+name = "hebesu"
+# 日本語の表記ゆれの検査（setoka-* に依存しない汎用ライブラリ。v0.22 Phase 104 で setoka-core の lint.rs から
+# 切り出した）。monorepo のまま crates.io へ公開する（開発は setoka ワークスペースで一体・repository は monorepo を
+# 指す）。バージョンは workspace と独立で、変更時にだけ上げて publish する（手順は `publish-crate` スキル）。
+# [dependencies] は意図的に書かない = 依存ゼロ
+description = "Detect Japanese orthographic variants in text: full-width alphanumerics, half-width katakana, katakana long-vowel mark variants across documents, and term dictionary"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+keywords = ["japanese", "lint", "text", "katakana", "proofreading"]
+categories = ["text-processing", "internationalization"]

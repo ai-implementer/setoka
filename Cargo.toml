@@ -122,6 +122,8 @@ kabosu = { path = "crates/kabosu" }
 shikuwasa = { path = "crates/shikuwasa", version = "0.1.0" }
 # API 仕様（OpenAPI / JSON Schema）の静的 HTML 化（setoka 非依存の汎用ライブラリ。v0.22 Phase 103。setoka-render が使う）
 amanatsu = { path = "crates/amanatsu" }
+# 日本語の表記ゆれの検査（setoka 非依存・依存ゼロの汎用ライブラリ。v0.22 Phase 104。setoka-core の lint が使う）
+hebesu = { path = "crates/hebesu" }
 
 # 配布バイナリのサイズ最適化（LTO ＋ debuginfo 除去。ビルド時間より配布サイズを優先。
 # シンボルテーブルは残す = クラッシュ時のバックトレースに関数名を出すため strip は

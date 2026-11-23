@@ -82,56 +82,46 @@ pub(crate) fn lint_project(
     Ok(out)
 }
 
-/// fullwidth-alphanumeric / halfwidth-kana: 文字クラスの連続 run を 1 診断にまとめる
-fn check_char_classes(page: &Page, opts: &MarkdownOptions, out: &mut Vec<Diagnostic>) {
-    let is_fullwidth_alnum = |c: char| matches!(c, '\u{FF10}'..='\u{FF19}' | '\u{FF21}'..='\u{FF3A}' | '\u{FF41}'..='\u{FF5A}');
-    let is_halfwidth_kana = |c: char| matches!(c, '\u{FF61}'..='\u{FF9F}');
-
-    for (text, span) in &markdown::extract_text_spans(&page.source, opts) {
-        for (offset, run) in char_class_runs(text, is_fullwidth_alnum) {
-            // 全角英数字 → 半角はコード点 −0xFEE0 の単純対応
-            let suggestion: String = run
-                .chars()
-                .map(|c| char::from_u32(c as u32 - 0xFEE0).unwrap_or(c))
-                .collect();
-            out.push(Diagnostic {
-                rule: rules::FULLWIDTH_ALPHANUMERIC,
-                base: DiagBase::Content,
-                rel: page.rel.clone(),
-                span: Some(run_span(span, offset, run.len())),
-                message: format!("全角英数字「{run}」は半角「{suggestion}」を推奨します"),
-                fix: Some(suggestion),
-            });
-        }
-        for (offset, run) in char_class_runs(text, is_halfwidth_kana) {
-            let suggestion = to_fullwidth_kana(run);
-            out.push(Diagnostic {
-                rule: rules::HALFWIDTH_KANA,
-                base: DiagBase::Content,
-                rel: page.rel.clone(),
-                span: Some(run_span(span, offset, run.len())),
-                message: format!("半角カナ「{run}」は全角「{suggestion}」を推奨します"),
-                fix: Some(suggestion),
-            });
-        }
+/// 表記ゆれの検査（crate hebesu）の 1 件を、テキストノードの位置から setoka の診断にする。
+/// 文言は hebesu のものを使い、`suffix`（`lint.terms` の案内など setoka の部分）を後ろに足す
+fn wording_diagnostic(
+    rel: &std::path::Path,
+    node: &SourceSpan,
+    finding: hebesu::Finding,
+    suffix: &str,
+) -> Diagnostic {
+    Diagnostic {
+        rule: wording_rule(finding.rule),
+        base: DiagBase::Content,
+        rel: rel.to_path_buf(),
+        span: Some(run_span(
+            node,
+            finding.range.start,
+            finding.range.end - finding.range.start,
+        )),
+        message: format!("{}{suffix}", finding.message),
+        fix: finding.suggestion,
     }
 }
 
-/// 述語を満たす文字の最長連続 run を (バイトオフセット, 部分文字列) で列挙する
-fn char_class_runs(text: &str, pred: impl Fn(char) -> bool) -> Vec<(usize, &str)> {
-    let mut runs = Vec::new();
-    let mut start: Option<usize> = None;
-    for (i, c) in text.char_indices() {
-        if pred(c) {
-            start.get_or_insert(i);
-        } else if let Some(s) = start.take() {
-            runs.push((s, &text[s..i]));
-        }
+/// hebesu のルール → setoka の診断のルール（名前は同じ。一致は下のテストが縛る）
+fn wording_rule(rule: hebesu::Rule) -> rules::Rule {
+    match rule {
+        hebesu::Rule::FullwidthAlphanumeric => rules::FULLWIDTH_ALPHANUMERIC,
+        hebesu::Rule::HalfwidthKana => rules::HALFWIDTH_KANA,
+        hebesu::Rule::KatakanaChoon => rules::KATAKANA_CHOON,
+        hebesu::Rule::TermVariant => rules::TERM_VARIANT,
     }
-    if let Some(s) = start {
-        runs.push((s, &text[s..]));
+}
+
+/// fullwidth-alphanumeric / halfwidth-kana: 文字クラスの連続 run を 1 診断にまとめる（検査は hebesu）
+fn check_char_classes(page: &Page, opts: &MarkdownOptions, out: &mut Vec<Diagnostic>) {
+    for (text, span) in &markdown::extract_text_spans(&page.source, opts) {
+        let found = hebesu::fullwidth_alphanumeric(text)
+            .into_iter()
+            .chain(hebesu::halfwidth_kana(text));
+        out.extend(found.map(|f| wording_diagnostic(&page.rel, span, f, "")));
     }
-    runs
 }
 
 /// テキストノード内の run 位置を SourceSpan へ（列は comrak と同じバイト基準）
@@ -144,133 +134,29 @@ fn run_span(node: &SourceSpan, offset: usize, len: usize) -> SourceSpan {
     }
 }
 
-/// 半角カナ（U+FF61〜FF9F）→ 全角の変換候補。濁点/半濁点は可能なら合成する
-fn to_fullwidth_kana(run: &str) -> String {
-    // U+FF61 起点の並び順どおりの対応表
-    const TABLE: &[char] = &[
-        '。', '「', '」', '、', '・', 'ヲ', 'ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ャ', 'ュ', 'ョ', 'ッ',
-        'ー', 'ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ', 'サ', 'シ', 'ス', 'セ',
-        'ソ', 'タ', 'チ', 'ツ', 'テ', 'ト', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ', 'ハ', 'ヒ', 'フ', 'ヘ',
-        'ホ', 'マ', 'ミ', 'ム', 'メ', 'モ', 'ヤ', 'ユ', 'ヨ', 'ラ', 'リ', 'ル', 'レ', 'ロ', 'ワ',
-        'ン', '゛', '゜',
-    ];
-    let mut out = String::new();
-    for c in run.chars() {
-        let mapped = TABLE
-            .get((c as usize).wrapping_sub(0xFF61))
-            .copied()
-            .unwrap_or(c);
-        match mapped {
-            // 濁点: カ〜ト・ハ〜ホは +1 で濁音、ウはヴ
-            '゛' => match out.pop() {
-                Some(prev @ ('カ'..='ト' | 'ハ'..='ホ')) => {
-                    out.push(char::from_u32(prev as u32 + 1).expect("カタカナ濁音"));
-                }
-                Some('ウ') => out.push('ヴ'),
-                Some(prev) => {
-                    out.push(prev);
-                    out.push('゛');
-                }
-                None => out.push('゛'),
-            },
-            // 半濁点: ハ行は +2 で半濁音
-            '゜' => match out.pop() {
-                Some(prev @ 'ハ'..='ホ') => {
-                    out.push(char::from_u32(prev as u32 + 2).expect("カタカナ半濁音"));
-                }
-                Some(prev) => {
-                    out.push(prev);
-                    out.push('゜');
-                }
-                None => out.push('゜'),
-            },
-            m => out.push(m),
-        }
-    }
-    out
-}
-
-/// katakana-choon: 長音符ゆれの混在検出（プロジェクト横断・多数決）。
+/// katakana-choon: 長音符ゆれの混在検出（プロジェクト横断・多数決。集計は hebesu の `ChoonTally`）。
 /// ー を全除去した正規化キーでカタカナ語をグループ化し、複数の表記が
 /// 混在していたら**少数派の出現箇所**に警告する（同数なら両方に警告）。
 /// 最短の表記が 3 文字未満のグループは対象外
 /// （「カド/カード」のような別語の偶然一致を除外。「サーバ/サーバー」は対象）
 fn check_katakana_choon(pages: &[Page], opts: &MarkdownOptions, out: &mut Vec<Diagnostic>) {
-    use std::collections::BTreeMap;
-
-    // 正規化キー → 表記 → 出現位置（BTreeMap で決定的な走査順）
-    type Occurrences = BTreeMap<String, Vec<(std::path::PathBuf, SourceSpan)>>;
-    let mut groups: BTreeMap<String, Occurrences> = BTreeMap::new();
-
-    let is_katakana = |c: char| matches!(c, '\u{30A1}'..='\u{30FA}' | 'ー');
+    let mut tally = hebesu::ChoonTally::new();
     // 合成ページ（用語集）は原稿ではないので、多数決の母数にも報告先にもしない
     // （[`lint_page`] と同じ理由）
     for page in pages.iter().filter(|p| !p.is_generated()) {
         for (text, span) in &markdown::extract_text_spans(&page.source, opts) {
-            for (offset, word) in char_class_runs(text, is_katakana) {
-                // ー のみ・実質 1 文字の run は語ではないので除外
-                let key: String = word.chars().filter(|&c| c != 'ー').collect();
-                if key.chars().count() < 2 {
-                    continue;
-                }
-                groups
-                    .entry(key)
-                    .or_default()
-                    .entry(word.to_string())
-                    .or_default()
-                    .push((page.rel.clone(), run_span(span, offset, word.len())));
-            }
+            tally.add(text, (&page.rel, *span));
         }
     }
-
-    for variants in groups.values() {
-        if variants.len() < 2 {
-            continue; // 表記が 1 種類なら混在なし
-        }
-        // 最短の表記が 3 文字未満なら別語の偶然一致とみなして除外（カド/カード等）
-        let min_surface = variants
-            .keys()
-            .map(|w| w.chars().count())
-            .min()
-            .unwrap_or(0);
-        if min_surface < 3 {
-            continue;
-        }
-        let max_count = variants.values().map(Vec::len).max().unwrap_or(0);
-        // 単独多数派の表記（同数タイなら None = 正解が決められないので自動修正なし）
-        let majority: Option<&String> = {
-            let mut top = variants.iter().filter(|(_, o)| o.len() == max_count);
-            match (top.next(), top.next()) {
-                (Some((w, _)), None) => Some(w),
-                _ => None,
-            }
-        };
-        let summary = variants
-            .iter()
-            .map(|(w, occs)| format!("{w}: {} 回", occs.len()))
-            .collect::<Vec<_>>()
-            .join(" / ");
-        for (word, occs) in variants {
-            if majority == Some(word) {
-                continue; // 単独多数派は正とみなして報告しない
-            }
-            for (rel, span) in occs {
-                out.push(Diagnostic {
-                    rule: rules::KATAKANA_CHOON,
-                    base: DiagBase::Content,
-                    rel: rel.clone(),
-                    span: Some(*span),
-                    message: format!(
-                        "長音符ゆれ「{word}」が混在しています（{summary}。多数派への統一を推奨）"
-                    ),
-                    fix: majority.cloned(),
-                });
-            }
-        }
-    }
+    out.extend(
+        tally
+            .finish()
+            .into_iter()
+            .map(|((rel, node), f)| wording_diagnostic(rel, &node, f, "")),
+    );
 }
 
-/// term-variant: 用語ゆれの検出（辞書ベース）。
+/// term-variant: 用語ゆれの検出（辞書ベース。検査は hebesu）。
 /// 本文のテキストノード（コード・URL は対象外）にゆれ表記が現れたら報告する。
 /// 正表記の一部としての出現（例: 正「サーバー」の中の「サーバ」）は誤検出なので除外する
 fn check_terms(
@@ -279,42 +165,12 @@ fn check_terms(
     terms: &std::collections::BTreeMap<String, Vec<String>>,
     out: &mut Vec<Diagnostic>,
 ) {
-    let texts = markdown::extract_text_spans(&page.source, opts);
-    for (text, span) in &texts {
-        for (canonical, variants) in terms {
-            // 正表記の出現区間（バイト範囲）。この中の variant マッチは除外する
-            let canon_ranges: Vec<(usize, usize)> = text
-                .match_indices(canonical.as_str())
-                .map(|(i, m)| (i, i + m.len()))
-                .collect();
-            for variant in variants {
-                if variant.is_empty() || variant == canonical {
-                    continue;
-                }
-                for (i, m) in text.match_indices(variant.as_str()) {
-                    let end = i + m.len();
-                    if canon_ranges.iter().any(|&(s, e)| s <= i && end <= e) {
-                        continue;
-                    }
-                    out.push(Diagnostic {
-                        rule: rules::TERM_VARIANT,
-                        base: DiagBase::Content,
-                        rel: page.rel.clone(),
-                        // comrak の列はバイト基準なので、ノード内バイトオフセットを足す
-                        span: Some(SourceSpan {
-                            start_line: span.start_line,
-                            start_col: span.start_col + i,
-                            end_line: span.start_line,
-                            end_col: span.start_col + end,
-                        }),
-                        message: format!(
-                            "「{variant}」は「{canonical}」に統一してください（lint.terms）"
-                        ),
-                        fix: Some(canonical.clone()),
-                    });
-                }
-            }
-        }
+    for (text, span) in &markdown::extract_text_spans(&page.source, opts) {
+        out.extend(
+            hebesu::term_variants(text, terms)
+                .into_iter()
+                .map(|f| wording_diagnostic(&page.rel, span, f, "（lint.terms）")),
+        );
     }
 }
 
@@ -1161,6 +1017,13 @@ mod tests {
             .find(|d| d.rule.id == "katakana-choon")
             .unwrap();
         assert_eq!(hit.fix.as_deref(), Some("サーバー"));
+    }
+
+    #[test]
+    fn 表記ゆれのルールの名前は_hebesu_と同じ() {
+        for rule in hebesu::Rule::ALL {
+            assert_eq!(super::wording_rule(rule).id, rule.name(), "{rule:?}");
+        }
     }
 
     #[test]

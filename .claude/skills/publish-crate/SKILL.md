@@ -1,18 +1,19 @@
 ---
 name: publish-crate
-description: 汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu）を crates.io へ公開する手順。setoka のリリースとは非同期で、変更が溜まったときだけ行う。kabosu は publish 前の fuzz 必須。バージョンを上げて publish するときに使う。
+description: 汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu）を crates.io へ公開する手順。setoka のリリースとは非同期で、変更が溜まったときだけ行う。kabosu は publish 前の fuzz 必須。バージョンを上げて publish するときに使う。
 ---
 
 # 汎用ライブラリの crates.io 公開
 
-対象は monorepo 内の 5 crate。バージョンは workspace と独立で、各 `Cargo.toml` の
-`version` を明示指定している（公開済み: tankan 0.2.2 / mikan 0.3.0 / kabosu 0.2.1 / shikuwasa 0.1.0。amanatsu は未公開で、初回は 0.1.0）。
+対象は monorepo 内の 6 crate。バージョンは workspace と独立で、各 `Cargo.toml` の
+`version` を明示指定している（公開済み: tankan 0.2.2 / mikan 0.3.0 / kabosu 0.2.1 / shikuwasa 0.1.0 / amanatsu 0.1.0。hebesu は未公開で、初回は 0.1.0）。
 
 | crate | 役割 | 備考 |
 | --- | --- | --- |
 | tankan | Mermaid 互換 SSR | |
 | mikan | 検索エンジン | native / wasm で 1 実装共有。版を上げると検索 wasm も作り直す（CI の `search wasm inputs`） |
 | kabosu | TOML パーサ（依存ゼロ・no_std + alloc） | **publish 前に fuzz を必ず一度回す** |
+| hebesu | 日本語の表記ゆれの検査（依存ゼロ。v0.22 Phase 104） | ルールの名前は setoka の診断の名前と同じ（setoka-core の lint.rs のテストが縛る）。文言は日本語。単独の CLI は v0.23 の候補 |
 | amanatsu | OpenAPI / JSON Schema の静的 HTML 化（v0.22 Phase 103） | crates.io の shikuwasa（json）に依存する（ワークスペースの `shikuwasa` の依存に `version` を書いてある）。shikuwasa の版を上げて新しい API を使ったら、**先に shikuwasa を publish** してから amanatsu を publish する。出力の文言は日本語・CSS は同梱しない（クラスの一覧は README） |
 | shikuwasa | YAML の安全な読み込み（saphyr の上。v0.22 Phase 102） | 0.1.0 は publish 前に fuzz を回した（11-23）。feature `json` の `to_json` は serde_json を引く。saphyr を上げたら別名の上限（loader の `alias_limit`）と文言の対応表（`load.rs` の `scan_message`）を見直す |
 
@@ -40,13 +41,13 @@ cargo publish -p <crate>
 ## 罠
 
 - **公開は取り消せない**（yank で新規取得を止められるだけ）。dry-run と CI green を飛ばさない
-- kabosu は `[dependencies]` セクションを意図的に書かない = 依存ゼロ。CI が package 後の
+- kabosu と hebesu は `[dependencies]` セクションを意図的に書かない = 依存ゼロ。CI が package 後の
   manifest を検査する（依存を足すと落ちる）
 - setoka 側の `Cargo.lock` はバンプの `cargo build` で追随する。setoka のリリースタグとは
   無関係に進めてよい（非同期）
-- 5 crate とも crate のディレクトリに `LICENSE-MIT` / `LICENSE-APACHE` の**コピー**を置いている
+- 6 crate とも crate のディレクトリに `LICENSE-MIT` / `LICENSE-APACHE` の**コピー**を置いている
   （`license.workspace = true` だけでは package にライセンス文が入らない。シンボリックリンクは
-  Windows の checkout で壊れるので使わない）。ワークスペース直下の LICENSE を変えたら 5 つとも
+  Windows の checkout で壊れるので使わない）。ワークスペース直下の LICENSE を変えたら 6 つとも
   合わせる。mikan は分かち書きモデルのライセンス文（`assets/model/LICENSE-*`）も同梱する
 - tankan のテスト用コーパス（`tests/corpus`・`corpus_test.rs`・`snapshots`）は `exclude` で
   配布物から外している（kabosu の toml-test と同じ形。CI が `cargo package --list` で確かめる）

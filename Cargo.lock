@@ -697,6 +697,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "hebesu"
+version = "0.1.0"
+
+[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1525,6 +1529,7 @@ version = "0.21.0"
 dependencies = [
  "comrak",
  "globset",
+ "hebesu",
  "insta",
  "same-file",
  "serde",
