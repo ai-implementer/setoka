@@ -1,0 +1,334 @@
+//! 書き込み・作成・削除（どれも経路の検査を通してから行う）
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use crate::guard::{ensure_no_symlink_under, resolve_output_rel};
+
+/// 書き込みの結果（`Unchanged` = 内容が同じなので書かなかった）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteOutcome {
+    Written,
+    Unchanged,
+}
+
+/// 内容が同じなら書き込みを省く（更新時刻を変えない）。
+///
+/// ⚠️ 経路の検証をしないので、**出力ディレクトリへ書くときは直接使わない**
+/// （[`write_under`] を通すこと）。単体で使ってよいのは、パスを利用者の入力や記録から
+/// 組み立てない書き込みだけ
+pub fn write_if_changed(path: &Path, data: &[u8]) -> std::io::Result<WriteOutcome> {
+    if let Ok(meta) = fs::metadata(path)
+        && meta.len() == data.len() as u64
+        && fs::read(path)? == data
+    {
+        return Ok(WriteOutcome::Unchanged);
+    }
+    fs::write(path, data)?;
+    Ok(WriteOutcome::Written)
+}
+
+/// `root` の下の `rel`（`/` 区切り）へ安全に書き出す。解決したパスを返す。
+///
+/// **出力ディレクトリへ書くコードはすべてこれを通すこと。** 3 つの防御を
+/// 1 実装にまとめている:
+///
+/// 1. `rel` の字句検証（[`resolve_output_rel`]。`..` や絶対パスを拒否）
+/// 2. **最終パスまでの経路のリンク検査**（[`ensure_no_symlink_under`]）。
+///    出力ルートまでを検査しても、`dist/guide -> /outside` のような
+///    **出力ツリー内部**のリンクは別途見ないと書き込みが外へ抜ける
+/// 3. 親ディレクトリの作成 ＋ 内容が同じなら書かない（[`write_if_changed`]。更新時刻を変えない）
+pub fn write_under(
+    root: &Path,
+    rel: &str,
+    data: &[u8],
+) -> std::io::Result<(PathBuf, WriteOutcome)> {
+    let path = resolve_output_rel(root, rel)?;
+    ensure_no_symlink_under(root, &path)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let outcome = write_if_changed(&path, data)?;
+    Ok((path, outcome))
+}
+
+/// [`write_under`] の原子的版（`{rel}.tmp` へ書いて rename）。
+///
+/// 使いどころは「**書き込みの途中で止まると、次に読む側が壊れた内容を
+/// 掴む**」ファイルだけ（キャッシュの目次のように、それが健全なら残りも整合しているとみなす
+/// ファイルなど）。
+///
+/// 3 つの防御（字句検証・経路のリンク検査・親ディレクトリの作成）は [`write_under`]
+/// と同じものを通し、**一時ファイルのパスにもリンク検査をかける**。
+/// 内容が同じでも書き直す（原子性のため）ので、更新時刻を変えたくない出力には使わない。
+/// 一時ファイルの名前は固定なので、同じ出力先へ同時に書くことは想定していない
+pub fn write_atomic_under(root: &Path, rel: &str, data: &[u8]) -> std::io::Result<PathBuf> {
+    let path = resolve_output_rel(root, rel)?;
+    ensure_no_symlink_under(root, &path)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    // 同一ディレクトリへ置く（rename が同一ファイルシステム内で完結する）
+    let tmp_rel = format!("{rel}.tmp");
+    let tmp = resolve_output_rel(root, &tmp_rel)?;
+    ensure_no_symlink_under(root, &tmp)?;
+    fs::write(&tmp, data)?;
+    fs::rename(&tmp, &path)?;
+    Ok(path)
+}
+
+/// [`ensure_no_symlink_under`] で経路を確認してから、`dir` までのディレクトリを作る。
+/// `dir` は `root` の下（`root` 自身は断る）
+pub fn create_dir_all_under(root: &Path, dir: &Path) -> std::io::Result<()> {
+    ensure_no_symlink_under(root, dir)?;
+    fs::create_dir_all(dir)
+}
+
+/// [`ensure_no_symlink_under`] で経路を確認してからディレクトリを再帰削除する。
+/// 削除したら `Ok(true)`、`dir` が無ければ何もせず `Ok(false)`。
+///
+/// 設定の字句検証（絶対パス・`..`・ほかのディレクトリとの重なり）をすり抜けた場合の最後の防波堤
+/// （字句の検証はシンボリックリンクの存在を見られない）。`dir` 自身がリンクなら断る
+/// （リンク先の中身を消さない）
+pub fn remove_dir_all_under(root: &Path, dir: &Path) -> std::io::Result<bool> {
+    ensure_no_symlink_under(root, dir)?;
+    if !dir.exists() {
+        return Ok(false);
+    }
+    fs::remove_dir_all(dir)?;
+    Ok(true)
+}
+
+/// [`ensure_no_symlink_under`] で経路を確認してからファイルを消す。
+/// 消したら `Ok(true)`、無ければ `Ok(false)`。`path` 自身がシンボリックリンクなら断る
+/// （[`remove_orphans`](crate::remove_orphans) と同じ規律）
+pub fn remove_file_under(root: &Path, path: &Path) -> std::io::Result<bool> {
+    ensure_no_symlink_under(root, path)?;
+    match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_if_changed_は同一内容でスキップし_mtime_を温存する() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.txt");
+        assert_eq!(
+            write_if_changed(&path, b"hello").unwrap(),
+            WriteOutcome::Written
+        );
+        let mtime1 = fs::metadata(&path).unwrap().modified().unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        assert_eq!(
+            write_if_changed(&path, b"hello").unwrap(),
+            WriteOutcome::Unchanged
+        );
+        let mtime2 = fs::metadata(&path).unwrap().modified().unwrap();
+        assert_eq!(mtime1, mtime2, "スキップ時は mtime が変わらない");
+
+        assert_eq!(
+            write_if_changed(&path, b"world").unwrap(),
+            WriteOutcome::Written
+        );
+        assert_eq!(fs::read(&path).unwrap(), b"world");
+    }
+
+    #[test]
+    fn write_under_は親ディレクトリを作って書き_同じ内容なら書かない() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("dist");
+        let (path, outcome) = write_under(&root, "a/b.html", b"x").unwrap();
+        assert_eq!(path, root.join("a").join("b.html"));
+        assert_eq!(outcome, WriteOutcome::Written);
+        assert_eq!(fs::read(&path).unwrap(), b"x");
+        assert_eq!(
+            write_under(&root, "a/b.html", b"x").unwrap().1,
+            WriteOutcome::Unchanged
+        );
+        assert!(write_under(&root, "../outside.html", b"x").is_err());
+        assert!(!dir.path().join("outside.html").exists());
+    }
+
+    /// 出力ツリー**内部**のリンク。ルートまでを検査しても、
+    /// `dist/guide -> /outside` があると書き込みがリンク先へ抜ける
+    #[cfg(unix)]
+    #[test]
+    fn write_under_は出力ツリー内部のリンクを拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("dist");
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("guide")).unwrap();
+
+        let err = write_under(&root, "guide/index.html", b"x").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(!outside.join("index.html").exists(), "リンク先へ書かない");
+
+        // 出力ファイル自体がリンクの場合も同じ
+        std::os::unix::fs::symlink(outside.join("t.html"), root.join("t.html")).unwrap();
+        assert!(write_under(&root, "t.html", b"x").is_err());
+        assert!(!outside.join("t.html").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_under_は基点自身がリンクなら拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&outside).unwrap();
+        let root = dir.path().join("dist");
+        std::os::unix::fs::symlink(&outside, &root).unwrap();
+
+        assert!(write_under(&root, "index.html", b"x").is_err());
+        assert!(!outside.join("index.html").exists(), "リンク先へ書かない");
+    }
+
+    #[test]
+    fn write_atomic_under_は_tmp_を残さない() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_atomic_under(dir.path(), "cache/global.json", b"{}").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"{}");
+        // 中間ファイルが残っていない（次回の読み込みや掃除が拾わない）
+        assert!(!dir.path().join("cache/global.json.tmp").exists());
+    }
+
+    #[test]
+    fn write_atomic_under_は既存を置き換える() {
+        let dir = tempfile::tempdir().unwrap();
+        write_atomic_under(dir.path(), "a.json", b"old").unwrap();
+        let path = write_atomic_under(dir.path(), "a.json", b"new").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"new");
+    }
+
+    #[test]
+    fn write_atomic_under_も経路を検証する() {
+        let dir = tempfile::tempdir().unwrap();
+        // ルート外・絶対パスは write_under と同じ規律で拒否する
+        assert!(write_atomic_under(dir.path(), "../outside.json", b"x").is_err());
+        assert!(write_atomic_under(dir.path(), "/abs.json", b"x").is_err());
+    }
+
+    #[test]
+    fn create_dir_all_under_はルートの下だけ作る() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        create_dir_all_under(&root, &root.join("pages/a")).unwrap();
+        assert!(root.join("pages/a").is_dir());
+        // 作成済みでも Ok
+        create_dir_all_under(&root, &root.join("pages/a")).unwrap();
+        assert!(create_dir_all_under(&root, &root).is_err(), "ルート自身");
+        assert!(create_dir_all_under(&root, &dir.path().join("outside")).is_err());
+        assert!(!dir.path().join("outside").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_dir_all_under_は経路のリンクを拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("pages")).unwrap();
+
+        let err = create_dir_all_under(&root, &root.join("pages/a")).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(!outside.join("a").exists(), "リンク先に作らない");
+    }
+
+    #[test]
+    fn remove_file_under_は消したかを返す() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("a.json"), b"x").unwrap();
+        assert!(remove_file_under(root, &root.join("a.json")).unwrap());
+        assert!(!root.join("a.json").exists());
+        assert!(
+            !remove_file_under(root, &root.join("a.json")).unwrap(),
+            "無ければ false"
+        );
+        assert!(remove_file_under(root, root).is_err(), "ルート自身");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remove_file_under_は経路のリンクを拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("cache");
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("keep.json"), "守られるべきファイル".as_bytes()).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("pages")).unwrap();
+
+        assert!(remove_file_under(&root, &root.join("pages/keep.json")).is_err());
+        assert!(outside.join("keep.json").exists(), "リンク先は消さない");
+    }
+
+    #[test]
+    fn remove_dir_all_under_はルート配下だけ削除する() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("dist");
+        fs::create_dir_all(out.join("nested")).unwrap();
+        fs::write(out.join("nested/a.html"), b"x").unwrap();
+
+        assert!(remove_dir_all_under(dir.path(), &out).unwrap());
+        assert!(!out.exists());
+        // 不在なら何もせず false
+        assert!(!remove_dir_all_under(dir.path(), &out).unwrap());
+    }
+
+    #[test]
+    fn remove_dir_all_under_はルート自身を拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("config.toml"), b"").unwrap();
+
+        let err = remove_dir_all_under(dir.path(), dir.path()).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(dir.path().join("config.toml").exists());
+    }
+
+    /// canonicalize はリンクを追うため、ルート**内**を指すリンクは
+    /// 「配下」の判定を通ってしまう（`dist -> content` で原稿が消える）
+    #[cfg(unix)]
+    #[test]
+    fn remove_dir_all_under_はルート内を指すシンボリックリンクも拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let content = dir.path().join("content");
+        fs::create_dir_all(&content).unwrap();
+        fs::write(content.join("index.md"), "守られるべきファイル".as_bytes()).unwrap();
+
+        let link = dir.path().join("dist");
+        std::os::unix::fs::symlink(&content, &link).unwrap();
+
+        let err = remove_dir_all_under(dir.path(), &link).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(content.join("index.md").exists(), "原稿が残っている");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remove_dir_all_under_はシンボリックリンクの脱出を拒否する() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("proj");
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("keep.txt"), "守られるべきファイル".as_bytes()).unwrap();
+
+        let link = root.join("dist");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+
+        let err = remove_dir_all_under(&root, &link).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(outside.join("keep.txt").exists());
+    }
+}

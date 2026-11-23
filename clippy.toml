@@ -1,0 +1,20 @@
+# 出力先と原稿への書き込みの口を縛る（10-12 レビューの R8。v0.22 Phase 106）。
+# std::fs の書き込み・削除・作成を直に呼ぶと clippy が落とす。書くときは次の口を通す:
+#   - 出力先（dist・.setoka）: setoka_core::output の再エクスポート（実体は crate kunenbo。
+#     相対パスの字句検証と経路のシンボリックリンクの検査を内包する）
+#   - 原稿（fmt・lint --fix）: setoka-cli の commands::rewrite_source
+# 許しているのは crate kunenbo（crate 全体）・rewrite_source と一時ファイルの作成・setoka new の雛形の書き出し・
+# テストのコードだけ（各 crate のルートの cfg_attr(test, …) と結合テストのファイルの先頭）
+disallowed-methods = [
+  { path = "std::fs::write", reason = "出力先は setoka_core::output::write_under、原稿は commands::rewrite_source を通す" },
+  { path = "std::fs::remove_file", reason = "setoka_core::output::remove_file_under（経路のリンクを検査する）を通す" },
+  { path = "std::fs::remove_dir", reason = "出力先の掃除は setoka_core::output::remove_orphans を通す" },
+  { path = "std::fs::remove_dir_all", reason = "setoka_core::output::remove_dir_all_under（経路のリンクを検査する）を通す" },
+  { path = "std::fs::rename", reason = "原稿は commands::rewrite_source、出力先は setoka_core::output::write_atomic_under を通す" },
+  { path = "std::fs::copy", reason = "読み込んで setoka_core::output::write_under で書く" },
+  { path = "std::fs::create_dir", reason = "setoka_core::output::create_dir_all_under（経路のリンクを検査する）を通す" },
+  { path = "std::fs::create_dir_all", reason = "setoka_core::output::create_dir_all_under（経路のリンクを検査する）を通す" },
+  { path = "std::fs::File::create", reason = "出力先は setoka_core::output::write_under、原稿は commands::rewrite_source を通す" },
+  { path = "std::fs::File::create_new", reason = "出力先は setoka_core::output::write_under、原稿は commands::rewrite_source を通す" },
+  { path = "std::fs::OpenOptions::open", reason = "出力先は setoka_core::output::write_under、原稿は commands::rewrite_source を通す" },
+]

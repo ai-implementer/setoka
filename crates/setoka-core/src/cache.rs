@@ -446,9 +446,8 @@ impl BuildCache {
         let mut inner = self.inner.lock().unwrap();
         let pages_dir = self.dir.join("pages");
         // `.setoka/cache/pages` がシンボリックリンクだと、以下の書き出しと
-        // stale 掃除（remove_file）がリンク先へ届く。dist と同じ規律で守る
-        crate::output::ensure_no_symlink_under(&self.dir, &pages_dir)?;
-        fs::create_dir_all(&pages_dir)?;
+        // stale 掃除（remove_file）がリンク先へ届く。dist と同じ規律で守る（作成・削除とも経路を検査する口を通す）
+        crate::output::create_dir_all_under(&self.dir, &pages_dir)?;
 
         // 削除ページのエントリを落とす
         let stale: Vec<String> = inner
@@ -477,7 +476,7 @@ impl BuildCache {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if !expected.contains(&name) {
-                    let _ = fs::remove_file(entry.path());
+                    let _ = crate::output::remove_file_under(&pages_dir, &entry.path());
                 }
             }
         }

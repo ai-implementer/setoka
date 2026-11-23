@@ -4,6 +4,9 @@
 //! （その場合は `cargo insta review` で差分確認のうえ更新する）。
 //! `syntect.css` 自体はスナップショット対象にしない。
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
 use std::fs;
 use std::path::Path;
 

@@ -97,12 +97,12 @@ cargo build -p setoka-cli
 setoka-cli → {jabara, setoka-render, setoka-index, setoka-core, setoka-config}
 setoka-render → setoka-core, setoka-config, setoka-theme, tankan, amanatsu
 setoka-index → setoka-core, mikan       mikan-wasm → mikan
-setoka-core → shikuwasa, hebesu          amanatsu → shikuwasa（json）
+setoka-core → shikuwasa, hebesu, kunenbo amanatsu → shikuwasa（json）
 setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
-tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu・jabara は他の setoka crate 非依存の汎用ライブラリ
-（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu は crates.io で公開済み。jabara は v0.22 Phase 105 で setoka-server を改名して切り出し、未公開。検索スタックの書き側集約は
+tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu・hebesu・jabara・kunenbo は他の setoka crate 非依存の汎用ライブラリ
+（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu・jabara は crates.io で公開済み。kunenbo は v0.22 Phase 106 で setoka-core の output.rs から切り出し、未公開。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
 setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
@@ -251,7 +251,7 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 `RenderCtx` / `IndexCtx` の**全フィールド None = 従来のフルビルドと同一動作**（ライブラリ単体テストはこの形。キャッシュ配線は cli 層の責務）。
 
 - **setoka-core** — `cache.rs`（ページ派生物キャッシュ。envKey / routesKey / sourceHash の
-  3 層無効化）＋ `output.rs`（compare-before-write・出力マニフェスト・孤児掃除）
+  3 層無効化）＋ `output.rs`（出力の記録・出力マニフェスト・孤児掃除のログ。compare-before-write と掃除の実体は crate kunenbo）
 - **setoka-render** — `RenderCtx`（cache / outputs / shared）と `RenderShared`
   （watch 間で再利用する minijinja Env・syntect）
 - **setoka-index** — `IndexCtx` と `IndexSession`（vaporetto トークナイザの遅延構築・再利用）
@@ -289,7 +289,7 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   フラグ・`--format json` のキー・診断ルールの名前を消す・改名する変更はマイナー版だけで、
   `--format json` のキーはマイナー版でも消さない。リリースノートの「非互換と注意」はこのページの
   対象を見て書く（`release` スキル）
-- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu / jabara）** — setoka のリリースと非同期。手順は
+- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu / hebesu / jabara / kunenbo）** — setoka のリリースと非同期。手順は
   **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須。amanatsu は crates.io の
   shikuwasa に依存するので、shikuwasa の版を上げたら先に shikuwasa を publish する）
   - fuzz.yml は 4 crate の対象（kabosu 3・mikan のシャード・shikuwasa の `parse`・tankan の `render_svg`）を
@@ -509,6 +509,18 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     解決済みパスを返すのでプロジェクトルート自身は常に実体
   - `output.dir` 自体の字句検証（ルート外・`input.dir` / `public` / `theme` / `.setoka` との
     重なり）は `setoka-config` の `load`（唯一の変換点）にある
+- **書き込みの関数の実体は crate kunenbo**（v0.22 Phase 106 で output.rs から切り出した）。setoka の crate は
+  `setoka_core::output` の再エクスポートを通す（ディレクトリの作成は `create_dir_all_under`、1 ファイルの削除は
+  `remove_file_under`）。出力の記録（`OutputTracker` / `OutputKind`）とマニフェストは setoka-core に残した。
+  kunenbo はログを出さないので、孤児掃除の警告は `output::remove_orphans` がコールバックで受けて切り出しの前と同じ
+  文言・target（`setoka_core::output`）でログに出す
+- **書き込みの口は clippy で縛っている**（ルートの `clippy.toml` の `disallowed-methods`。10-12 レビューの R8）。
+  std::fs の書き込み・削除・作成を直に呼ぶと CI の clippy が落ちる。許しているのは kunenbo（crate 全体）・
+  `rewrite_source` と一時ファイルの作成・`setoka new` の雛形の書き出し（関数に `#[expect(…, reason)]`）・テストのコード
+  （crate のルートの `cfg_attr(test, …)` と結合テストのファイルの先頭）だけ。**新しい書き込みのために allow を足さない**。
+  mikan は当面 crate の `clippy.toml` で縛りを外している（mikan はファイルへ書かず、src が検索 wasm の入力のハッシュに
+  入っているため、テストのための属性でも wasm の作り直しが要る）。**次に検索 wasm を作り直すときに、mikan の `lib.rs` に
+  `cfg_attr(test, …)` を足してこのファイルを消す**（ROADMAP「その他の候補」。mikan の publish より前に）
 
 ### fmt と診断
 

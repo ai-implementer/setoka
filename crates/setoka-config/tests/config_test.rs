@@ -1,5 +1,8 @@
 //! setoka-config の統合テスト: TOML 読み込み・上方探索・解決
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
 use std::fs;
 
 use setoka_config::{ConfigError, find_project_root, load};

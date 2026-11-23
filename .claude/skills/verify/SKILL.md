@@ -16,6 +16,13 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI の deny ジョブと同じ
 ```
 
+- clippy はルートの `clippy.toml` で std::fs の書き込み・削除・作成（`fs::write`・`remove_*`・`rename`・`copy`・
+  `create_dir(_all)`・`File::create(_new)`・`OpenOptions::open`）を禁じている（10-12 レビューの R8。v0.22 Phase 106）。
+  落ちたら出力先は `setoka_core::output` の口（実体は kunenbo）、原稿は `commands::rewrite_source` を通す。
+  テストのコードは各 crate のルートの `#![cfg_attr(test, allow(clippy::disallowed_methods))]` と結合テストのファイルの
+  先頭の `#![allow(…)]` で許している（結合テストのファイルを足したら先頭に書く）。mikan は当面 crate の `clippy.toml` で
+  縛りを外している（ソースが検索 wasm の入力のハッシュに入るため。次に wasm を作り直すときに消す）。clippy は前の結果を再利用するので、設定だけを変えて
+  確かめるときは `touch crates/*/src/lib.rs crates/setoka-cli/src/main.rs` してから実行する
 - machete の false positive は該当 crate の Cargo.toml に
   `[package.metadata.cargo-machete] ignored = ["<crate>"]` を書いて抑制する。
 - CI の cargo は `--locked` 付き（Phase 82）。Cargo.lock の更新が要る変更は、手元で lock を
@@ -43,15 +50,15 @@ cargo test --locked -p setoka-cli --bins --test serve
 
 ```bash
 cargo build --locked --workspace
-cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa -p amanatsu -p hebesu -p jabara
+cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa -p amanatsu -p hebesu -p jabara -p kunenbo
 scripts/third-party-licenses.sh check
 scripts/build-search-wasm.sh --check   # 検索 wasm の作り直し忘れ（Phase 89。ビルドのツールは要らない）
 git grep -n -i 'y[u]zu' -- . ':!ROADMAP.md' ':!ROADMAP-history.md'   # 旧名の残り（v0.21 Phase 94。何も出なければよい）
 scripts/check-doc-refs.sh              # 文書とコメントが指すパス・スキル・ROADMAP / CLAUDE.md の節が実在するか（Phase 93）
 ```
 
-- `cargo package` は公開対象 7 crate のメタデータ・同梱内容の回帰を検出する（CI にもある）。
-  CI は加えて `cargo package --list` で 7 crate とも `LICENSE-MIT` / `LICENSE-APACHE` を含み、
+- `cargo package` は公開対象 8 crate のメタデータ・同梱内容の回帰を検出する（CI にもある）。
+  CI は加えて `cargo package --list` で 8 crate とも `LICENSE-MIT` / `LICENSE-APACHE` を含み、
   tankan に `tests/corpus` が入らないことを見る。
 - `third-party-licenses.sh check` は two-face の一覧の版（Phase 81）に加えて、使ってよい
   ライセンスの一覧が `licenses/about.toml` と `deny.toml` で同じか、検索 wasm の通知に載った

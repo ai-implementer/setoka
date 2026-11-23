@@ -18,6 +18,9 @@
 //!
 //! 文言（エラー・ログ）は日本語。
 
+// テストのコードは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![cfg_attr(test, allow(clippy::disallowed_methods))]
+
 mod error;
 mod host;
 mod livereload;

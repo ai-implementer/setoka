@@ -2,6 +2,9 @@
 //! CLI（build_once）と同じオーケストレーションを再現して 2 回ビルドし、
 //! キャッシュヒット・出力不変・孤児掃除を検証する
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;

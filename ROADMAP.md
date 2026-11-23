@@ -423,7 +423,49 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   setoka-core に残すか、種類を型の引数にして kunenbo に入れるかを決める。clippy の `disallowed-methods`
   （`clippy.toml`）で `fs::write` などを禁じ、kunenbo と `rewrite_source` の実装だけ許す
 - 判断点: 出力の記録を kunenbo に入れるか / `rewrite_source`（原稿への書き込み）も kunenbo に入れるか
-- 非互換と注意: なし
+- 非互換と注意: なし（出力・キャッシュ・ログの文言を変えない）
+- 決定（11-23。ユーザが推奨案で決めた）
+  - 出力の記録（`OutputTracker`・`OutputKind`）とマニフェストは setoka-core に残す。kunenbo は生成物の種類を持たない
+  - `rewrite_source`（原稿への書き込み）は setoka-cli に残す
+  - R8 の範囲は書き込み・削除・作成: std::fs の `write`・`remove_file`・`remove_dir`・`remove_dir_all`・`rename`・`copy`・
+    `create_dir`・`create_dir_all`・`File::create`・`File::create_new`・`OpenOptions::open` を禁じる。許すのは kunenbo・
+    `rewrite_source`・`setoka new` の雛形の書き出し・テストのコードだけ。キャッシュ（`cache.rs`）・setoka-index・setoka-render の
+    ディレクトリの作成と削除は、経路のリンクを検査する kunenbo の口に替える
+- 実装で決めたこと（判断点ではない。変えるならレビューで）
+  - kunenbo はログを出さない（tracing に依存しない）。掃除の警告は `remove_orphans` のコールバック（`OrphanWarning`）で渡し、
+    setoka-core の `output::remove_orphans` が切り出しの前と同じ文言・target（`setoka_core::output`）でログに出す。戻り値の
+    構造体にしなかったのは、途中の削除の失敗で `Err` を返すときに、それまでの警告が消えるため
+  - setoka の crate は kunenbo に直に依存せず、`setoka_core::output` の再エクスポートを通す（依存の向きは setoka-core →
+    kunenbo だけ。呼び出し側は変えていない）
+  - 大文字小文字の付け直しの一時名を `.{name}.setoka-case-{n}` から `.{name}.kunenbo-case-{n}` にした（2 回の rename の間だけ
+    ある名前で、出力は変わらない）
+  - mikan は当面 crate の `clippy.toml` で縛りを外す（11-23。ユーザが 3 案から選んだ）。mikan のテスト（fuzz の種の書き直し）が
+    `fs::write` を使うが、mikan の src と Cargo.toml は検索 wasm の入力のハッシュに入っていて、テストのための属性 1 つでも wasm の
+    作り直しが要るため。いま作り直すと wasm のバイトが変わり（rustc・wasm-opt の版で変わる）、「出力が切り出しの前と変わらない」を
+    wasm 以外でしか言えなくなる。mikan はファイルへ書かないので、縛りを外しても失うものは小さい。**次に検索 wasm を作り直すとき**
+    （v0.23 の vaporetto 0.7 か mikan の版上げ）に、テストに `cfg_attr(test, allow(…))` を足して `clippy.toml` を消す（下の
+    「その他の候補」）。mikan の publish には版上げ＝wasm の作り直しが要るので、`clippy.toml` は配布物に入らない
+  - キャッシュの `pages/` の掃除は `remove_file_under`（末端のリンクも断る）を通すので、`pages/` に置かれたシンボリックリンクは
+    消さずに残るようになった（前はリンク自体を消していた。読まないファイルなので害は無い）
+- やったこと
+  - `crates/kunenbo/`（0.1.0。依存は same-file・walkdir。`lib.rs`・`guard.rs`・`write.rs`・`orphans.rs`・README・LICENSE 2 つ）。
+    setoka-core の `output.rs` の `resolve_output_rel`・`ensure_no_symlink_under`・`ensure_symlink_free`・`write_if_changed`・
+    `write_under`・`write_atomic_under`・`remove_dir_all_under`・`list_files_under`・`remove_orphans` を名前とエラーの文言を変えずに
+    移し、`create_dir_all_under`・`remove_file_under` を足した。テストも移した（kunenbo は 30 本と doc テスト 1 本）
+  - setoka-core の `output.rs`（1184 行 → 518 行）は kunenbo の再エクスポートと、出力の記録・マニフェスト・掃除のログだけにした。
+    `save_manifest` の重複したディレクトリの作成を消した（`write_under` が作る）。setoka-core の依存から same-file を外した
+  - キャッシュの `pages/` の作成と掃除・setoka-index の `_search/index` の作成・setoka-render の出力先の作成を kunenbo の口に替えた
+  - ルートの `clippy.toml`（`disallowed-methods` 11 個。理由の文言に通すべき口を書いた）。kunenbo は crate のルートで許し、
+    `rewrite_source`・一時ファイルの作成（`create_temp_beside`）・`setoka new` の `run` は関数に `#[expect(…, reason)]` を付けた。
+    テストは setoka-core・setoka-render・setoka-cli・jabara のルートの `cfg_attr(test, …)` と、結合テスト 11 ファイルの先頭で許した
+  - ci.yml（package の検査に kunenbo を足した・clippy の注記）・CLAUDE.md（依存の向きの図・汎用ライブラリ・「出力先への書き込み」の
+    節）・verify・release・publish-crate スキル・docs の「開発者向け」（crate の一覧・依存の図）を直した。jabara を「公開済み 0.1.0」にした
+- 確かめたこと: `cargo test --workspace`（1207 本）・clippy・fmt・非テストのコード（setoka-render）に `fs::write` と
+  `fs::remove_dir_all` を足すと clippy が理由の文言付きで落ちること（確かめて戻した）・main（b24a235）の setoka と比べて、docs の
+  dist と `.setoka`（キャッシュ・マニフェスト）が `--force` の build・続けての増分の build・ページを 1 つ消したときの掃除のどれでも
+  バイト単位で同じ・マニフェストに不正なパスを入れたときの警告の文言が同じ・`cargo package -p kunenbo`（11 ファイル）・
+  `cargo doc -p kunenbo` に警告なし・README の例をスクラッチの crate で動かした・`build-search-wasm.sh --check`（mikan の src は
+  変えていない）
 - 工数: 中
 
 ### 107 docs ゲートの一本化と dogfooding ⬜
@@ -501,6 +543,10 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
   分かった）— 今は別ファイルへの `$ref` の読み込みとパースまでで、`#/components/schemas/Nope` のように指す先が無い
   参照や循環は、描画で注記になるだけで check は何も言わない。足すと check の出力が増える（新しい診断）。参照ファイルの
   上限に読めなかったファイルも数えるか（今は読めたファイルだけ）も一緒に決める
+- **mikan も書き込みの口の縛りに入れる**（次に検索 wasm を作り直すとき。v0.22 Phase 106 で決めた）— 今は
+  `crates/mikan/clippy.toml` でワークスペースの `clippy.toml` の縛り（R8）を外している。vaporetto 0.7 への更新か mikan の版上げで
+  wasm を作り直すときに、mikan の `lib.rs` に `#![cfg_attr(test, allow(clippy::disallowed_methods))]` を足して
+  `crates/mikan/clippy.toml` を消す（src を変えるので wasm の作り直しと同じ PR にする）。mikan の publish より前に行う
 - **ci.yml のシェルの e2e を Windows でも動かす**（v0.23 の予定。v0.22 Phase 101 で延期を決めた）— 今の
   Windows・macOS の CLI の確認は setoka-cli の結合テスト（`crates/setoka-cli/tests/`）だけで、ci.yml の e2e（bash。
   Linux だけ）が見ている build の報告・リンクの遮断・外部リンク検査などは Windows で動かしていない。パスと改行の
@@ -525,6 +571,7 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
   （vaporetto-models v0.5.0 の `bccwj-suw_c1.0`。0.6 の形式）を `model version mismatch` で読めない。
   モデルの差し替えと検索 wasm の作り直しが要るので、自動では上げず手動で行う（11-06。dependabot の
   #74・#75 を閉じ、`dependabot.yml` の ignore に足した）
+  - wasm を作り直すので、上の「mikan も書き込みの口の縛りに入れる」を同じ PR で行う
   - 0.7 の形式のモデルは vaporetto 本体の v0.7.0 のリリースに添付されている（`bccwj-suw_c1.0.tar.xz` も
     ある）。`scripts/vendor-vaporetto-model.sh` の取得元（今は vaporetto-models）と SHA-256 を差し替える
   - 上流のリリースノートでは、BCCWJ だけのモデルは 0.5.0 のものを `convert_bincode_model` で新しい
@@ -608,7 +655,9 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
     フィルタを書き忘れてもコンパイルが通る
   - 対処案: `PageOrigin { File(PathBuf), Generated(GeneratedKind) }` にし、ファイルのパスは
     `source_file() -> Option<&Path>` からしか取れなくする
-- ~~**R8 出力先と原稿への書き込み口を clippy で縛る**~~ → v0.22 Phase 106（工数: 小。**10-12 に確認**（件数））
+- ~~**R8 出力先と原稿への書き込み口を clippy で縛る**~~ → v0.22 Phase 106（工数: 小。**10-12 に確認**（件数）。11-23 にルートの
+  `clippy.toml` で縛った。書き込みに加えて削除と作成も禁じ、キャッシュ・setoka-index・setoka-render のディレクトリの作成と削除も
+  kunenbo の口に替えた）
   - 「書き込みは `write_under` / `rewrite_source` だけ」はコメントで縛っている。今は守られている
     （テスト以外の `fs::write` / `remove_dir_all` は実装そのものと雛形の 4 か所だけ）
   - 対処案: `clippy.toml` の `disallowed-methods` で禁じ、4 か所だけ許す（前例は `main.rs` の

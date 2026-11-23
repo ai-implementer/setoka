@@ -1,0 +1,25 @@
+[package]
+name = "kunenbo"
+# 出力先への安全な書き込み（setoka-* に依存しない汎用ライブラリ。v0.22 Phase 106 で setoka-core の output.rs から
+# 切り出した）。monorepo のまま crates.io へ公開する（開発は setoka ワークスペースで一体・repository は monorepo を
+# 指す）。バージョンは workspace と独立で、変更時にだけ上げて publish する（手順は `publish-crate` スキル）
+description = "Safe writes into an output directory: relative path validation, symlink checks along the path, write-if-changed, atomic replace, and orphan cleanup that is safe on case-insensitive file systems"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+keywords = ["filesystem", "symlink", "static-site", "output", "write"]
+categories = ["filesystem"]
+
+[dependencies]
+# 掃除で「前回のパスと今回のパスが同じファイルか」を見る（大文字小文字を区別しない FS。
+# Unix は dev / inode、Windows はファイル ID）
+same-file = { workspace = true }
+# 出力ディレクトリの下のファイルの列挙（リンクを辿らない）
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -55,6 +55,10 @@ fn fill_placeholders(content: &str) -> String {
     content.replace(VERSION_PLACEHOLDER, env!("CARGO_PKG_VERSION"))
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "雛形を空のディレクトリ（利用者が指定した生成先）へ書き出す。出力先でも原稿の書き換えでもない"
+)]
 pub fn run(cx: &crate::cx::Cx, dir: &Path) -> anyhow::Result<()> {
     // `new` は既存プロジェクトを読まない唯一のコマンドなので `--root` の意味がない。
     // 黙って無視せずエラーにする（未知のキーを黙殺しないという設定側の姿勢と揃える）

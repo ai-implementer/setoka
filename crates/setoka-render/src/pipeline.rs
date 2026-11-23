@@ -6,7 +6,6 @@
 //! 直列のまま = インクリメンタルビルドの層構造は不変
 
 use std::collections::BTreeSet;
-use std::fs;
 
 use minijinja::context;
 use rayon::prelude::*;
@@ -196,7 +195,8 @@ pub fn render_site(params: &RenderParams) -> Result<(), RenderError> {
         setoka_core::output::remove_dir_all_under(&rc.root, output_dir)
             .map_err(RenderError::io(output_dir))?;
     }
-    fs::create_dir_all(output_dir).map_err(RenderError::io(output_dir))?;
+    setoka_core::output::create_dir_all_under(&rc.root, output_dir)
+        .map_err(RenderError::io(output_dir))?;
 
     // セッション共有があれば再利用、なければこのビルド限りで構築（従来コスト）
     let local_shared = match ctx.shared {

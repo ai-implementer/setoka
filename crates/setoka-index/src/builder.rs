@@ -283,7 +283,8 @@ pub fn build_search_index_with(
         setoka_core::output::remove_dir_all_under(output_dir, &search_dir)
             .map_err(IndexError::io(&search_dir))?;
     }
-    fs::create_dir_all(search_dir.join("index")).map_err(IndexError::io(&search_dir))?;
+    setoka_core::output::create_dir_all_under(output_dir, &search_dir.join("index"))
+        .map_err(IndexError::io(&search_dir))?;
     let write = |rel: &str, data: &[u8]| -> Result<(), IndexError> {
         let rel_from_dist = format!("{SEARCH_DIR_NAME}/{rel}");
         match ctx.outputs {

@@ -5,6 +5,9 @@
 //!
 //! TCP で待ち受けるので、ネットワークを禁じたサンドボックスの中では失敗する
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
 mod common;
 
 use common::Project;

@@ -106,6 +106,10 @@ pub(crate) fn warn_config_diagnostics(rc: &ResolvedConfig) {
 /// - 書く直前に、ディスクの内容が読み込んだとき（`expected`）から変わっていないかを
 ///   照合する。変わっていたら書かずにエラーにする（エディタの保存と重なったときに、
 ///   古い内容から作った結果で上書きしない）
+#[expect(
+    clippy::disallowed_methods,
+    reason = "原稿への書き込みの口そのもの（一時ファイルの rename と、失敗したときの一時ファイルの削除）"
+)]
 pub(crate) fn rewrite_source(
     path: &std::path::Path,
     expected: &str,
@@ -149,6 +153,10 @@ pub(crate) fn rewrite_source(
 /// Unix では作った時点から本人だけが読み書きできる権限（600）にする。既定の権限（umask 022 なら
 /// 644）で作ると、本文を書いてから元の権限へ戻すまでの間、非公開の原稿を他のユーザが読める
 /// （PR #47 の再レビューの指摘）。Windows の権限はディレクトリから引き継ぐ ACL なので扱わない
+#[expect(
+    clippy::disallowed_methods,
+    reason = "rewrite_source の一時ファイルを排他的に作る（create_new と作成時の権限）"
+)]
 fn create_temp_beside(
     path: &std::path::Path,
 ) -> std::io::Result<(std::path::PathBuf, std::fs::File)> {

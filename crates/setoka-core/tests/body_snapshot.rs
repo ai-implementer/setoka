@@ -1,5 +1,8 @@
 //! render_body_html のスナップショットテスト（GFM 表・コード・mermaid・重複見出し）
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
 use std::fs;
 
 use setoka_core::{

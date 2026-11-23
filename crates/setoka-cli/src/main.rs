@@ -1,4 +1,7 @@
 //! setoka CLI のエントリポイント
+
+// テストのコードは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![cfg_attr(test, allow(clippy::disallowed_methods))]
 // 標準出力は out モジュールに集約する（SIGPIPE で panic しないため。out.rs 参照）。
 // print! / println! を書いた瞬間に clippy が落とすので、規律が機械的に守られる
 #![deny(clippy::print_stdout)]

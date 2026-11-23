@@ -37,6 +37,8 @@ jobs:
       - name: machete (unused dependencies)
         uses: bnjbvr/cargo-machete@431e75731b681a69a4cfdeb1315b505778bb5c70 # v0.10.1
 
+      # ルートの clippy.toml が std::fs の書き込み・削除・作成を禁じ、出力先と原稿への書き込みを kunenbo（setoka-core の
+      # output の再エクスポート）と rewrite_source に縛る（10-12 レビューの R8。v0.22 Phase 106）
       - name: clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
@@ -51,14 +53,14 @@ jobs:
       - name: build
         run: cargo build --locked --workspace
 
-      # crates.io 公開対象（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu・jabara）のパッケージ検証。メタデータ・
+      # crates.io 公開対象（tankan・mikan・kabosu・shikuwasa・amanatsu・hebesu・jabara・kunenbo）のパッケージ検証。メタデータ・
       # 同梱内容の回帰を PR で検出する。実公開は手動 cargo publish（`publish-crate` スキル）
-      - name: package (tankan, mikan, kabosu, shikuwasa, amanatsu, hebesu, jabara)
+      - name: package (tankan, mikan, kabosu, shikuwasa, amanatsu, hebesu, jabara, kunenbo)
         run: |
-          cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa -p amanatsu -p hebesu -p jabara
-          # 7 crate とも LICENSE を同梱する（ワークスペース直下のコピーを各 crate に置く。
+          cargo package --locked -p tankan -p mikan -p kabosu -p shikuwasa -p amanatsu -p hebesu -p jabara -p kunenbo
+          # 8 crate とも LICENSE を同梱する（ワークスペース直下のコピーを各 crate に置く。
           # Phase 81）。tankan のテスト用コーパスは配布物に含めない
-          for c in tankan mikan kabosu shikuwasa amanatsu hebesu jabara; do
+          for c in tankan mikan kabosu shikuwasa amanatsu hebesu jabara kunenbo; do
             list="$(cargo package --locked --list -p "$c")"
             for f in LICENSE-MIT LICENSE-APACHE; do
               if ! printf '%s\n' "$list" | grep -qx "$f"; then
