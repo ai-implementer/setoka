@@ -1,13 +1,13 @@
 //! OpenAPI 3.x・Swagger 2.0 / JSON Schema の Value 走査 → HTML 組み立て
-//! （[`super::render_spec`] の本体）。2.0 のレイアウト差（definitions /
-//! `in: body` / responses 直下の schema / produces・consumes）は
+//! （[`crate::render`] の本体。v0.22 Phase 103 で setoka-render の apispec から移した）。2.0 のレイアウト差
+//! （definitions / `in: body` / responses 直下の schema / produces・consumes）は
 //! [`SpecVersion::V2`] の分岐でのみ吸収し、3.x パスの挙動は変えない。
 //!
 //! 設計:
 //! - 入力（YAML / JSON）は `shikuwasa::to_json` で `serde_json::Value` に読む。
-//!   setoka-render の serde_json は `preserve_order` 有効なので Map は記述順を保つ
+//!   serde_json は `preserve_order` 有効なので Map は記述順を保つ
 //!   （= 出力は決定的。HashMap の非決定順序を混ぜない）
-//! - 走査中の全テキストは [`escape_html`] を通してから埋め込む（XSS 安全）
+//! - 走査中の全テキストは [`crate::escape_html`] を通してから埋め込む（XSS 安全）
 //! - `$ref` は文書内（`#/...`）とプロジェクト内ファイル（`path#/pointer`）を解決。
 //!   パス基準は「仕様ファイル内は参照元ファイル相対（OpenAPI ツールチェーン標準）、
 //!   インラインブロック内はプロジェクトルート相対（`file:` と同じ規約）」。
@@ -19,9 +19,8 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
-use crate::highlight::escape_html as esc;
-
-use super::{SpecFiles, SpecKind};
+use crate::escape_html as esc;
+use crate::{Issue, Rendered, SpecFiles, SpecKind, Warning, error_box};
 
 /// 入れ子スキーマ描画の深さ上限（これを超えたら「以降省略」）
 const MAX_DEPTH: usize = 8;
@@ -36,18 +35,32 @@ const COMBINATORS: [(&str, &str); 3] = [
     ("allOf", "すべて（allOf）"),
 ];
 
-/// 仕様テキストを HTML に変換する（[`super::render_spec`] から委譲される本体）
-pub(super) fn render(
+/// エラーボックスだけの結果（警告 1 件つき）
+fn failed(message: &str, warning: String, source: &str) -> Rendered {
+    Rendered {
+        html: error_box(message, source),
+        warnings: vec![Warning {
+            file: None,
+            message: warning,
+        }],
+    }
+}
+
+/// 仕様テキストを HTML に変換する（[`crate::render`] から委譲される本体）
+pub(crate) fn render(
     kind: SpecKind,
     source: &str,
     origin: Option<&str>,
     files: &dyn SpecFiles,
-) -> String {
+) -> Rendered {
     let value: Value = match shikuwasa::to_json(source) {
         Ok(v) => v,
         Err(e) => {
-            tracing::warn!(error = %e, "API 仕様のパースに失敗しました");
-            return super::error_box(&format!("パースに失敗しました: {e}"), source);
+            return failed(
+                &format!("パースに失敗しました: {e}"),
+                format!("API 仕様のパースに失敗しました: {e}"),
+                source,
+            );
         }
     };
 
@@ -65,8 +78,7 @@ pub(super) fn render(
         } else {
             let msg = "OpenAPI 3.x / Swagger 2.0 のみ対応しています\
                        （`openapi: 3.x.y` か `swagger: \"2.0\"` が必要です）";
-            tracing::warn!("{msg}");
-            return super::error_box(msg, source);
+            return failed(msg, msg.to_string(), source);
         }
     } else {
         // JSON Schema 単体に版の概念は無い（version は operation・一覧描画でしか使わない）
@@ -85,9 +97,13 @@ pub(super) fn render(
         .expect("load_documents はメイン文書を必ず登録する");
     let mut r = Renderer::new(&docs, main_key.clone(), version);
 
-    match kind {
+    let html = match kind {
         SpecKind::OpenApi => r.render_openapi_document(root),
         SpecKind::JsonSchema => r.render_jsonschema_document(root),
+    };
+    Rendered {
+        html,
+        warnings: docs.warnings,
     }
 }
 
@@ -95,17 +111,17 @@ pub(super) fn render(
 ///
 /// [`render`] がエラーボックス・注記にする失敗と**同じ分類・同じ文言**を返す。
 /// 描画側の挙動は変えない（従来どおりエラーボックスでビルドは継続する）
-pub(super) fn check(
+pub(crate) fn check(
     kind: SpecKind,
     source: &str,
     origin: Option<&str>,
     files: &dyn SpecFiles,
-) -> Vec<super::SpecIssue> {
+) -> Vec<Issue> {
     let value: Value = match shikuwasa::to_json(source) {
         Ok(v) => v,
         // パースできなければ以降の検査は無意味（描画もエラーボックスで打ち切る）
         Err(e) => {
-            return vec![super::SpecIssue {
+            return vec![Issue {
                 message: format!("パースに失敗しました: {e}"),
                 fatal: true,
             }];
@@ -120,7 +136,7 @@ pub(super) fn check(
             .is_some_and(|v| v.starts_with('3'));
         let v2 = value.get("swagger").map(plain_value).as_deref() == Some("2.0");
         if !v3 && !v2 {
-            return vec![super::SpecIssue {
+            return vec![Issue {
                 message: "OpenAPI 3.x / Swagger 2.0 のみ対応しています\
                           （`openapi: 3.x.y` か `swagger: \"2.0\"` が必要です）"
                     .to_string(),
@@ -145,7 +161,7 @@ pub(super) fn check(
         } else {
             format!("$ref 先 {path} を解決できません: {reason}")
         };
-        issues.push(super::SpecIssue {
+        issues.push(Issue {
             message,
             // 参照ファイル数の上限は書き間違いではなく設計上の制限なので警告どまり
             fatal: !reason.contains("参照ファイルが多すぎます"),
@@ -160,6 +176,8 @@ struct DocSet {
     docs: HashMap<String, Value>,
     /// 読み込み・パースに失敗したファイル → 理由（描画時に注記として出す）
     failed: HashMap<String, String>,
+    /// 読み込み・パースの失敗の警告（見つけた順。[`crate::Rendered::warnings`] に入る）
+    warnings: Vec<Warning>,
 }
 
 /// メイン文書から到達可能な参照ファイルをワークリストで全ロードする。
@@ -167,6 +185,7 @@ struct DocSet {
 fn load_documents(main_key: &str, main: Value, files: &dyn SpecFiles) -> DocSet {
     let mut docs = HashMap::new();
     let mut failed: HashMap<String, String> = HashMap::new();
+    let mut warnings = Vec::new();
     let mut pending: Vec<String> = Vec::new();
 
     collect_file_refs(main_key, &main, &mut pending);
@@ -186,12 +205,18 @@ fn load_documents(main_key: &str, main: Value, files: &dyn SpecFiles) -> DocSet 
         }
         match files.read(&path) {
             Err(reason) => {
-                tracing::warn!(file = %path, "仕様ファイルの読み込みに失敗: {reason}");
+                warnings.push(Warning {
+                    file: Some(path.clone()),
+                    message: format!("仕様ファイルの読み込みに失敗: {reason}"),
+                });
                 failed.insert(path, reason);
             }
             Ok(text) => match shikuwasa::to_json(&text) {
                 Err(e) => {
-                    tracing::warn!(file = %path, error = %e, "仕様ファイルのパースに失敗");
+                    warnings.push(Warning {
+                        file: Some(path.clone()),
+                        message: format!("仕様ファイルのパースに失敗: {e}"),
+                    });
                     failed.insert(path, format!("パースに失敗しました: {e}"));
                 }
                 Ok(v) => {
@@ -201,7 +226,11 @@ fn load_documents(main_key: &str, main: Value, files: &dyn SpecFiles) -> DocSet 
             },
         }
     }
-    DocSet { docs, failed }
+    DocSet {
+        docs,
+        failed,
+        warnings,
+    }
 }
 
 /// 文書 `doc_key` 内の全 `$ref` からファイル参照を集める（正規化済みパスで push）。
@@ -1206,7 +1235,17 @@ fn plain_value(v: &Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{NoFiles, SpecKind, render_spec};
+    use crate::{NoFiles, SpecKind};
+
+    /// HTML だけを見るテスト用（setoka-render の apispec だったころの `render_spec` と同じ形）
+    fn render_spec(
+        kind: SpecKind,
+        source: &str,
+        origin: Option<&str>,
+        files: &dyn crate::SpecFiles,
+    ) -> String {
+        crate::render(kind, source, origin, files).html
+    }
 
     /// 最小 OpenAPI: 1 path・GET・パラメータ 1・レスポンス 200
     #[test]
@@ -1775,7 +1814,7 @@ paths:
     /// テスト用: メモリ上のファイル群（キー = 正規化済みルート相対パス）
     struct MapFiles(std::collections::HashMap<String, String>);
 
-    impl super::super::SpecFiles for MapFiles {
+    impl crate::SpecFiles for MapFiles {
         fn read(&self, rel: &str) -> Result<String, String> {
             self.0
                 .get(rel)

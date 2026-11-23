@@ -1,0 +1,21 @@
+[package]
+name = "amanatsu"
+# OpenAPI / JSON Schema を JS なしの静的 HTML にする（setoka-* に依存しない汎用ライブラリ。v0.22 Phase 103 で
+# setoka-render の apispec から切り出した）。monorepo のまま crates.io へ公開する（開発は setoka ワークスペースで
+# 一体・repository は monorepo を指す）。バージョンは workspace と独立で、変更時にだけ上げて publish する
+# （手順は `publish-crate` スキル）
+description = "Render OpenAPI 3.x, Swagger 2.0 and JSON Schema documents (YAML or JSON) to static HTML without JavaScript"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+keywords = ["openapi", "swagger", "json-schema", "html", "documentation"]
+categories = ["web-programming", "template-engine", "parser-implementations"]
+
+[dependencies]
+# 仕様の記述順を保つ（出力を決定的にする）ため preserve_order を使う
+serde_json = { workspace = true, features = ["preserve_order"] }
+shikuwasa = { workspace = true, features = ["json"] }

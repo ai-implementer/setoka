@@ -257,6 +257,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   版が要り、`cargo package -p amanatsu` は依存を crates.io から取ろうとする。103 の始めに、path の依存に `version` を
   付けて shikuwasa と amanatsu を 1 回の `cargo package` にまとめれば CI の toolchain で通るかを確かめる。通らなければ
   103 の package の検査を shikuwasa の公開まで外す（公開は取り消せないので、確かめる前に急いで publish しない）
+  → 103 に着手する前（11-23）にユーザが shikuwasa 0.1.0 を publish したので、確かめるまでもなく
+  `cargo package -p amanatsu` は crates.io の shikuwasa で通った
 - 工数: 小〜中
 
 ### 103 amanatsu（API 仕様の HTML 化） ⬜
@@ -270,7 +272,33 @@ JS なしの静的 HTML にする。
   変わらないことをスナップショットで確かめる
 - 判断点: 出力の文言（日本語のままにするか、文言を差し替えられるようにするか）/ 見た目の CSS を crate に
   同梱するか、クラス名を README に書くだけにするか / 公開 API（`SpecFiles` の trait・エラーの型）
-- 非互換と注意: なし（HTML を変えない）
+- 非互換と注意: なし（HTML を変えない）。ログ（stderr）だけ変わる: build の API 仕様の警告に `page=` が付き、
+  パースの失敗の理由が文の中に入る（以前は `error=` の欄）。check では `$ref` 先を読めないときの WARN の行が
+  出なくなる（同じ内容を `spec-error` の診断で出している）
+- 決定（11-23。判断点への応答が無かったので推奨案で**仮決め**）
+  - 出力の文言は日本語のまま（tankan・shikuwasa と同じ。README に書いた）
+  - CSS は setoka のテーマに残し、出力のクラスの一覧と構造を amanatsu の README に書く（CSS を 2 か所に持たない）
+  - 公開 API は今の形: `render`（`Rendered` = HTML と警告）・`check`（`Issue` の一覧）・`SpecKind`・`SpecFiles`
+    （読み込みのエラーは利用者に見せる文字列）・`NoFiles`・`error_box`・`escape_html`。フェンスの言語名
+    （openapi / jsonschema）との対応は setoka に残す
+  - 警告はログに出さず `Rendered::warnings` で返す（amanatsu は tracing に依存しない）。setoka がページ名を付けて
+    ログに出す
+- やったこと
+  - `crates/amanatsu/`（0.1.0。`lib.rs`・`render.rs`・README・LICENSE 2 つ）。`render.rs` は setoka-render の
+    `apispec/render.rs` を `git mv` で移し、`tracing::warn!` の 4 か所を警告の返り値にした。テスト 29 本も移した
+  - setoka-render: `apispec.rs` は言語名と `SpecKind` の対応・警告をページ名付きでログに出す包みだけにし、
+    `speccheck.rs` は `amanatsu::check` を使う。`highlight.rs` の `escape_html` は amanatsu の 1 実装を使う
+    （setoka-render の写しを消した）。setoka-render の依存から serde_json と shikuwasa が外れた
+  - ワークスペースの `shikuwasa` の依存に `version = "0.1.0"` を書いた（公開する amanatsu が crates.io の shikuwasa を
+    指すため）
+  - ci.yml の package の検査・publish-crate・verify・release スキル・CLAUDE.md（依存の向きの図・特別レンダリング
+    言語・外部ファイル参照の節・汎用ライブラリ）・docs の「開発者向け」（crate の一覧・依存の図）を直した。shikuwasa を
+    「公開済み 0.1.0」にした
+- 確かめたこと: `cargo test --workspace`（1177 本。スナップショットとキャッシュの指紋を含む = `CACHE_FORMAT_VERSION` は
+  据え置き）・clippy・main と切り出し後の setoka で docs の dist（312 ファイル。API 仕様のページを含む）がバイト単位で
+  同じ（docs の「開発者向け」を直す前に比べた）・壊れた仕様と読めない `$ref` の check の診断と終了コードが main と同じ・
+  `cargo package -p amanatsu`（shikuwasa 0.1.0 が公開済みなので通る。9 ファイル）・`cargo doc -p amanatsu` に警告なし
+- 未確認: fuzz の対象は足していない（判断点に無かった。必要なら候補にする）
 - 工数: 中
 
 ### 104 hebesu（日本語の表記ゆれの検査） ⬜
@@ -463,7 +491,8 @@ v0.10.1 レビューの 1 つは中身ごと、10-04 見直しと 10-07 見直�
   - ~~**外部への露出が無い**~~ → v0.21 Phase 96・98（cargo-binstall・README・比較のページ）
   - ~~**外部からの貢献の受け口が無い**~~ → v0.21 Phase 97
   - ⬜ **長い関数**（工数: 中）
-  - ⬜ **同じ処理が 2 か所にある**（工数: 小。v0.23 の予定。`escape_html` は v0.22 の amanatsu の切り出しで 1 つ減る見込み）
+  - ⬜ **同じ処理が 2 か所にある**（工数: 小。v0.23 の予定。`escape_html` は v0.22 Phase 103 で setoka-render の写しを消して amanatsu の 1 実装にした。setoka-core の
+    `markdown/mod.rs` に 1 つ残る）
   - ⬜ **性能の気になる点**（工数: 小〜中。どちらも未計測）
 - 10-07 見直し
   - ⬜ **E1 公開 crate（tankan / mikan）の semver 上の危うさ**（工数: 小〜中）

@@ -95,13 +95,14 @@ cargo build -p setoka-cli
 
 ```
 setoka-cli → {setoka-server, setoka-render, setoka-index, setoka-core, setoka-config}
-setoka-render → setoka-core, setoka-config, setoka-theme, tankan, shikuwasa（json）
+setoka-render → setoka-core, setoka-config, setoka-theme, tankan, amanatsu
 setoka-index → setoka-core, mikan       mikan-wasm → mikan
-setoka-core → shikuwasa                  setoka-config → kabosu（通常依存はこれだけ）
+setoka-core → shikuwasa                  amanatsu → shikuwasa（json）
+setoka-config → kabosu（通常依存はこれだけ）
 （mikan は native/wasm 共通の本体。mikan-wasm はその wasm ラッパで、
 トークナイザ・フォーマット・抜粋生成を 1 実装で共有する）
-tankan・mikan・mikan-wasm・kabosu・shikuwasa は他の setoka crate 非依存の汎用ライブラリ
-（tankan・mikan・kabosu は crates.io で公開済み。shikuwasa は v0.22 Phase 102 で切り出し、未公開。検索スタックの書き側集約は
+tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu は他の setoka crate 非依存の汎用ライブラリ
+（tankan・mikan・kabosu・shikuwasa は crates.io で公開済み。amanatsu は v0.22 Phase 103 で切り出し、未公開。検索スタックの書き側集約は
 mikan::build、読み側クエリエンジンは SearchEngine にあり、
 setoka-index はページ抽出とファイル I/O だけの薄い呼び出し側）
 ```
@@ -174,8 +175,8 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 
 - **特別レンダリング言語** — setoka-core の `is_special_render_lang` と setoka-render
   `highlight.rs::render` のディスパッチは**集合を同期**させる
-  - openapi / jsonschema は `SPEC_LANGS` が唯一の定義で、render 側 `SpecKind` との一致は
-    speccheck のテストが縛る
+  - openapi / jsonschema は `SPEC_LANGS` が唯一の定義で、render 側の言語名と amanatsu の `SpecKind` の
+    対応（`apispec.rs` の `lang` / `spec_kind`）との一致は speccheck のテストが縛る
 - **URL 分類** — `linkcheck.rs` の判定と setoka-render `urls.rs` の `UrlResolver::rewrite` を揃える
   - 外部 URL の判定は `urlpath::is_external_url`、フル URL かは `has_url_scheme`（先頭の `scheme://`）。
     **`contains("://")` で判定しない** = `/search/?q=https://…` を外部扱いにして base が付かず、
@@ -196,7 +197,10 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     ルート配下強制の同じ規律 `read_under_root` を共有する
   - 本文の解決 `resolve_spec_source`（読み込み口はクロージャで受ける）と参照の検証
     `validate_spec_refs` もここ
-  - **仕様の中身の検証だけが setoka-render**
+  - **仕様の中身の描画と検証は crate amanatsu**（v0.22 Phase 103 で setoka-render の apispec から切り出した）。
+    setoka の診断（`spec-error` / `spec-warning`）に変えるのは setoka-render の `speccheck.rs`、描画の警告を
+    ページ名付きでログに出すのは `apispec.rs`（amanatsu はログを出さず `Rendered::warnings` で返す）。
+    文言は日本語・CSS は setoka のテーマ（`api-spec` など。クラスの一覧は amanatsu の README）
 - **エイリアス** — `aliases.rs`（render と check）
 - **YAML の読み込み** — crate shikuwasa（frontmatter・未知キーの lint は `shikuwasa::parse`、openapi /
   jsonschema は feature `json` の `shikuwasa::to_json`。Phase 88 で作り v0.22 Phase 102 で切り出した）。
@@ -285,8 +289,9 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   フラグ・`--format json` のキー・診断ルールの名前を消す・改名する変更はマイナー版だけで、
   `--format json` のキーはマイナー版でも消さない。リリースノートの「非互換と注意」はこのページの
   対象を見て書く（`release` スキル）
-- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa）** — setoka のリリースと非同期。手順は
-  **`publish-crate` スキル**（kabosu と shikuwasa の初回は publish 前に fuzz 必須）
+- **汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amanatsu）** — setoka のリリースと非同期。手順は
+  **`publish-crate` スキル**（kabosu は publish 前に fuzz 必須。amanatsu は crates.io の
+  shikuwasa に依存するので、shikuwasa の版を上げたら先に shikuwasa を publish する）
   - fuzz.yml は 4 crate の対象（kabosu 3・mikan のシャード・shikuwasa の `parse`・tankan の `render_svg`）を
     週 1 回実行する
     （v0.20 Phase 92）。合否は artifact と終了コードで決め、tankan の panic だけは最後まで実行できたら

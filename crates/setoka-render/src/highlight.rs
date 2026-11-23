@@ -280,6 +280,7 @@ impl<'a> PageCodeRenderer<'a> {
                 source.text(),
                 source.origin(),
                 &files,
+                &self.page_label(),
             )),
             Err(setoka_core::SpecRefError { rel, message }) => {
                 tracing::warn!(page = %self.page_label(), file = rel, "{message}");
@@ -455,20 +456,9 @@ fn include_error_box(message: &str, path: &str) -> String {
     )
 }
 
-/// HTML エスケープ（テキストノード・属性値用の最小集合）
-pub(crate) fn escape_html(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            _ => out.push(c),
-        }
-    }
-    out
-}
+/// HTML エスケープ（テキストノード・属性値用の最小集合）。API 仕様の HTML と同じ規則にするため
+/// amanatsu の 1 実装を使う（v0.22 Phase 103 まではここにも同じものがあった）
+pub(crate) use amanatsu::escape_html;
 
 #[cfg(test)]
 mod tests {

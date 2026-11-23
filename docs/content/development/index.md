@@ -20,7 +20,8 @@ crate を分けています。
     ├─ setoka-render  # サイトモデル → HTML（minijinja・syntect・mermaid 変換・base path 解決）
     ├─ setoka-config  # setoka.toml の探索・スキーマ・解決（パーサは kabosu）
     ├─ kabosu       # TOML パーサ・エンコーダ（依存ゼロ・no_std。setoka 非依存・crates.io 公開）
-    ├─ shikuwasa    # YAML の安全な読み込み（frontmatter・API 仕様。setoka 非依存）
+    ├─ shikuwasa    # YAML の安全な読み込み（frontmatter・API 仕様。setoka 非依存・crates.io 公開）
+    ├─ amanatsu     # OpenAPI / JSON Schema → 静的 HTML（setoka 非依存）
     ├─ setoka-theme   # デフォルトテーマ（rust-embed: テンプレ + CSS + JS + mermaid.js）
     ├─ setoka-cli     # CLI（bin: setoka）
     ├─ setoka-server  # preview/watch 用最小静的サーバ + notify 監視
@@ -44,25 +45,28 @@ flowchart TD
     REN --> CORE
     REN --> THEME[setoka-theme]
     REN --> TAN[tankan]
-    REN --> YAML[shikuwasa]
+    REN --> API[amanatsu]
+    API --> YAML[shikuwasa]
     CORE --> YAML
     IDX --> CORE
     IDX --> FMT[mikan]
     WASM[mikan-wasm] --> FMT
     classDef generic fill:#fff3d6,stroke:#8a6d1a
-    class TAN,FMT,WASM,KAB,YAML generic
+    class TAN,FMT,WASM,KAB,YAML,API generic
 ```
 
 Figure: crate 間の依存方向（色付きは setoka 非依存の汎用ライブラリ） {#fig:deps}
 
-色を付けた **tankan・mikan・mikan-wasm・kabosu・shikuwasa** は setoka の他の
+色を付けた **tankan・mikan・mikan-wasm・kabosu・shikuwasa・amanatsu** は setoka の他の
 crate に依存しない汎用ライブラリです。tankan（Mermaid SSR）と mikan（検索エンジン）
 は [crates.io で公開](https://crates.io/crates/mikan)しており
 （開発はこの monorepo で一体のまま）、書き側集約は `mikan::build`、読み側クエリエンジンは
 `SearchEngine` にあり、setoka-index はページ抽出とファイル I/O だけを担う
 薄い呼び出し側です）。kabosu（TOML）は setoka-config の唯一の通常依存で、
 設計は [kabosu の設計](kabosu.md)を参照してください。shikuwasa（YAML）は setoka-core の
-frontmatter と setoka-render の API 仕様が使う読み込み口で、v0.22 で setoka-core から切り出しました。
+frontmatter と amanatsu が使う読み込み口で、v0.22 で setoka-core から切り出しました。amanatsu（OpenAPI /
+JSON Schema を静的 HTML にする）は v0.22 で setoka-render から切り出しました（見た目の CSS は setoka のテーマに
+あります）。
 
 ## 凍結した設計判断
 
