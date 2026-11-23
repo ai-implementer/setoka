@@ -25,7 +25,9 @@ use crate::{Issue, Rendered, SpecFiles, SpecKind, Warning, error_box};
 /// 入れ子スキーマ描画の深さ上限（これを超えたら「以降省略」）
 const MAX_DEPTH: usize = 8;
 
-/// 1 ブロックから到達できる参照ファイル数の上限（暴走・参照爆発のガード）
+/// 1 文書から読み込める参照先ファイル数の上限（暴走・参照爆発のガード）。数えるのは**読み込みと
+/// パースに成功した**ファイルだけで、読めなかったファイルは数えない（同じパスは 1 回だけ読む）。
+/// 上限を超えた参照先は読まずに注記にする
 const MAX_FILES: usize = 16;
 
 /// スキーマ合成キーワードと、そのセクション見出しラベル
@@ -195,7 +197,7 @@ fn load_documents(main_key: &str, main: Value, files: &dyn SpecFiles) -> DocSet 
         if docs.contains_key(&path) || failed.contains_key(&path) {
             continue;
         }
-        // メイン文書を除いた参照ファイル数で上限を判定する
+        // メイン文書を除いた、読み込めた参照ファイルの数で上限を判定する（`failed` は数えない）
         if docs.len() > MAX_FILES {
             failed.insert(
                 path,
@@ -1962,5 +1964,60 @@ paths:
             html.matches("<details").count(),
             html.matches("</details>").count()
         );
+    }
+
+    /// 読んだ回数を数える読み込み口（どのファイルも無い）
+    struct CountingFiles(std::cell::Cell<usize>);
+
+    impl crate::SpecFiles for CountingFiles {
+        fn read(&self, rel: &str) -> Result<String, String> {
+            self.0.set(self.0.get() + 1);
+            Err(format!("{rel} が見つかりません"))
+        }
+    }
+
+    /// PR #109 のレビュー指摘: 参照ファイルの上限が数えるのは読めたファイルだけ（README と rustdoc に
+    /// 書いた動き）。読めなかったファイルは数えず、参照先ごとに 1 回ずつ読んで、どれも致命的な問題になる
+    #[test]
+    fn 参照ファイルの上限は読めたファイルだけを数える() {
+        let refs: String = (0..20)
+            .map(|i| format!("        f{i}: {{$ref: \"missing{i}.yaml#/A\"}}\n"))
+            .collect();
+        let src = format!(
+            "openapi: 3.0.0\ninfo: {{title: t, version: \"1\"}}\npaths: {{}}\ncomponents:\n  schemas:\n    Root:\n      type: object\n      properties:\n{refs}"
+        );
+        let files = CountingFiles(std::cell::Cell::new(0));
+        let issues = crate::check(SpecKind::OpenApi, &src, None, &files);
+        assert_eq!(files.0.get(), 20, "参照先ごとに 1 回読む");
+        assert_eq!(issues.len(), 20);
+        assert!(
+            issues
+                .iter()
+                .all(|i| i.fatal && !i.message.contains("多すぎます"))
+        );
+    }
+
+    /// PR #109 のレビュー指摘: check が見るのは別ファイルの参照まで。文書の中の参照（`#/...`）の
+    /// 指す先が無くても check は何も返さない（描画では注記になる。README と rustdoc に書いた範囲）
+    #[test]
+    fn 文書の中の参照の指す先が無くても_check_は返さず描画は注記にする() {
+        let src = "openapi: 3.0.0\ninfo: {title: t, version: \"1\"}\npaths: {}\ncomponents:\n  schemas:\n    A: {$ref: \"#/components/schemas/Nope\"}\n";
+        assert!(crate::check(SpecKind::OpenApi, src, None, &NoFiles).is_empty());
+        let out = crate::render(SpecKind::OpenApi, src, None, &NoFiles);
+        assert!(out.html.contains("api-ref"), "{}", out.html);
+        assert!(out.warnings.is_empty());
+    }
+
+    /// 参照先のファイルを読めないとき、check は致命的とするが、描画は文書全体をエラーボックスにせず注記にする
+    #[test]
+    fn 参照先のファイルを読めなくても描画はエラーボックスにしない() {
+        let src = "openapi: 3.0.0\ninfo: {title: t, version: \"1\"}\npaths: {}\ncomponents:\n  schemas:\n    A: {$ref: \"missing.yaml#/A\"}\n";
+        let issues = crate::check(SpecKind::OpenApi, src, None, &NoFiles);
+        assert!(issues.len() == 1 && issues[0].fatal, "{issues:?}");
+        let out = crate::render(SpecKind::OpenApi, src, None, &NoFiles);
+        assert!(!out.html.contains("markdown-alert-caution"), "{}", out.html);
+        assert!(out.html.contains("api-ref"));
+        assert_eq!(out.warnings.len(), 1);
+        assert_eq!(out.warnings[0].file.as_deref(), Some("missing.yaml"));
     }
 }
