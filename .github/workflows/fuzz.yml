@@ -49,6 +49,8 @@ jobs:
           - { crate: kabosu, target: roundtrip }
           - { crate: kabosu, target: decode }
           - { crate: mikan, target: shard }
+          # 読み込みと JSON への写し（別名の展開の上限・位置が入力の中を指すこと。v0.22 Phase 102）
+          - { crate: shikuwasa, target: parse }
           # panic を受け流して最後まで実行する（-fork と -ignore_crashes。ハングとメモリ超過では止める）
           - { crate: tankan, target: render_svg, keep_going: true }
     defaults:
@@ -69,6 +71,7 @@ jobs:
         run: cargo install cargo-fuzz --locked
 
       # 種: mikan はエンコーダが書いたシャード（fuzz/seeds/。mikan のテストが今の出力と照合する）、
+      # shikuwasa は frontmatter・OpenAPI・別名とタグの YAML（fuzz/seeds/parse/）、
       # tankan は図種ごとの corpus（tests/corpus/<図種>/*.mmd。図種の間で名前が重なるので図種を前に付ける）
       - name: seed corpus
         run: |

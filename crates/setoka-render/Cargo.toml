@@ -20,6 +20,8 @@ rayon = { workspace = true }
 serde = { workspace = true }
 # OpenAPI / JSON Schema の SSR（YAML/JSON → Value 走査 → HTML）用
 serde_json = { workspace = true, features = ["preserve_order"] }
+# OpenAPI / JSON Schema の YAML / JSON を serde_json::Value へ読む（frontmatter と同じ読み込み口）
+shikuwasa = { workspace = true, features = ["json"] }
 syntect = { workspace = true }
 thiserror = { workspace = true }
 two-face = { workspace = true }

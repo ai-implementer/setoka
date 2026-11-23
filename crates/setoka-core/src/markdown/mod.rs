@@ -152,7 +152,7 @@ pub(crate) fn extract_meta(
                         .into_iter()
                         .map(|p| {
                             // raw はファイルの 1 行目から始まるので、raw の中の位置 = ファイル上の位置
-                            let (line, col) = crate::yaml::line_col(raw, p.offset);
+                            let (line, col) = shikuwasa::line_col(raw, p.offset);
                             FrontmatterProblem {
                                 path: src_path.to_path_buf(),
                                 line,

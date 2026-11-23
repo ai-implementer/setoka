@@ -1,18 +1,19 @@
 ---
 name: publish-crate
-description: 汎用ライブラリ（tankan / mikan / kabosu）を crates.io へ公開する手順。setoka のリリースとは非同期で、変更が溜まったときだけ行う。kabosu は publish 前の fuzz 必須。バージョンを上げて publish するときに使う。
+description: 汎用ライブラリ（tankan / mikan / kabosu / shikuwasa）を crates.io へ公開する手順。setoka のリリースとは非同期で、変更が溜まったときだけ行う。kabosu と shikuwasa の初回は publish 前の fuzz 必須。バージョンを上げて publish するときに使う。
 ---
 
 # 汎用ライブラリの crates.io 公開
 
-対象は monorepo 内の 3 crate。バージョンは workspace と独立で、各 `Cargo.toml` の
-`version` を明示指定している（公開済み: tankan 0.2.2 / mikan 0.3.0 / kabosu 0.2.1）。
+対象は monorepo 内の 4 crate。バージョンは workspace と独立で、各 `Cargo.toml` の
+`version` を明示指定している（公開済み: tankan 0.2.2 / mikan 0.3.0 / kabosu 0.2.1。shikuwasa は未公開で、初回は 0.1.0）。
 
 | crate | 役割 | 備考 |
 | --- | --- | --- |
 | tankan | Mermaid 互換 SSR | |
 | mikan | 検索エンジン | native / wasm で 1 実装共有。版を上げると検索 wasm も作り直す（CI の `search wasm inputs`） |
 | kabosu | TOML パーサ（依存ゼロ・no_std + alloc） | **publish 前に fuzz を必ず一度回す** |
+| shikuwasa | YAML の安全な読み込み（saphyr の上。v0.22 Phase 102） | 初回の 0.1.0 は **publish 前に fuzz を一度回す**。feature `json` の `to_json` は serde_json を引く。saphyr を上げたら別名の上限（loader の `alias_limit`）と文言の対応表（`load.rs` の `scan_message`）を見直す |
 
 公開しない crate: **mikan-wasm**（wasm 成果物を作るビルド用。`publish = false`）と
 setoka 本体側の crate（将来構想は ROADMAP.md）。
@@ -24,12 +25,12 @@ setoka 本体側の crate（将来構想は ROADMAP.md）。
 cargo build
 # 2. コミット → push → CI green を確認（ci.yml の cargo package --locked が
 #    メタデータ・同梱内容の回帰を検出する。作業ツリーが dirty だと package は拒否される）
-# 3. kabosu は必須・mikan と tankan も推奨: fuzz を一度回す（fuzz.yml を手動実行するのが基本。
+# 3. kabosu と shikuwasa の初回は必須・mikan と tankan も推奨: fuzz を一度回す（fuzz.yml を手動実行するのが基本。
 #    週 1 回の定期実行の結果が新しければそれでもよい）
 gh workflow run fuzz.yml          # 1 対象 600 秒。結果は Actions の Summary（panic・ハング・メモリ超過の件数）
 #    手元で回すときは fuzz.yml の env（FUZZ_TIMEOUT・FUZZ_RSS_LIMIT_MB）と同じ値を渡す
 #    （nightly・cargo-fuzz・C++ コンパイラが要る。開発コンテナには g++ が無い）
-cd crates/kabosu && cargo +nightly fuzz run parse -- -max_total_time=600 -timeout=10 -rss_limit_mb=2048   # roundtrip / decode も
+cd crates/kabosu && cargo +nightly fuzz run parse -- -max_total_time=600 -timeout=10 -rss_limit_mb=2048   # roundtrip / decode も（shikuwasa は crates/shikuwasa の parse）
 # 4. dry-run → publish（要 cargo login。公開は取り消し不可・yank のみ可能）
 cargo publish --dry-run -p <crate>
 cargo publish -p <crate>
@@ -42,9 +43,9 @@ cargo publish -p <crate>
   manifest を検査する（依存を足すと落ちる）
 - setoka 側の `Cargo.lock` はバンプの `cargo build` で追随する。setoka のリリースタグとは
   無関係に進めてよい（非同期）
-- 3 crate とも crate のディレクトリに `LICENSE-MIT` / `LICENSE-APACHE` の**コピー**を置いている
+- 4 crate とも crate のディレクトリに `LICENSE-MIT` / `LICENSE-APACHE` の**コピー**を置いている
   （`license.workspace = true` だけでは package にライセンス文が入らない。シンボリックリンクは
-  Windows の checkout で壊れるので使わない）。ワークスペース直下の LICENSE を変えたら 3 つとも
+  Windows の checkout で壊れるので使わない）。ワークスペース直下の LICENSE を変えたら 4 つとも
   合わせる。mikan は分かち書きモデルのライセンス文（`assets/model/LICENSE-*`）も同梱する
 - tankan のテスト用コーパス（`tests/corpus`・`corpus_test.rs`・`snapshots`）は `exclude` で
   配布物から外している（kabosu の toml-test と同じ形。CI が `cargo package --list` で確かめる）

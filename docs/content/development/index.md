@@ -20,6 +20,7 @@ crate を分けています。
     ├─ setoka-render  # サイトモデル → HTML（minijinja・syntect・mermaid 変換・base path 解決）
     ├─ setoka-config  # setoka.toml の探索・スキーマ・解決（パーサは kabosu）
     ├─ kabosu       # TOML パーサ・エンコーダ（依存ゼロ・no_std。setoka 非依存・crates.io 公開）
+    ├─ shikuwasa    # YAML の安全な読み込み（frontmatter・API 仕様。setoka 非依存）
     ├─ setoka-theme   # デフォルトテーマ（rust-embed: テンプレ + CSS + JS + mermaid.js）
     ├─ setoka-cli     # CLI（bin: setoka）
     ├─ setoka-server  # preview/watch 用最小静的サーバ + notify 監視
@@ -43,22 +44,25 @@ flowchart TD
     REN --> CORE
     REN --> THEME[setoka-theme]
     REN --> TAN[tankan]
+    REN --> YAML[shikuwasa]
+    CORE --> YAML
     IDX --> CORE
     IDX --> FMT[mikan]
     WASM[mikan-wasm] --> FMT
     classDef generic fill:#fff3d6,stroke:#8a6d1a
-    class TAN,FMT,WASM,KAB generic
+    class TAN,FMT,WASM,KAB,YAML generic
 ```
 
 Figure: crate 間の依存方向（色付きは setoka 非依存の汎用ライブラリ） {#fig:deps}
 
-色を付けた **tankan・mikan・mikan-wasm・kabosu** は setoka の他の
+色を付けた **tankan・mikan・mikan-wasm・kabosu・shikuwasa** は setoka の他の
 crate に依存しない汎用ライブラリです。tankan（Mermaid SSR）と mikan（検索エンジン）
 は [crates.io で公開](https://crates.io/crates/mikan)しており
 （開発はこの monorepo で一体のまま）、書き側集約は `mikan::build`、読み側クエリエンジンは
 `SearchEngine` にあり、setoka-index はページ抽出とファイル I/O だけを担う
 薄い呼び出し側です）。kabosu（TOML）は setoka-config の唯一の通常依存で、
-設計は [kabosu の設計](kabosu.md)を参照してください。
+設計は [kabosu の設計](kabosu.md)を参照してください。shikuwasa（YAML）は setoka-core の
+frontmatter と setoka-render の API 仕様が使う読み込み口で、v0.22 で setoka-core から切り出しました。
 
 ## 凍結した設計判断
 
@@ -71,7 +75,7 @@ Web 調査込みで確定済みの技術選定です（差し替えない前提�
 | ハイライト | syntect ＋ two-face | pure-Rust（onig 非依存）。CSS クラス出力でビルド時実行。two-face（bat のアセット由来）が TypeScript / TSX / TOML / Dockerfile 等を補完する |
 | CLI | clap（derive）＋ `clap_complete` | 終了コード規約は 0 / 1 / 2。サブコマンドをまたぐ実行文脈（`--root`）は `Cx` 1 つにまとめて各 `run()` へ渡す。シェル補完は clap の定義から実行時に生成する（同梱しない・動的補完は使わない） |
 | 設定 | TOML（kabosu） | `setoka.toml` を自作の依存ゼロパーサ kabosu で読む（手書き decode・span 付き診断・未知キーは設定エラー）。上方向探索でルート確定（`--root` 指定時は探索しない）。v0.14 で serde ＋ JSONC から移行 |
-| YAML | saphyr（YAML 1.2） | frontmatter と openapi / jsonschema を setoka-core の `yaml` モジュール 1 か所で読む。型の検査は自前（日本語・ファイル上の位置・全件）で、YAML 1.1 の書き方（`yes` / `no`・`010`）は黙って読み替えずエラーにする。v0.20 で `serde_yaml_ng` から移行 |
+| YAML | saphyr（YAML 1.2） | frontmatter と openapi / jsonschema を shikuwasa（v0.22 で setoka-core の `yaml` モジュールから切り出した crate）1 か所で読む。型の検査は自前（日本語・ファイル上の位置・全件）で、YAML 1.1 の書き方（`yes` / `no`・`010`）は黙って読み替えずエラーにする。v0.20 で `serde_yaml_ng` から移行 |
 | テーマ同梱 | rust-embed | バイナリ埋め込み＋ `theme/` でファイル単位の上書き |
 | Mermaid | 既定はクライアント描画 | `[markdown.mermaid]` の `backend = "ssr"` で自作 SSR（tankan）に切り替える。未対応の図種は自動でクライアント描画へフォールバックする |
 | dev サーバ | axum ＋ notify ＋ WebSocket | `/__livereload` への push でリロード |

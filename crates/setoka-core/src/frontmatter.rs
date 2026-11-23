@@ -1,13 +1,12 @@
 //! frontmatter（YAML）の読み込み。
 //!
-//! YAML の読み込みは [`crate::yaml`]（openapi / jsonschema と共有）。ここではキーごとに型を
-//! 検査し、書き間違いを位置付きで全件集める（setoka.toml の設定エラーと同じ考え方）。
-//! 未知のキーは読み飛ばす（`frontmatter-unknown-key` の lint が警告する）
+//! YAML の読み込みは crate shikuwasa（openapi / jsonschema と共有。v0.22 Phase 102 で yaml.rs から
+//! 切り出した）。ここではキーごとに型を検査し、書き間違いを位置付きで全件集める（setoka.toml の
+//! 設定エラーと同じ考え方）。未知のキーは読み飛ばす（`frontmatter-unknown-key` の lint が警告する）
 
-use saphyr::ScalarStyle;
+use shikuwasa::{Kind, Node, Scalar, ScalarValue, Style};
 
 use crate::model::Frontmatter;
-use crate::yaml::{self, Node, Plain, View, resolve, view};
 
 /// [`Frontmatter`] が受理するトップレベルキー（lint の未知キー検出用）。
 /// フィールドを増やすときはここにも足す（乖離は下のテストで検知する）
@@ -26,7 +25,7 @@ pub(crate) const KNOWN_KEYS: &[&str] = &[
 
 /// frontmatter の書き間違い 1 件。位置は raw の中のバイト位置で、raw はファイルの
 /// 先頭から始まる（comrak は frontmatter を 1 行目からしか切り出さない）ので、
-/// [`yaml::line_col`] で raw の中の行・列にすればそのままファイル上の位置になる
+/// [`shikuwasa::line_col`] で raw の中の行・列にすればそのままファイル上の位置になる
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Problem {
     pub offset: usize,
@@ -38,7 +37,7 @@ pub(crate) struct Problem {
 /// 書き間違いはキーごとに検査して全件返す（構文エラーは最初の 1 件で止まる）
 pub(crate) fn parse_frontmatter(raw: &str) -> Result<Frontmatter, Vec<Problem>> {
     let (start, body) = yaml_body_at(raw);
-    let root = yaml::load(body).map_err(|e| {
+    let root = shikuwasa::parse(body).map_err(|e| {
         vec![Problem {
             offset: start + e.offset,
             message: e.message,
@@ -46,7 +45,6 @@ pub(crate) fn parse_frontmatter(raw: &str) -> Result<Frontmatter, Vec<Problem>> 
     })?;
     let mut decoder = Decoder {
         start,
-        body,
         problems: Vec::new(),
     };
     let frontmatter = match root {
@@ -61,20 +59,19 @@ pub(crate) fn parse_frontmatter(raw: &str) -> Result<Frontmatter, Vec<Problem>> 
 }
 
 /// キーごとの型の検査。型が違う値は既定値のままにして、書き間違いを集める
-struct Decoder<'b> {
+struct Decoder {
     /// body の raw の中での開始位置
     start: usize,
-    body: &'b str,
     problems: Vec<Problem>,
 }
 
-impl Decoder<'_> {
-    fn frontmatter(&mut self, root: &Node<'_>) -> Frontmatter {
+impl Decoder {
+    fn frontmatter(&mut self, root: &Node) -> Frontmatter {
         let mut fm = Frontmatter::default();
-        let map = match view(root) {
-            View::Mapping(map) => map,
+        let map = match &root.kind {
+            Kind::Mapping(map) => map,
             // `---` の間がコメントだけ・`~` だけ
-            View::Scalar { text, style, tag } if resolve(text, style, tag) == Plain::Null => {
+            Kind::Scalar(s) if s.value == ScalarValue::Null => {
                 return fm;
             }
             _ => {
@@ -88,9 +85,10 @@ impl Decoder<'_> {
         };
         // KNOWN_KEYS と同じ集合（全キーを読むことは下のテストが縛る）
         for (key, value) in map {
-            let View::Scalar { text: key, .. } = view(key) else {
+            let Kind::Scalar(Scalar { text: key, .. }) = &key.kind else {
                 continue;
             };
+            let key = key.as_str();
             match key {
                 "title" => fm.title = self.string(key, value),
                 "order" => fm.order = self.int(key, value),
@@ -109,11 +107,9 @@ impl Decoder<'_> {
     }
 
     /// 文字列。スカラーは書いたとおりの原文（`title: 1.0` は `"1.0"`）、値なしは `None`
-    fn string(&mut self, key: &str, node: &Node<'_>) -> Option<String> {
-        match view(node) {
-            View::Scalar { text, style, tag } => {
-                (resolve(text, style, tag) != Plain::Null).then(|| text.to_string())
-            }
+    fn string(&mut self, key: &str, node: &Node) -> Option<String> {
+        match &node.kind {
+            Kind::Scalar(s) => (s.value != ScalarValue::Null).then(|| s.text.clone()),
             _ => {
                 self.mismatch(key, node, "文字列", "");
                 None
@@ -122,17 +118,20 @@ impl Decoder<'_> {
     }
 
     /// 整数。値なしは `None`（指定しないのと同じ）
-    fn int(&mut self, key: &str, node: &Node<'_>) -> Option<i64> {
-        let View::Scalar { text, style, tag } = view(node) else {
+    fn int(&mut self, key: &str, node: &Node) -> Option<i64> {
+        let Kind::Scalar(Scalar {
+            text, style, value, ..
+        }) = &node.kind
+        else {
             self.mismatch(key, node, "整数", "");
             return None;
         };
-        let out_of_range = match resolve(text, style, tag) {
-            Plain::Int(v) => return Some(v),
-            Plain::Null => return None,
-            Plain::UInt(_) => true,
+        let out_of_range = match *value {
+            ScalarValue::Int(v) => return Some(v),
+            ScalarValue::Null => return None,
+            ScalarValue::UInt(_) => true,
             // i64 にも u64 にも収まらない 10 進数は小数として読まれる
-            Plain::Float(_) => is_decimal(unsigned(text)),
+            ScalarValue::Float(_) => is_decimal(unsigned(text)),
             _ => false,
         };
         if out_of_range {
@@ -143,42 +142,43 @@ impl Decoder<'_> {
                 ),
             );
         } else {
-            let hint = int_hint(text, style);
+            let hint = int_hint(text, *style);
             self.mismatch(key, node, "整数", &hint);
         }
         None
     }
 
     /// 真偽値。型が違えば `slot` を既定値のままにする
-    fn bool(&mut self, key: &str, node: &Node<'_>, slot: &mut bool) {
-        let View::Scalar { text, style, tag } = view(node) else {
+    fn bool(&mut self, key: &str, node: &Node, slot: &mut bool) {
+        let Kind::Scalar(Scalar {
+            text, style, value, ..
+        }) = &node.kind
+        else {
             self.mismatch(key, node, "真偽値", "");
             return;
         };
-        match resolve(text, style, tag) {
-            Plain::Bool(b) => *slot = b,
-            Plain::Null => self.push(
+        match *value {
+            ScalarValue::Bool(b) => *slot = b,
+            ScalarValue::Null => self.push(
                 node,
                 format!("`{key}` に値がありません（`true` か `false` を書いてください）"),
             ),
             _ => {
-                let hint = bool_hint(text, style);
+                let hint = bool_hint(text, *style);
                 self.mismatch(key, node, "真偽値", &hint);
             }
         }
     }
 
     /// 文字列の配列。値なしは空
-    fn strings(&mut self, key: &str, node: &Node<'_>) -> Vec<String> {
-        match view(node) {
-            View::Sequence(items) => {
+    fn strings(&mut self, key: &str, node: &Node) -> Vec<String> {
+        match &node.kind {
+            Kind::Sequence(items) => {
                 let mut out = Vec::new();
                 for (n, item) in items.iter().enumerate() {
-                    match view(item) {
-                        View::Scalar { text, style, tag }
-                            if resolve(text, style, tag) != Plain::Null =>
-                        {
-                            out.push(text.to_string());
+                    match &item.kind {
+                        Kind::Scalar(s) if s.value != ScalarValue::Null => {
+                            out.push(s.text.clone());
                         }
                         _ => {
                             let found = kind_name(item);
@@ -194,11 +194,9 @@ impl Decoder<'_> {
                 }
                 out
             }
-            View::Scalar { text, style, tag } if resolve(text, style, tag) == Plain::Null => {
-                Vec::new()
-            }
-            View::Scalar { text, .. } => {
-                let hint = format!("。1 つだけでも `[{text}]` のように配列で書いてください");
+            Kind::Scalar(s) if s.value == ScalarValue::Null => Vec::new(),
+            Kind::Scalar(s) => {
+                let hint = format!("。1 つだけでも `[{}]` のように配列で書いてください", s.text);
                 self.mismatch(key, node, "文字列の配列", &hint);
                 Vec::new()
             }
@@ -209,7 +207,7 @@ impl Decoder<'_> {
         }
     }
 
-    fn mismatch(&mut self, key: &str, node: &Node<'_>, expected: &str, hint: &str) {
+    fn mismatch(&mut self, key: &str, node: &Node, expected: &str, hint: &str) {
         let found = kind_name(node);
         self.push(
             node,
@@ -217,42 +215,45 @@ impl Decoder<'_> {
         );
     }
 
-    fn push(&mut self, node: &Node<'_>, message: String) {
+    fn push(&mut self, node: &Node, message: String) {
         self.problems.push(Problem {
-            offset: self.start + yaml::byte_offset(self.body, node.span.start),
+            offset: self.start + node.offset,
             message,
         });
     }
 }
 
 /// 値の種類の日本語名（型の違いの文言用。setoka.toml の文言と同じ呼び方）
-fn kind_name(node: &Node<'_>) -> &'static str {
-    match view(node) {
-        View::Scalar { text, style, tag } => match resolve(text, style, tag) {
-            Plain::Null => "値なし",
-            Plain::Bool(_) => "真偽値",
-            Plain::Int(_) | Plain::UInt(_) => "整数",
-            Plain::Float(_) => "小数",
-            Plain::Str => "文字列",
+fn kind_name(node: &Node) -> &'static str {
+    match &node.kind {
+        Kind::Scalar(s) => match s.value {
+            ScalarValue::Null => "値なし",
+            ScalarValue::Bool(_) => "真偽値",
+            ScalarValue::Int(_) | ScalarValue::UInt(_) => "整数",
+            ScalarValue::Float(_) => "小数",
+            ScalarValue::Str => "文字列",
         },
-        View::Sequence(_) => "配列",
-        View::Mapping(_) => "マッピング",
-        View::Other => "値",
+        Kind::Sequence(_) => "配列",
+        Kind::Mapping(_) => "マッピング",
+        // 値を作れなかった循環した別名（`&a [*a]` の `*a`）
+        Kind::Unresolved => "値",
     }
 }
 
 /// 真偽値のつもりで書かれた文字列への案内。YAML 1.1 の真偽値（`yes` / `no`・`on` / `off`）は
 /// YAML 1.2 では文字列なので、黙って読み替えずに書き直しを案内する（Phase 88 の決定）
-fn bool_hint(text: &str, style: ScalarStyle) -> String {
+fn bool_hint(text: &str, style: Style) -> String {
     let yaml11 = matches!(
         text.to_ascii_lowercase().as_str(),
         "yes" | "no" | "on" | "off" | "y" | "n"
     );
-    if style == ScalarStyle::Plain && yaml11 {
+    if style == Style::Plain && yaml11 {
         format!(
             "。`{text}` は YAML 1.1 の真偽値の書き方で、YAML 1.2 では文字列です。`true` か `false` で書いてください"
         )
-    } else if style != ScalarStyle::Plain && matches!(yaml::resolve_plain(text), Plain::Bool(_)) {
+    } else if style != Style::Plain
+        && matches!(shikuwasa::resolve_plain(text), ScalarValue::Bool(_))
+    {
         "。引用符を外してください".to_string()
     } else {
         String::new()
@@ -261,10 +262,10 @@ fn bool_hint(text: &str, style: ScalarStyle) -> String {
 
 /// 整数のつもりで書かれた文字列への案内。先頭 0 の 10 進数（`010`）は YAML 1.1 では
 /// 8 進数なので、どちらにも読み替えずに書き直しを案内する（Phase 88 の決定）
-fn int_hint(text: &str, style: ScalarStyle) -> String {
+fn int_hint(text: &str, style: Style) -> String {
     let digits = unsigned(text);
-    if style != ScalarStyle::Plain {
-        if matches!(yaml::resolve_plain(text), Plain::Int(_)) {
+    if style != Style::Plain {
+        if matches!(shikuwasa::resolve_plain(text), ScalarValue::Int(_)) {
             return "。引用符を外してください".to_string();
         }
     } else if digits.len() > 1 && digits.starts_with('0') && is_decimal(digits) {
@@ -395,8 +396,8 @@ pub(crate) fn looks_like_misread_thematic_break(raw: &str) -> bool {
     if body.trim().is_empty() {
         return false;
     }
-    match yaml::load(body) {
-        Ok(Some(root)) => !matches!(view(&root), View::Mapping(_)),
+    match shikuwasa::parse(body) {
+        Ok(Some(root)) => !matches!(root.kind, Kind::Mapping(_)),
         // コメントだけ
         Ok(None) => true,
         Err(_) => !body.lines().any(|l| is_yaml_key_line(l.trim_start())),
@@ -407,17 +408,17 @@ pub(crate) fn looks_like_misread_thematic_break(raw: &str) -> bool {
 /// YAML として読めない・マッピングでないなら空（読めない frontmatter は build が止める）
 pub(crate) fn top_level_keys(raw: &str) -> Vec<(String, usize)> {
     let (start, body) = yaml_body_at(raw);
-    let Ok(Some(root)) = yaml::load(body) else {
+    let Ok(Some(root)) = shikuwasa::parse(body) else {
         return Vec::new();
     };
-    let View::Mapping(map) = view(&root) else {
+    let Kind::Mapping(map) = &root.kind else {
         return Vec::new();
     };
-    map.keys()
-        .filter_map(|key| match view(key) {
-            View::Scalar { text, .. } => {
-                let offset = start + yaml::byte_offset(body, key.span.start);
-                Some((text.to_string(), yaml::line_col(raw, offset).0))
+    map.iter()
+        .filter_map(|(key, _)| match &key.kind {
+            Kind::Scalar(s) => {
+                let offset = start + key.offset;
+                Some((s.text.clone(), shikuwasa::line_col(raw, offset).0))
             }
             _ => None,
         })
@@ -535,7 +536,7 @@ mod tests {
             .unwrap_err()
             .into_iter()
             .map(|p| {
-                let (line, col) = crate::yaml::line_col(raw, p.offset);
+                let (line, col) = shikuwasa::line_col(raw, p.offset);
                 (line, col, p.message)
             })
             .collect()
@@ -576,6 +577,19 @@ mod tests {
         assert_eq!((got[0].0, got[0].1), (3, 22));
         let got = problems("---\r\ntitle: x\r\norder: x\r\n---\r\n");
         assert_eq!((got[0].0, got[0].1), (3, 8), "CRLF でも行がずれない");
+    }
+
+    /// PR #108 のレビュー指摘: 循環した別名（saphyr が値を作れない）を値なしにしていた。
+    /// 切り出し前と同じく型の違いにする（値なしにすると未指定として素通りする）
+    #[test]
+    fn 循環した別名は値なしではなく型の違い() {
+        let got = problems("---\naliases: &a [*a]\n---\n");
+        assert_eq!(
+            got[0].2,
+            "`aliases` の 1 番目の型が違います（期待: 文字列、実際: 値）"
+        );
+        let got = problems("---\ntitle: &a [*a]\n---\n");
+        assert!(got[0].2.contains("実際: 配列"), "{got:?}");
     }
 
     #[test]

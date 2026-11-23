@@ -89,8 +89,8 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   | 各 Phase の判断点を決める | 100〜107 | 着手時 |
   | 5 つの crate を crates.io へ publish する（`publish-crate` スキル） | 102〜106 | それぞれのマージ後（まとめてもよい） |
 
-- **時間が足りなければ v0.23 へ移すもの**: 101 の ci.yml のシェルの e2e を Windows でも動かすこと（11-21 に
-  仮決めで延期。Windows では結合テストが動く）/ 104 の CLI（hebesu を単独の
+- **時間が足りなければ v0.23 へ移すもの**: 101 の ci.yml のシェルの e2e を Windows でも動かすこと（11-23 に
+  延期を確定。Windows では結合テストが動く）/ 104 の CLI（hebesu を単独の
   コマンドとして出す部分）。100〜103・105〜107 と 104 のライブラリの部分は移さない
 
 ### 現状の確認（11-17）
@@ -131,7 +131,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - 判断点: 使う道具（Playwright か、ほかのもの）と、テストのファイルの置き場 / 何を確かめるか / ジョブを
   PR ごとに動かすか
 - 非互換と注意: なし（CI だけ）
-- 決定（11-18。判断点への応答が無かったので推奨案で**仮決め**）
+- 決定（11-18 に判断点への応答が無かったので推奨案で仮決めし、11-23 にユーザがそのまま確定した）
   - 道具は Playwright（@playwright/test 1.65.1。CI では Chromium だけを入れる）
   - 版は `tests/browser/package.json` の完全一致の指定で固定し、dependabot の npm で上げる。開発コンテナに
     Node が無く package-lock.json を作れないので、lock は置かない（@playwright/test が依存する playwright・
@@ -171,7 +171,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
   足す。`lint --fix` の収束のループを純関数に出してテストする。Windows でも CLI の e2e を動かすか（延期可）
 - 判断点: watch の確認を e2e（シェル）にするか Rust のテストにするか / Windows の CLI の e2e を入れるか
 - 非互換と注意: なし
-- 決定（11-21。判断点への応答が無かったので推奨案で**仮決め**）
+- 決定（11-21 に判断点への応答が無かったので推奨案で仮決めし、11-23 にユーザがそのまま確定した）
   - watch・dev / preview の HTTP・`lint --fix`・`--drafts` の確認は Rust の結合テスト（`crates/setoka-cli/tests/`）に
     する。ビルドした setoka を子プロセスで動かし、HTTP は std の `TcpStream` で取る（deny.toml が HTTP クライアントを
     禁止している）。`cargo test` に入るので、CI の test-cross で Windows・macOS でも動き、verify スキルへ手で写す
@@ -203,7 +203,7 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
     サンドボックスの外の側へ移した
 - 工数: 中
 
-### 102 shikuwasa（YAML の安全な読み込み） ⬜
+### 102 shikuwasa（YAML の安全な読み込み） ✅
 
 **概要**: setoka-core の `yaml.rs` を crate shikuwasa に切り出す。setoka-core（frontmatter・未知キーの lint）と
 103 の amanatsu が使う。
@@ -213,7 +213,50 @@ setoka の中の、ほかのツールでも使える機能を、tankan・mikan�
 - やること: crate を作り、setoka-core から使う。公開する API（読み込み・JSON への変換・位置・エラー）を決める。
   CLAUDE.md の「YAML の読み込み」の節を shikuwasa を指すように直す。fuzz の対象に足すか決める
 - 判断点: 公開 API の形（`serde_json::Value` を返す関数を入れるか＝serde_json に依存するか）/ fuzz の対象に足すか
-- 非互換と注意: なし（frontmatter の読み方は変えない）
+- 非互換と注意: なし（frontmatter の読み方は変えない）。ただし CR だけで改行した API 仕様（openapi / jsonschema の
+  YAML。`file:` の参照先も）では、パースのエラーの行と列が正しくなる（不具合の修正。以前は LF だけを数えて 1 行目を
+  指していた。PR #108 のレビュー指摘）。CR だけで改行した Markdown の原稿は comrak が frontmatter として切り出さない
+  （YAML の部分は本文として出る）ので、この修正では変わらない
+- 決定（11-22。ユーザが推奨案で決めた）
+  - 読んだ木は自前の型で返す（`Node`・`Kind`・`Scalar`・`Style`・`Tag`・`ScalarValue`。位置はバイトに直した
+    `offset`）。saphyr の型は公開しない（saphyr を上げても shikuwasa の API は変わらない）
+  - `to_json`（`serde_json::Value` へ写す）は既定で無効の feature `json` に入れる（serde_json の `preserve_order`）。
+    使わない人の依存は saphyr と saphyr-parser だけ
+  - エラーの文言は日本語のまま（tankan と同じ。README に書いた）
+  - fuzz の対象に足す（`crates/shikuwasa/fuzz` の `parse`）
+- やったこと
+  - `crates/shikuwasa/`（0.1.0。`lib.rs`・`load.rs`・`scalar.rs`・`tests.rs`・README・LICENSE 2 つ）。中身は setoka-core の
+    `yaml.rs` を移したもの（別名の展開の上限・同名のキー・コアタグ・スカラーの解釈・日本語の文言）に、自前の木への
+    変換を足した。位置の変換は ASCII だけなら文字数のまま、ほかは文字の開始バイトの表を 1 回だけ作る（ノードごとに
+    数え直さない）
+  - setoka-core の `yaml.rs` を消し、frontmatter（`frontmatter.rs`）と frontmatter のエラーの位置（`markdown/mod.rs`）を
+    shikuwasa に、setoka-render の API 仕様の読み込みを `shikuwasa::to_json` にした。setoka-core の依存から saphyr と
+    saphyr-parser が外れた
+  - テスト: yaml.rs のテストを移し、木の型・タグ付きの集合の位置・文字の途中を指す位置・feature `json` の写しを足した
+    （feature 無しで 11 本・`json` 付きで 15 本・doc テスト 4 本）
+  - fuzz: `crates/shikuwasa/fuzz`（`parse`。読み込み・位置が入力の中の文字の境界を指すこと・`to_json`）と種 3 つ
+    （frontmatter・OpenAPI・別名とタグ）。fuzz.yml の対象に足した
+  - ci.yml の package の検査（LICENSE の同梱を含む）に shikuwasa を足し、既定の feature（json 無し）でのテストを 1 行足した（ワークスペースのテストでは json 付きになる）。publish-crate・verify・release スキル、
+    CLAUDE.md（依存の向きの図・凍結した設計判断・「1 実装で共有する箇所」の YAML の節・汎用ライブラリ）、docs の
+    「開発者向け」（crate の一覧・依存の図・凍結した設計判断の表）を直した
+  - crates.io の名前は 5 つ（shikuwasa・amanatsu・hebesu・jabara・kunenbo）とも空いている（11-22 に確かめた）
+- 確かめたこと: `cargo test --workspace`（スナップショットとキャッシュの指紋を含めて通った = `CACHE_FORMAT_VERSION` は
+  据え置き）・main と切り出し後の setoka で docs の dist（312 ファイル）がバイト単位で同じ・fuzz の対象の本体を
+  スクラッチの crate で型検査して動かした（開発コンテナに C++ コンパイラが無く libfuzzer-sys をビルドできない）
+- fuzz（2 回目）: レビュー指摘を直した後（5198ec6）にも fuzz.yml を手動実行し、6 対象とも成功（shikuwasa の `parse` は
+  600 秒で 308 万回・panic、ハング、メモリ超過なし）。shikuwasa 0.1.0 の publish の前の fuzz を兼ねる
+- レビュー指摘 2 件（PR #108）
+  - [P2] saphyr が値を作れない循環した別名（`&a [*a]` の `*a`。BadValue）を値なしにしていた。frontmatter の
+    `aliases: &a [*a]` が「実際: 値なし」になり、値なしは未指定として素通りする書き方もあった。`Kind::Unresolved` を
+    足して区別し、切り出し前と同じ「実際: 値」の型の違い（終了コード 2）に戻した。`to_json` は従来どおり null
+  - [P3] `line_col` が LF だけを数えていた（yaml.rs のときから）。YAML 1.2 と saphyr は CR だけの改行も認めるので、
+    CR 区切りの文書のエラーが 1 行目を指していた。LF・CR・CRLF を数える（CRLF は 1 つ）
+- fuzz: ブランチ（3e93073。上の 2 件を直す前）で fuzz.yml を手動実行し、6 対象とも成功（shikuwasa の `parse` は
+  600 秒で 397 万回・panic、ハング、メモリ超過なし。ハーネスもここで初めてビルドした）
+- 103 への注意（まだ確かめていない）: amanatsu は shikuwasa（json）に依存する。path の依存は crates.io に公開するときに
+  版が要り、`cargo package -p amanatsu` は依存を crates.io から取ろうとする。103 の始めに、path の依存に `version` を
+  付けて shikuwasa と amanatsu を 1 回の `cargo package` にまとめれば CI の toolchain で通るかを確かめる。通らなければ
+  103 の package の検査を shikuwasa の公開まで外す（公開は取り消せないので、確かめる前に急いで publish しない）
 - 工数: 小〜中
 
 ### 103 amanatsu（API 仕様の HTML 化） ⬜
@@ -345,6 +388,10 @@ PR #53 のレビュアー側の協議で提案され、こちらの 3 人格の�
 
 ### その他の候補
 
+- **ci.yml のシェルの e2e を Windows でも動かす**（v0.23 の予定。v0.22 Phase 101 で延期を決めた）— 今の
+  Windows・macOS の CLI の確認は setoka-cli の結合テスト（`crates/setoka-cli/tests/`）だけで、ci.yml の e2e（bash。
+  Linux だけ）が見ている build の報告・リンクの遮断・外部リンク検査などは Windows で動かしていない。パスと改行の
+  違いで直す所が多い
 - **client 描画の Mermaid の書き間違いを check で報告する**（v0.23 の予定。setoka-core は tankan に依存できないので、検査は setoka-render 側に置き `rules::CHECK_ONLY` に足す。mermaid の版の判断の後）（v0.19 Phase 85 から回した）— 今は
   既定の client では build も check も何も言わない。tankan のパースだけ通し、未対応
   （`is_unsupported`）以外の構文エラーを抑制できる warning で報告する案。tankan が未対応の
