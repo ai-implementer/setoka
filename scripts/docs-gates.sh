@@ -13,7 +13,7 @@
 # ゲートの足し方: 新しい機能・原稿の節を足したら、ここに 1 行足す（ci.yml・verify スキルには書かない）。
 # **ゲートを && で繋がない**（bash -e は `A && B` の A の失敗では止まらない = A はゲートにならない。ci.yml の
 # docs ステップにあった 10 行がそうなっていた）。否定のゲートは `if grep …; then echo …; exit 1; fi` の形にする
-# （`! cmd` も -e の対象外）。ci.yml が && の行の混入を検査する。
+# （`! cmd` も -e の対象外）。コメント以外の行には && を書かない（ci.yml が混入を検査する。条件を繋ぐときは if を入れ子にする）。
 #
 # macOS 標準の Bash 3.2 でも動くように書く（mapfile・連想配列・${var,,} 等の Bash 4 以降の機能を使わない。
 # 日本語が続く変数は ${var} と囲む。verify スキルからホストで呼ぶ）
@@ -27,7 +27,7 @@ for loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
   fi
 done
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." || exit 1; pwd)"
 cd "$ROOT"
 SETOKA="${1:-${CARGO_TARGET_DIR:-target}/debug/setoka}"
 if [ ! -x "$SETOKA" ]; then
@@ -74,8 +74,11 @@ if [ "$(sed -n "${first},${last}p" docs/setoka.toml | grep '^\[' | tail -n 1)" !
   echo "code-and-math.md の lines=${ranges} の最後の表が setoka.toml の [markdown.glossary.terms] ではありません" >&2
   exit 1
 fi
-if ! sed -n "$((last + 1))p" docs/setoka.toml | grep -qE '^(\[|$)'; then
-  echo "code-and-math.md の lines=${ranges} が [markdown.glossary.terms] の途中（${last} 行目）で切れています" >&2
+# 範囲の後ろから次の表（または終わり）までに、空行とコメント以外の行（引用から漏れた項目）が無い。
+# 直後の 1 行だけを見ると、用語集の途中に空行を入れたときに後ろの項目が漏れても通っていた（PR #114 のレビュー指摘）
+left_out="$(sed -n "$((last + 1)),\$p" docs/setoka.toml | awk '/^\[/ { exit } { print }' | grep -vE '^[[:space:]]*(#|$)' || true)"
+if [ -n "$left_out" ]; then
+  echo "code-and-math.md の lines=${ranges} の外（${last} 行目より後ろ）に [markdown.glossary.terms] の項目が残っています: ${left_out}" >&2
   exit 1
 fi
 grep -q "<figcaption>setoka.toml:${ranges}</figcaption>" docs/dist/guide/code-and-math/index.html
@@ -331,6 +334,9 @@ done
 # Phase 90（リリース判定）: サブパス配信（docs.yml と同じ --base-url）で、favicon の
 # link が base の下を指し、そのファイルが dist にある（以前は link が無く、ブラウザが
 # 探すドメイン直下の /favicon.ico は 404 だった）。docs/dist を作り直すので最後に置く
+# ここで止まっても docs/dist を既定の base に戻す（/setoka/ 向けの成果物を残さない。終了コードは止まったときのまま。
+# PR #114 のレビュー指摘）
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then "$SETOKA" build --root docs -q >/dev/null 2>&1 || true; fi; exit "$rc"' EXIT
 "$SETOKA" build --root docs --base-url /setoka/
 href="$(grep -oE '<link rel="icon" href="[^"]*"' docs/dist/index.html | sed -E 's/.*href="([^"]*)"/\1/')"
 case "$href" in
@@ -341,5 +347,6 @@ test -f "docs/dist/${href#/setoka/}"
 grep -q '<footer class="site-footer">' docs/dist/index.html
 grep -q 'class="header-links"' docs/dist/index.html
 # 後で docs/dist を開く人のために、既定の base で作り直しておく
+trap - EXIT
 "$SETOKA" build --root docs -q
 echo "docs のゲートはすべて通りました"

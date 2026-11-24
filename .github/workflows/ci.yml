@@ -251,9 +251,10 @@ jobs:
         # dogfooding。cd docs しない）、出力は docs/dist/ に出る
         run: |
           # ゲートを && で繋がない（bash -e は `A && B` の A の失敗では止まらないので、A がゲートにならない。
-          # 以前の docs ステップの 10 行がそうなっていた）
-          if grep -nE '^[[:space:]]*(grep|test) [^#]*&&' scripts/docs-gates.sh; then
-            echo "scripts/docs-gates.sh のゲートが && で繋がっている（上記。1 行に 1 つのゲートにする）" >&2
+          # 以前の docs ステップの 10 行がそうなっていた）。コメント以外の行には && を書かない決まりにして、
+          # 行のどこにあっても見つける（引用符の中の # で照合を止めない。PR #114 のレビュー指摘）
+          if grep -nE '^[[:space:]]*[^#[:space:]].*&&' scripts/docs-gates.sh; then
+            echo "scripts/docs-gates.sh のコメント以外の行に && がある（上記。ゲートは 1 行に 1 つにし、条件は if を入れ子にする）" >&2
             exit 1
           fi
           scripts/docs-gates.sh target/debug/setoka
