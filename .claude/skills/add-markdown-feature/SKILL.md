@@ -108,7 +108,7 @@ frontmatter のキーを足す場合は `crates/setoka-core/src/frontmatter.rs` 
 - **doc コメント内でフェンスを入れ子にすると doctest がコンパイルされて失敗する**（インデント記法も同様）。散文で書く
 - **アンカー採番は extract_meta / HTML 化 / extract_plain_sections の 3 経路とも全見出しを文書順に** Anchorizer へ通す。片方で飛ばすと id がずれる
 - `comrak_options_keep_footnotes` は fmt / normalize / linkcheck 専用。HTML レンダと extract_meta に使うと壊れる
-- **`docs/setoka.toml` の `[markdown]` ブロック**（`[markdown]` から `[markdown.glossary.terms]` の終わりまで）は、`docs/content/guide/code-and-math.md` がインクルードの `lines=` で引用している。キーを足してこのブロックの行が動いたら `lines=` も直す（`scripts/docs-gates.sh` が範囲のずれを見つけて、直す場所を出す）
+- **`docs/setoka.toml` の `[markdown]` ブロック**（`[markdown]` とその下の表 `[markdown.…]`）は、`docs/content/guide/code-and-math.md` がインクルードの `lines=` で引用している。キーを足してこのブロックの行が動いたら `lines=` も直す（`scripts/docs-gates.sh` が範囲のずれを見つけて、直す場所を出す）
 
 ## 仕上げ
 

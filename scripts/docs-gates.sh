@@ -11,13 +11,24 @@
 # jq が要る。終了コード: 0 = すべて通った / 0 以外 = どこかのゲートで止まった（止まった行を出す）
 #
 # ゲートの足し方: 新しい機能・原稿の節を足したら、ここに 1 行足す（ci.yml・verify スキルには書かない）。
-# **ゲートを && で繋がない**（bash -e は `A && B` の A の失敗では止まらない = A はゲートにならない。ci.yml の
-# docs ステップにあった 10 行がそうなっていた）。否定のゲートは `if grep …; then echo …; exit 1; fi` の形にする
-# （`! cmd` も -e の対象外）。コメント以外の行には && を書かない（ci.yml が混入を検査する。条件を繋ぐときは if を入れ子にする）。
+# 1 行に 1 つのゲートにし、否定のゲートは `if grep …; then echo …; exit 1; fi` の形にする。
+# **ゲートを素通りさせる書き方は使えない**（bash -e は `A && B` の A・`A || B` の A・`!` で反転したコマンドの失敗では
+# 止まらず、`|| true` や `set +e` は失敗を消す。ci.yml の docs ステップにあった `grep -q A && grep -q B` の 10 行は
+# A がゲートになっていなかった）。起動時にこのファイル自身を調べ、コメント以外の行の && と ||・! で始まる文・
+# set +e があれば止まる。条件を繋ぐときは if を入れ子にし、検索する文字列に && や || が要るときは [&][&] のように書く。
 #
 # macOS 標準の Bash 3.2 でも動くように書く（mapfile・連想配列・${var,,} 等の Bash 4 以降の機能を使わない。
 # 日本語が続く変数は ${var} と囲む。verify スキルからホストで呼ぶ）
 set -euo pipefail
+
+# このファイル自身に、ゲートを素通りさせる書き方が無いか（上の決まり。この行の正規表現は、文字クラスで書いて
+# 自分自身に一致しないようにしてある）
+bypass="$(awk '/^[[:space:]]*#/ { next } /&[&]|[|][|]|^[[:space:]]*![[:space:]]|set[[:space:]]+[+]e/ { print FNR ": " $0 }' "$0")"
+if [ -n "$bypass" ]; then
+  echo "scripts/docs-gates.sh にゲートを素通りさせる書き方があります（AND・OR の演算子 / ! で始まる文 / errexit を止める set。1 行に 1 つのゲートにし、条件は if を入れ子にする）:" >&2
+  echo "$bypass" >&2
+  exit 2
+fi
 
 # 日本語の文字列を文字単位で扱うため、実在する UTF-8 のロケールを使う（scripts/check-doc-refs.sh と同じ）
 for loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
@@ -27,8 +38,8 @@ for loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
   fi
 done
 
-ROOT="$(cd "$(dirname "$0")/.." || exit 1; pwd)"
-cd "$ROOT"
+# リポジトリのルートへ移る（失敗したら set -e で止まる）
+cd "$(dirname "$0")/.."
 SETOKA="${1:-${CARGO_TARGET_DIR:-target}/debug/setoka}"
 if [ ! -x "$SETOKA" ]; then
   echo "setoka のバイナリがありません: ${SETOKA}（先に cargo build -p setoka-cli する）" >&2
@@ -56,29 +67,123 @@ test -f docs/dist/_search/manifest.json
 # エイリアス（guide/quality の旧 URL）にリダイレクト HTML が生成される
 grep -q 'http-equiv="refresh"' docs/dist/guide/lint/index.html
 # コンテンツインクルード: setoka.toml の引用が展開されている。引用する行の範囲は原稿（code-and-math.md）の
-# `lines=` から読み、その範囲が setoka.toml の `[markdown]` から `[markdown.glossary.terms]` の終わりまでを
-# 指していることも確かめる（setoka.toml の行を動かすと、原稿の引用と CI が同時に壊れるため。v0.22 Phase 107 で
-# 行番号の直書きをやめた）
-ranges="$(grep -oE 'file="setoka\.toml" lines=[0-9]+-[0-9]+' docs/content/guide/code-and-math.md | sed 's/.*lines=//' | sort -u)"
-if [ -z "$ranges" ] || [ "$(printf '%s\n' "$ranges" | wc -l | tr -d ' ')" -ne 1 ]; then
+# `lines=` から読み、その範囲が setoka.toml の `[markdown]` とその下の表（`[markdown.…]`）を漏れなく指していることも
+# 確かめる（setoka.toml の行を動かすと、原稿の引用と CI が同時に壊れるため。v0.22 Phase 107 で行番号の直書きをやめた）
+ranges="$(awk 'match($0, /file="setoka\.toml" lines=[0-9]+-[0-9]+/) { s = substr($0, RSTART, RLENGTH); sub(/.*lines=/, "", s); print s }' docs/content/guide/code-and-math.md | sort -u)"
+count="$(printf '%s\n' "$ranges" | awk 'NF { n++ } END { print n + 0 }')"
+if [ "$count" -ne 1 ]; then
   echo "code-and-math.md の setoka.toml の引用（lines=）が読めないか、範囲がそろっていません: ${ranges}" >&2
   exit 1
 fi
 first="${ranges%-*}"
 last="${ranges#*-}"
-if [ "$(sed -n "${first}p" docs/setoka.toml)" != "[markdown]" ]; then
-  echo "code-and-math.md の lines=${ranges} の先頭（${first} 行目）が setoka.toml の [markdown] ではありません（setoka.toml の行が動いたら lines= を直す）" >&2
-  exit 1
-fi
-if [ "$(sed -n "${first},${last}p" docs/setoka.toml | grep '^\[' | tail -n 1)" != "[markdown.glossary.terms]" ]; then
-  echo "code-and-math.md の lines=${ranges} の最後の表が setoka.toml の [markdown.glossary.terms] ではありません" >&2
-  exit 1
-fi
-# 範囲の後ろから次の表（または終わり）までに、空行とコメント以外の行（引用から漏れた項目）が無い。
-# 直後の 1 行だけを見ると、用語集の途中に空行を入れたときに後ろの項目が漏れても通っていた（PR #114 のレビュー指摘）
-left_out="$(sed -n "$((last + 1)),\$p" docs/setoka.toml | awk '/^\[/ { exit } { print }' | grep -vE '^[[:space:]]*(#|$)' || true)"
-if [ -n "$left_out" ]; then
-  echo "code-and-math.md の lines=${ranges} の外（${last} 行目より後ろ）に [markdown.glossary.terms] の項目が残っています: ${left_out}" >&2
+# TOML を 1 行ずつ読み、文字列（"…"・'…'・"""…"""・'''…'''）と複数行の配列の中かどうかを追いながら、その外にある
+# 行だけを表の見出しとして見分ける（行頭の空白・末尾のコメント・括弧の中の空白・引用符付きのキー・[[…]] を許す）。
+# 1 列目の `[` だけを見ると、インデントした見出しを見落とし、複数行の文字列の中の `[lint]` の行を見出しと取り違えて
+# 引用漏れを見落とした（PR #114 のレビュー指摘）。判定:
+#   1. 範囲の先頭の行が [markdown] の見出し
+#   2. 範囲の中に markdown の外の表の見出しが無い
+#   3. 範囲の外（前にも後ろにも）に markdown の表（[markdown.…]）の見出しが無く、表の見出しより前に markdown.… の
+#      キーも無い
+#   4. 範囲の後ろから次の見出し（または終わり）までが空行とコメントだけで、範囲が値（複数行の文字列・配列）の途中で
+#      切れていない（最後の表の項目が引用から漏れない）
+problem="$(awk -v first="$first" -v last="$last" '
+  function header(line,   s) {
+    s = line
+    sub(/^[[:space:]]+/, "", s)
+    if (s !~ /^\[/) return ""
+    sub(/[[:space:]]*#.*$/, "", s)
+    sub(/[[:space:]]+$/, "", s)
+    if (s !~ /\]$/) return ""
+    gsub(/^\[+|\]+$/, "", s)
+    gsub(/[[:space:]"\047]/, "", s)
+    if (s !~ /^[A-Za-z0-9_.-]+$/) return ""
+    return s
+  }
+  function family(name) { if (name == "markdown") return 1; return index(name, "markdown.") == 1 }
+  function fail(message) { print message; failed = 1; exit }
+  # 行の文字を読んで、複数行の文字列の中（ml = 1 は """、2 は \047\047\047）と配列の深さ（depth）を進める
+  function scan(line,   i, n, c, c3) {
+    i = 1
+    n = length(line)
+    while (i <= n) {
+      c = substr(line, i, 1)
+      c3 = substr(line, i, 3)
+      if (ml == 1) {
+        if (c == "\\") { i += 2; continue }
+        if (c3 == "\"\"\"") { ml = 0; i += 3; continue }
+        i++
+        continue
+      }
+      if (ml == 2) {
+        if (c3 == "\047\047\047") { ml = 0; i += 3; continue }
+        i++
+        continue
+      }
+      if (c == "#") return
+      if (c3 == "\"\"\"") { ml = 1; i += 3; continue }
+      if (c3 == "\047\047\047") { ml = 2; i += 3; continue }
+      if (c == "\"") {
+        i++
+        while (i <= n) {
+          c = substr(line, i, 1)
+          if (c == "\\") { i += 2; continue }
+          i++
+          if (c == "\"") break
+        }
+        continue
+      }
+      if (c == "\047") {
+        i++
+        while (i <= n) {
+          c = substr(line, i, 1)
+          i++
+          if (c == "\047") break
+        }
+        continue
+      }
+      if (c == "[") depth++
+      if (c == "]") { if (depth > 0) depth-- }
+      i++
+    }
+  }
+  {
+    # この行の始まりで、文字列にも配列にも入っていないか
+    top = 0
+    if (ml == 0) { if (depth == 0) top = 1 }
+    h = ""
+    if (top) h = header($0)
+    if (h != "") {
+      any_header = 1
+      if (NR == first) {
+        if (h != "markdown") fail("先頭（" NR " 行目）が [markdown] の見出しではありません")
+      } else if (NR < first) {
+        if (family(h)) fail("範囲より前（" NR " 行目）に markdown の表 [" h "] があります")
+      } else if (NR <= last) {
+        if (!family(h)) fail("範囲の中（" NR " 行目）に markdown の外の表 [" h "] があります")
+      } else {
+        if (family(h)) fail("範囲より後ろ（" NR " 行目）に markdown の表 [" h "] があります")
+        after_header = 1
+      }
+      next
+    }
+    if (NR == first) fail("先頭（" NR " 行目）が [markdown] の見出しではありません")
+    if (top) {
+      if (!any_header) {
+        if ($0 ~ /^[[:space:]]*["\047]?markdown["\047]?[[:space:]]*[.=]/) fail("表の見出しより前（" NR " 行目）に markdown のキーがあります: " $0)
+      }
+    }
+    if (NR > last) {
+      if (!after_header) {
+        if (!top) fail("範囲が値（複数行の文字列か配列）の途中（" last " 行目）で切れています")
+        if ($0 !~ /^[[:space:]]*(#|$)/) fail("範囲の外（" NR " 行目）に最後の表の項目が残っています: " $0)
+      }
+    }
+    scan($0)
+  }
+' docs/setoka.toml)"
+if [ -n "$problem" ]; then
+  echo "code-and-math.md の lines=${ranges} が setoka.toml の [markdown] の表を漏れなく指していません: ${problem}（setoka.toml の行が動いたら lines= を直す）" >&2
   exit 1
 fi
 grep -q "<figcaption>setoka.toml:${ranges}</figcaption>" docs/dist/guide/code-and-math/index.html
@@ -336,7 +441,7 @@ done
 # 探すドメイン直下の /favicon.ico は 404 だった）。docs/dist を作り直すので最後に置く
 # ここで止まっても docs/dist を既定の base に戻す（/setoka/ 向けの成果物を残さない。終了コードは止まったときのまま。
 # PR #114 のレビュー指摘）
-trap 'rc=$?; if [ "$rc" -ne 0 ]; then "$SETOKA" build --root docs -q >/dev/null 2>&1 || true; fi; exit "$rc"' EXIT
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then if "$SETOKA" build --root docs -q >/dev/null 2>&1; then :; fi; fi; exit "$rc"' EXIT
 "$SETOKA" build --root docs --base-url /setoka/
 href="$(grep -oE '<link rel="icon" href="[^"]*"' docs/dist/index.html | sed -E 's/.*href="([^"]*)"/\1/')"
 case "$href" in

@@ -92,10 +92,11 @@ cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の�
   検索の照合（`setoka search`。jq が要る）・SSR フォールバックの検出・`--base-url /setoka/` の favicon の確認・
   公開する crate が文書（docs の「開発者向け」・CLAUDE.md・`publish-crate` スキル・ci.yml の package の検査）に
   載っているかの照合を行う。止まったら、止まった行と文言が出る
-- **新しい機能・原稿の節のゲートはスクリプトに足す**（ci.yml とこのスキルには書かない）。ゲートを `&&` で繋がない
-  （`bash -e` は `A && B` の A の失敗で止まらない。ci.yml が && の行の混入を検査する）
-- `docs/setoka.toml` の `[markdown]` から `[markdown.glossary.terms]` の終わりまでは、`docs/content/guide/code-and-math.md`
-  の `lines=` で引用されている。スクリプトが `lines=` の範囲を原稿から読み、その範囲が今もこのブロックを指しているかを
+- **新しい機能・原稿の節のゲートはスクリプトに足す**（ci.yml とこのスキルには書かない）。ゲートを素通りさせる書き方
+  （`&&`・`||`・`!` で始まる文・`set +e`。`bash -e` は `A && B` の A の失敗などで止まらない）は使えず、スクリプトが起動時に自分を
+  調べて止まる
+- `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、`docs/content/guide/code-and-math.md`
+  の `lines=` で引用されている。スクリプトが `lines=` の範囲を原稿から読み、その範囲が今もこれらの表を漏れなく指しているかを
   確かめるので、`docs/setoka.toml` の行を動かしたら、止まったときの文言に従って `lines=`（引用の 2 か所と、説明の文の例）を直す
 - 終わったときの `docs/dist/` は既定の base で作り直してある（`run` スキルで開ける）
 

@@ -249,15 +249,8 @@ jobs:
         # check・build と機能ごとの配信ゲートは scripts/docs-gates.sh にまとめてある（v0.22 Phase 107。verify スキルも
         # 同じスクリプトを呼ぶ。ゲートを足すのはスクリプトの方）。プロジェクトは --root docs で指定し（Phase 75 の
         # dogfooding。cd docs しない）、出力は docs/dist/ に出る
-        run: |
-          # ゲートを && で繋がない（bash -e は `A && B` の A の失敗では止まらないので、A がゲートにならない。
-          # 以前の docs ステップの 10 行がそうなっていた）。コメント以外の行には && を書かない決まりにして、
-          # 行のどこにあっても見つける（引用符の中の # で照合を止めない。PR #114 のレビュー指摘）
-          if grep -nE '^[[:space:]]*[^#[:space:]].*&&' scripts/docs-gates.sh; then
-            echo "scripts/docs-gates.sh のコメント以外の行に && がある（上記。ゲートは 1 行に 1 つにし、条件は if を入れ子にする）" >&2
-            exit 1
-          fi
-          scripts/docs-gates.sh target/debug/setoka
+        # ゲートを素通りさせる書き方（&& / || / ! で始まる文 / set +e）は、スクリプトが起動時に自分を調べて断る
+        run: scripts/docs-gates.sh target/debug/setoka
 
       # e2e: サンプルプロジェクト生成 → ビルド → ネイティブ検索（誤字クエリ込み）
       - name: e2e (setoka new && setoka build && setoka search)
