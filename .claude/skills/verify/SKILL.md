@@ -96,10 +96,10 @@ cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の�
   （`&&`・`||`・`!` で始まる文・`set +e`。`bash -e` は `A && B` の A の失敗などで止まらない）は使えず、スクリプトが起動時に自分を
   調べて止まる
 - `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、`docs/content/guide/code-and-math.md`
-  の `lines=` で引用されている。その範囲がこれらの表を漏れなく・余分なく指しているかは、TOML を kabosu で読む setoka-config の
-  テスト（`crates/setoka-config/tests/docs_excerpt_test.rs`。2 節の cargo test で動く）が確かめる。`docs/setoka.toml` の行を
-  動かしたら、テストのメッセージに出る範囲で `lines=`（引用の 2 か所と、説明の文の例）を直す。スクリプトは `lines=` を読んで
-  figcaption を照合する
+  の `lines=` で引用されている（書き方の例も同じ範囲）。その範囲がこれらの表を漏れなく・余分なく指しているか・例と同じかは、
+  setoka の情報文字列の読み取りと kabosu を使う setoka-core のテスト（`crates/setoka-core/tests/docs_excerpt_test.rs`。2 節の
+  cargo test で動く）が確かめる。`docs/setoka.toml` の行を動かしたら、テストのメッセージの案内に従って表の並びか `lines=`
+  （引用と例。説明の文の例も合わせる）を直す。スクリプトはビルドした HTML に `setoka.toml:行範囲` の figcaption があるかを見る
 - 終わったときの `docs/dist/` は既定の base で作り直してある（`run` スキルで開ける）
 
 ## 6. e2e（CLI 実機）

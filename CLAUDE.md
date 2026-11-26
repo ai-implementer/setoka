@@ -568,9 +568,10 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 - **docs のゲートは `scripts/docs-gates.sh` にまとめてあり、docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用。
   ci.yml の docs ステップと `verify` スキルはこのスクリプトを呼ぶだけ = ゲートはスクリプトにだけ書く。v0.22 Phase 107）
   - `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、原稿（`docs/content/guide/code-and-math.md`）が
-    インクルードの `lines=` で引用している。その範囲がこれらの表を漏れなく・余分なく指しているかは、TOML を kabosu で読む
-    setoka-config のテスト（`crates/setoka-config/tests/docs_excerpt_test.rs`）が確かめる（行を動かすと、テストのメッセージが
-    直す範囲を示す）。awk などで TOML を読んで同じことをしない（複数行の文字列・エスケープしたキーなどで見逃した。PR #114）
+    インクルードの `lines=` で引用している（書き方の例も同じ範囲）。その範囲がこれらの表を漏れなく・余分なく指しているか・例と
+    同じかは、setoka の情報文字列の読み取り（`collect_include_specs`）と kabosu を使う setoka-core のテスト
+    （`crates/setoka-core/tests/docs_excerpt_test.rs`）が確かめる（行を動かすと、テストのメッセージが直す場所を示す）。
+    シェルの正規表現や awk で原稿や TOML を読んで同じことをしない（属性の順・複数行の文字列・エスケープしたキーなどで見逃した。PR #114）
   - 公開する crate（`publish = false` の無いもの）が docs の「開発者向け」・この CLAUDE.md の汎用ライブラリの一覧・
     `publish-crate` スキルの表・ci.yml の package の検査にそろって載っていることも、このスクリプトが照合する
   - **雛形 deploy.yml を変えたら `docs/snippets/deploy.yml` へ写す**（docs は雛形を docs のルートの

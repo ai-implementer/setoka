@@ -66,18 +66,12 @@ test -f docs/dist/index.html
 test -f docs/dist/_search/manifest.json
 # エイリアス（guide/quality の旧 URL）にリダイレクト HTML が生成される
 grep -q 'http-equiv="refresh"' docs/dist/guide/lint/index.html
-# コンテンツインクルード: setoka.toml の引用が展開されている。引用する行の範囲は原稿（code-and-math.md）の `lines=` から
-# 読む（v0.22 Phase 107 で行番号の直書きをやめた）。その範囲が setoka.toml の `[markdown]` とその下の表を漏れなく・余分なく
-# 指しているかは、TOML をパーサ（kabosu）で読む setoka-config のテスト（crates/setoka-config/tests/docs_excerpt_test.rs。
-# cargo test で動く）が確かめる（awk で TOML を読むと、複数行の文字列やエスケープしたキーなどの書き方で見逃した。
-# PR #114 のレビュー指摘）
-ranges="$(awk 'match($0, /file="setoka\.toml" lines=[0-9]+-[0-9]+/) { s = substr($0, RSTART, RLENGTH); sub(/.*lines=/, "", s); print s }' docs/content/guide/code-and-math.md | sort -u)"
-count="$(printf '%s\n' "$ranges" | awk 'NF { n++ } END { print n + 0 }')"
-if [ "$count" -ne 1 ]; then
-  echo "code-and-math.md の setoka.toml の引用（lines=）が読めないか、範囲がそろっていません: ${ranges}" >&2
-  exit 1
-fi
-grep -q "<figcaption>setoka.toml:${ranges}</figcaption>" docs/dist/guide/code-and-math/index.html
+# コンテンツインクルード: setoka.toml の引用が展開されている（キャプションは `setoka.toml:行範囲`）。引用の範囲が
+# setoka.toml の `[markdown]` とその下の表を漏れなく・余分なく指しているか・書き方の例と同じかは、setoka の情報文字列の
+# 読み取りと kabosu を使う setoka-core のテスト（crates/setoka-core/tests/docs_excerpt_test.rs。cargo test で動く）が
+# 確かめる（v0.22 Phase 107。シェルで原稿や TOML を読むと、属性の順・複数行の文字列・エスケープしたキーなどで
+# 見逃した。PR #114 のレビュー指摘）
+grep -qE '<figcaption>setoka\.toml:[0-9]+-[0-9]+</figcaption>' docs/dist/guide/code-and-math/index.html
 # 図表番号: キャプションの採番と参照リンクの自動補完
 grep -q 'id="fig:deps"' docs/dist/development/index.html
 grep -q '<a href="#fig:deps">図 1</a>' docs/dist/development/index.html
