@@ -66,12 +66,24 @@ test -f docs/dist/index.html
 test -f docs/dist/_search/manifest.json
 # エイリアス（guide/quality の旧 URL）にリダイレクト HTML が生成される
 grep -q 'http-equiv="refresh"' docs/dist/guide/lint/index.html
-# コンテンツインクルード: setoka.toml の引用が展開されている（キャプションは `setoka.toml:行範囲`）。引用の範囲が
-# setoka.toml の `[markdown]` とその下の表を漏れなく・余分なく指しているか・書き方の例と同じかは、setoka の情報文字列の
-# 読み取りと kabosu を使う setoka-core のテスト（crates/setoka-core/tests/docs_excerpt_test.rs。cargo test で動く）が
-# 確かめる（v0.22 Phase 107。シェルで原稿や TOML を読むと、属性の順・複数行の文字列・エスケープしたキーなどで
-# 見逃した。PR #114 のレビュー指摘）
-grep -qE '<figcaption>setoka\.toml:[0-9]+-[0-9]+</figcaption>' docs/dist/guide/code-and-math/index.html
+# コンテンツインクルード: setoka.toml の引用が展開され、描画したキャプション（`setoka.toml:行範囲`）の範囲が原稿の `lines=` と
+# 同じ（行番号の直書きをやめた代わりに、原稿から読んで照合する。キャプションの範囲を見ないと、描画が原稿と食い違っても
+# 通った。PR #114 のレビュー指摘）。原稿は、`file="setoka.toml"` を含むフェンスの行（実際の引用と、書き方の例）の `lines=` を、
+# 属性の順に依らずに読む。引用と例の範囲がそろっていること・その範囲が setoka.toml の `[markdown]` とその下の表を漏れなく・
+# 余分なく指していることは、setoka の情報文字列の読み取りと kabosu を使う setoka-core のテスト
+# （crates/setoka-core/tests/docs_excerpt_test.rs。cargo test で動く）が確かめる（v0.22 Phase 107。シェルで TOML を読むと、
+# 複数行の文字列・エスケープしたキーなどで見逃した）
+ranges="$(awk '/^[[:space:]]*(```|~~~)/ { if ($0 ~ /file=["\047]?setoka\.toml["\047]?([[:space:]]|$)/) { if (match($0, /lines=[0-9]+-[0-9]+/)) print substr($0, RSTART + 6, RLENGTH - 6) } }' docs/content/guide/code-and-math.md | sort -u)"
+count="$(printf '%s\n' "$ranges" | awk 'NF { n++ } END { print n + 0 }')"
+if [ "$count" -ne 1 ]; then
+  echo "code-and-math.md の setoka.toml の引用（lines=）が読めないか、範囲がそろっていません: ${ranges}" >&2
+  exit 1
+fi
+captions="$(awk '{ s = $0; while (match(s, /<figcaption>setoka\.toml:[0-9]+-[0-9]+<\/figcaption>/)) { t = substr(s, RSTART, RLENGTH); sub(/^<figcaption>setoka\.toml:/, "", t); sub(/<\/figcaption>$/, "", t); print t; s = substr(s, RSTART + RLENGTH) } }' docs/dist/guide/code-and-math/index.html | sort -u)"
+if [ "$captions" != "$ranges" ]; then
+  echo "code-and-math のページの setoka.toml の引用のキャプション（${captions:-無し}）が原稿の lines=${ranges} と違います" >&2
+  exit 1
+fi
 # 図表番号: キャプションの採番と参照リンクの自動補完
 grep -q 'id="fig:deps"' docs/dist/development/index.html
 grep -q '<a href="#fig:deps">図 1</a>' docs/dist/development/index.html

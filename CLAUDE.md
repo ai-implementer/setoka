@@ -571,7 +571,8 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     インクルードの `lines=` で引用している（書き方の例も同じ範囲）。その範囲がこれらの表を漏れなく・余分なく指しているか・例と
     同じかは、setoka の情報文字列の読み取り（`collect_include_specs`）と kabosu を使う setoka-core のテスト
     （`crates/setoka-core/tests/docs_excerpt_test.rs`）が確かめる（行を動かすと、テストのメッセージが直す場所を示す）。
-    シェルの正規表現や awk で原稿や TOML を読んで同じことをしない（属性の順・複数行の文字列・エスケープしたキーなどで見逃した。PR #114）
+    `scripts/docs-gates.sh` は、原稿の `lines=` と描画したキャプション（`setoka.toml:行範囲`）が同じかだけを見る。範囲の正しさを
+    シェルの正規表現や awk で TOML を読んで判定しない（複数行の文字列・エスケープしたキーなどで見逃した。PR #114）
   - 公開する crate（`publish = false` の無いもの）が docs の「開発者向け」・この CLAUDE.md の汎用ライブラリの一覧・
     `publish-crate` スキルの表・ci.yml の package の検査にそろって載っていることも、このスクリプトが照合する
   - **雛形 deploy.yml を変えたら `docs/snippets/deploy.yml` へ写す**（docs は雛形を docs のルートの

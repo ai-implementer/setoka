@@ -99,7 +99,7 @@ cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の�
   の `lines=` で引用されている（書き方の例も同じ範囲）。その範囲がこれらの表を漏れなく・余分なく指しているか・例と同じかは、
   setoka の情報文字列の読み取りと kabosu を使う setoka-core のテスト（`crates/setoka-core/tests/docs_excerpt_test.rs`。2 節の
   cargo test で動く）が確かめる。`docs/setoka.toml` の行を動かしたら、テストのメッセージの案内に従って表の並びか `lines=`
-  （引用と例。説明の文の例も合わせる）を直す。スクリプトはビルドした HTML に `setoka.toml:行範囲` の figcaption があるかを見る
+  （引用と例。説明の文の例も合わせる）を直す。スクリプトは描画したキャプション（`setoka.toml:行範囲`）の範囲が原稿の `lines=` と同じかを見る
 - 終わったときの `docs/dist/` は既定の base で作り直してある（`run` スキルで開ける）
 
 ## 6. e2e（CLI 実機）
