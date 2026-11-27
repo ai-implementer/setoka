@@ -50,3 +50,6 @@ tracing-subscriber = { workspace = true }
 # 並列処理中の panic が main の catch_unwind まで伝わることのテスト用
 rayon = { workspace = true }
 tempfile = { workspace = true }
+# docs サイトの原稿が docs/setoka.toml の [markdown] の表を引用している範囲の照合（tests/docs_excerpt.rs）で、
+# TOML を位置付きで読むのに使う（v0.22 Phase 107）
+kabosu = { workspace = true }

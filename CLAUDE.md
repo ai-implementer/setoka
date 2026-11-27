@@ -568,11 +568,12 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
 - **docs のゲートは `scripts/docs-gates.sh` にまとめてあり、docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用。
   ci.yml の docs ステップと `verify` スキルはこのスクリプトを呼ぶだけ = ゲートはスクリプトにだけ書く。v0.22 Phase 107）
   - `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、原稿（`docs/content/guide/code-and-math.md`）が
-    インクルードの `lines=` で引用している（書き方の例も同じ範囲）。その範囲がこれらの表を漏れなく・余分なく指しているか・例と
-    同じかは、setoka の情報文字列の読み取り（`collect_include_specs`）と kabosu を使う setoka-core のテスト
-    （`crates/setoka-core/tests/docs_excerpt_test.rs`）が確かめる（行を動かすと、テストのメッセージが直す場所を示す）。
-    `scripts/docs-gates.sh` は、原稿の `lines=` と描画したキャプション（`setoka.toml:行範囲`）が同じかだけを見る。範囲の正しさを
-    シェルの正規表現や awk で TOML を読んで判定しない（複数行の文字列・エスケープしたキーなどで見逃した。PR #114）
+    インクルードの `lines=` で引用している（書き方の例も同じ範囲）。引用と例の範囲がそろっているか・その範囲がこれらの表を漏れ
+    なく・余分なく指しているか・docs をビルドしたときのキャプションがその範囲かは、setoka-cli の結合テスト
+    （`crates/setoka-cli/tests/docs_excerpt.rs`）が確かめる。原稿は setoka の情報文字列の読み取り（`collect_include_specs`）、
+    TOML は kabosu、キャプションの文言は `IncludeSpec::default_title` で作る（行を動かすと、テストのメッセージが直す場所を示す）。
+    **シェルの正規表現や awk で原稿や TOML を読んで同じことをしない**（属性の順・値の引用符・複数行の文字列・エスケープした
+    キーなどで setoka の読み方とずれ、PR #114 のレビューで 6 回直した）
   - 公開する crate（`publish = false` の無いもの）が docs の「開発者向け」・この CLAUDE.md の汎用ライブラリの一覧・
     `publish-crate` スキルの表・ci.yml の package の検査にそろって載っていることも、このスクリプトが照合する
   - **雛形 deploy.yml を変えたら `docs/snippets/deploy.yml` へ写す**（docs は雛形を docs のルートの

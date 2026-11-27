@@ -39,7 +39,7 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
 
 ```bash
 cargo test --locked --workspace --exclude jabara --exclude setoka-cli
-cargo test --locked -p setoka-cli --test commands
+cargo test --locked -p setoka-cli --test commands --test docs_excerpt
 # ↓ サンドボックス外で実行する（TCP で待ち受ける）
 cargo test --locked -p jabara
 cargo test --locked -p setoka-cli --bins --test serve
@@ -96,10 +96,11 @@ cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の�
   （`&&`・`||`・`!` で始まる文・`set +e`。`bash -e` は `A && B` の A の失敗などで止まらない）は使えず、スクリプトが起動時に自分を
   調べて止まる
 - `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、`docs/content/guide/code-and-math.md`
-  の `lines=` で引用されている（書き方の例も同じ範囲）。その範囲がこれらの表を漏れなく・余分なく指しているか・例と同じかは、
-  setoka の情報文字列の読み取りと kabosu を使う setoka-core のテスト（`crates/setoka-core/tests/docs_excerpt_test.rs`。2 節の
-  cargo test で動く）が確かめる。`docs/setoka.toml` の行を動かしたら、テストのメッセージの案内に従って表の並びか `lines=`
-  （引用と例。説明の文の例も合わせる）を直す。スクリプトは描画したキャプション（`setoka.toml:行範囲`）の範囲が原稿の `lines=` と同じかを見る
+  の `lines=` で引用されている（書き方の例も同じ範囲）。引用と例の範囲がそろっているか・その範囲がこれらの表を漏れなく・余分なく
+  指しているか・docs をビルドしたときのキャプション（`setoka.toml:行範囲`）がその範囲かは、setoka-cli の結合テスト
+  （`crates/setoka-cli/tests/docs_excerpt.rs`。2 節の `--test docs_excerpt`。docs を一時ディレクトリへ写してビルドする）が確かめる。
+  `docs/setoka.toml` の行を動かしたら、テストのメッセージの案内に従って表の並びか `lines=`（引用と例。説明の文の例も合わせる）を
+  直す。スクリプトは原稿も TOML も読まない
 - 終わったときの `docs/dist/` は既定の base で作り直してある（`run` スキルで開ける）
 
 ## 6. e2e（CLI 実機）

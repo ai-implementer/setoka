@@ -574,8 +574,9 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
   - 11-24 に変更（ユーザが決めた）: 範囲が `[markdown]` の表を漏れなく指しているかの検査は、スクリプトの awk ではなく、TOML を
     kabosu で読む setoka-config のテスト（`crates/setoka-config/tests/docs_excerpt_test.rs`）で行う。awk で TOML を読む検査に、
     有効な書き方での見逃しがレビューで 3 回続けて見つかったため（下の記録）。次のレビューで、原稿の引用も setoka の情報文字列の
-    読み取りで読むために setoka-core のテスト（`crates/setoka-core/tests/docs_excerpt_test.rs`。kabosu は開発用の依存）へ移した。
-    スクリプトは、描画したキャプション（`setoka.toml:行範囲`）の範囲が原稿の `lines=` と同じかを見る（6 回目のレビュー）
+    読み取りで読むために setoka-core のテストへ移し、さらに docs をビルドしたキャプションも同じ読み取りで照合するために、setoka-cli の
+    結合テスト（`crates/setoka-cli/tests/docs_excerpt.rs`。kabosu は setoka-cli の開発用の依存）へ移した（7 回目のレビュー）。
+    スクリプトは原稿も TOML も読まない
 - 実装で決めたこと（判断点ではない。変えるならレビューで）
   - 公開する crate（`publish = false` の無いもの）が、docs の「開発者向け」・CLAUDE.md の汎用ライブラリの一覧・
     `publish-crate` スキルの表・ci.yml の package の検査にそろって載っているかをスクリプトで照合する（リリース判定の
@@ -679,6 +680,18 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
     範囲がすべてそれと同じかを見るようにした。範囲が `[markdown]` の表を指しているか・引用と例がそろっているかは、今までどおり
     setoka-core のテストが見る
   - 確かめたこと: 描画したキャプションだけを 27-44 に変える・キャプションを消すと止まり、原稿の属性の順を入れ替えると通る
+- 7 回目のレビューの指摘 1 件（PR #114）
+  - [P3] 原稿の引用と例を `lines="27-47"`（値に引用符）に変えると、setoka は正しいキャプションを作り、Rust のテストも通るのに、
+    スクリプトは範囲を読めずに止まった。調べると、前の回でスクリプトに書いた原稿の読み取りは `file='setoka.toml'`（一重引用符。setoka
+    は受け付けない）を通すなど、setoka の読み方と別の 2 つ目の読み取りになっていた。シェルで原稿を読む限りずれは無くならないので、
+    キャプションの照合も Rust に移した。setoka-cli の結合テスト `docs_excerpt.rs` が、(1) 原稿の引用と例の範囲（`collect_include_specs`）・
+    (2) その範囲が `[markdown]` の表を指していること（kabosu）・(3) docs を一時ディレクトリへ写してビルドしたときのキャプションが
+    `IncludeSpec::default_title` の文言と同じこと、をまとめて見る（docs のビルドは debug で 4 秒ほど）。テストを setoka-core から
+    setoka-cli へ移し、kabosu を setoka-core の開発用の依存から setoka-cli のものに移した。スクリプトからは原稿の読み取りと
+    キャプションの照合を外した。verify スキルの setoka-cli のテストの行に `--test docs_excerpt` を足した
+  - 確かめたこと: テスト 4 本（docs の照合とビルド・TOML の書き方に依らない表の範囲・属性の順と値の引用符に依らない読み取り・
+    キャプションの取り出し）。docs では、`lines="27-47"` はテストもゲートも通り、キャプションだけを違う範囲にする（`title=` で
+    作った）・例だけ範囲を変える・`[markdown.math]` を末尾へ移す、の 3 つはテストが止めた
 - 工数: 小〜中
 
 ## 今後の候補

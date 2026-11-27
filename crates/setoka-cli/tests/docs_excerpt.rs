@@ -1,37 +1,50 @@
 //! docs サイトの原稿（`docs/content/guide/code-and-math.md`）は、`docs/setoka.toml` の `[markdown]` とその下の表
 //! （`[markdown.…]`）をインクルード（`file="setoka.toml" lines=…`）で引用し、同じ書き方を例としても見せている。
-//! 引用の範囲が `[markdown]` の表を漏れなく・余分なく指しているか、例の範囲が実際の引用と同じかを確かめる
-//! （v0.22 Phase 107。docs/setoka.toml の行を動かすと原稿の引用がずれるので、行番号を文書に直書きせずここで縛る）。
+//! 次の 3 つを、setoka 自身の読み取りで確かめる（v0.22 Phase 107。docs/setoka.toml の行を動かすと原稿の引用がずれるので、
+//! 行番号を文書に直書きせずここで縛る）。
 //!
-//! - 引用は setoka が使う情報文字列の読み取り（[`setoka_core::collect_include_specs`]。属性は順不同）で読む。
-//!   例（4 つのバッククォートで囲んだ Markdown の中のフェンスの行）も、その行を 1 つの Markdown として同じ関数に渡す
-//!   （`file=` の直後の `lines=` だけを文字列で拾うと、`lines=27-44 file="setoka.toml"` の順に書いた例を見逃した）
-//! - TOML は kabosu で読む（awk で読むと、複数行の文字列の中の `[lint]`・エスケープした引用符付きのキー・4 個の引用符で
-//!   終わる文字列などで見逃した）。以上は PR #114 のレビュー指摘
+//! 1. 引用と例の範囲がそろっている（setoka が使う情報文字列の読み取り [`setoka_core::collect_include_specs`] で読む。
+//!    属性は順不同・値の引用符の有無も setoka のとおり。例 = 4 つのバッククォートで囲んだ Markdown の中のフェンスの行も、
+//!    その行を 1 つの Markdown として同じ関数に渡す）
+//! 2. その範囲が `[markdown]` の表を漏れなく・余分なく指している（TOML は kabosu で読む）
+//! 3. docs をビルドすると、引用のキャプションがその範囲になる（docs を一時ディレクトリへ写してビルドし、期待する文言は
+//!    setoka がキャプションに使う [`setoka_core::IncludeSpec::default_title`] で作る）
+//!
+//! 以前はシェルや awk で原稿と TOML を読んでいたが、属性の順・値の引用符・複数行の文字列・エスケープした引用符付きの
+//! キーなどで見逃しと誤りが続いた（PR #114 のレビュー指摘）。読み取りは setoka と kabosu の 1 実装に任せる。
 //!
 //! 失敗したら、メッセージの案内に従って `docs/setoka.toml` の表の並びか、`code-and-math.md` の `lines=`（引用と例。
 //! 説明の文の例 `lines=27-47` も合わせる）を直す。
 
+// 結合テストは書き込みの口の縛り（ワークスペースの clippy.toml。v0.22 Phase 106）の対象外
+#![allow(clippy::disallowed_methods)]
+
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use kabosu::{Document, Node, Span, Value};
-use setoka_core::{MarkdownOptions, collect_include_specs, extract_fence_blocks};
+use setoka_core::{IncludeSpec, MarkdownOptions, collect_include_specs, extract_fence_blocks};
 
 fn docs_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs")
 }
 
-/// Markdown の中の `setoka.toml` のインクルードの範囲（setoka の読み取りを通す）
-fn setoka_toml_ranges(markdown: &str, opts: &MarkdownOptions) -> Vec<(usize, usize)> {
+const MANUSCRIPT: &str = "content/guide/code-and-math.md";
+const PAGE: &str = "dist/guide/code-and-math/index.html";
+
+/// Markdown の中の `setoka.toml` のインクルード（setoka の読み取りを通す）
+fn setoka_toml_includes(markdown: &str, opts: &MarkdownOptions) -> Vec<IncludeSpec> {
     collect_include_specs(markdown, opts)
         .into_iter()
-        .filter(|r| r.spec.path == "setoka.toml")
-        .map(|r| {
-            r.spec
-                .lines
-                .expect("setoka.toml の引用に lines= が無い（ファイル全体を引用している）")
-        })
+        .map(|r| r.spec)
+        .filter(|spec| spec.path == "setoka.toml")
         .collect()
+}
+
+fn range_of(spec: &IncludeSpec) -> (usize, usize) {
+    spec.lines
+        .expect("setoka.toml の引用に lines= が無い（ファイル全体を引用している）")
 }
 
 /// コードブロックの中に例として書いたフェンスの行（```toml file=… など）の `setoka.toml` の範囲
@@ -49,7 +62,7 @@ fn example_ranges(markdown: &str, opts: &MarkdownOptions) -> Vec<(usize, usize)>
             }
             // 例の 1 行を、閉じたフェンスとして同じ読み取りに渡す
             let doc = format!("{trimmed}\n{fence}\n");
-            ranges.extend(setoka_toml_ranges(&doc, opts));
+            ranges.extend(setoka_toml_includes(&doc, opts).iter().map(range_of));
         }
     }
     ranges
@@ -95,7 +108,7 @@ fn line_range(doc: &Document, spans: &[Span]) -> (usize, usize) {
     )
 }
 
-/// `range` の行にかかる、`markdown` 以外の最上位のキー（重複なし・出てくる順）
+/// `range` の行にかかる、`markdown` 以外の最上位のキー（出てくる順）
 fn others_within(doc: &Document, range: (usize, usize)) -> Vec<(String, usize)> {
     let mut found = Vec::new();
     for entry in doc.root().entries().filter(|e| e.key() != "markdown") {
@@ -131,18 +144,53 @@ fn markdown_lines(src: &str) -> Result<(usize, usize), String> {
     Ok(range)
 }
 
+/// HTML の中の `<figcaption>…</figcaption>` の中身（出てくる順）
+fn figcaptions(html: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut rest = html;
+    while let Some(i) = rest.find("<figcaption>") {
+        rest = &rest[i + "<figcaption>".len()..];
+        let Some(end) = rest.find("</figcaption>") else {
+            break;
+        };
+        found.push(rest[..end].to_string());
+        rest = &rest[end..];
+    }
+    found
+}
+
+/// `from` の中身を `to` へ写す（docs をビルドする一時ディレクトリを作る。前のビルドの出力とキャッシュは写さない）
+fn copy_tree(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let name = entry.file_name();
+        if name == "dist" || name == ".setoka" {
+            continue;
+        }
+        let kind = entry.file_type().unwrap();
+        if kind.is_dir() {
+            copy_tree(&entry.path(), &to.join(&name));
+        } else if kind.is_file() {
+            fs::copy(entry.path(), to.join(&name)).unwrap();
+        }
+    }
+}
+
 #[test]
-fn 原稿が引用する_setoka_toml_の範囲は_markdown_の表を漏れなく余分なく指す() {
+fn 原稿が引用する_setoka_toml_の範囲は_markdown_の表を指し_ビルドしたキャプションもその範囲() {
     let docs = docs_dir();
-    let src = std::fs::read_to_string(docs.join("setoka.toml")).unwrap();
-    let manuscript = std::fs::read_to_string(docs.join("content/guide/code-and-math.md")).unwrap();
+    let src = fs::read_to_string(docs.join("setoka.toml")).unwrap();
+    let manuscript = fs::read_to_string(docs.join(MANUSCRIPT)).unwrap();
     let opts = MarkdownOptions::default();
 
-    let cited = setoka_toml_ranges(&manuscript, &opts);
+    // 1. 引用と例の範囲がそろっている
+    let includes = setoka_toml_includes(&manuscript, &opts);
     assert!(
-        !cited.is_empty(),
+        !includes.is_empty(),
         "code-and-math.md に setoka.toml の引用（file=\"setoka.toml\" lines=…）が無い"
     );
+    let cited: Vec<(usize, usize)> = includes.iter().map(range_of).collect();
     let examples = example_ranges(&manuscript, &opts);
     assert!(
         !examples.is_empty(),
@@ -154,12 +202,40 @@ fn 原稿が引用する_setoka_toml_の範囲は_markdown_の表を漏れなく
         "code-and-math.md の setoka.toml の引用と例の範囲がそろっていない（引用 {cited:?}・例 {examples:?}）"
     );
 
+    // 2. その範囲が [markdown] の表を漏れなく・余分なく指している
     let expected = markdown_lines(&src).unwrap_or_else(|message| panic!("{message}"));
     assert_eq!(
         all[0], expected,
         "code-and-math.md の lines={}-{} が docs/setoka.toml の [markdown] の表（{}-{} 行目）と合わない。\
          lines={}-{} に直す（引用と例。説明の文の例も合わせる）",
         all[0].0, all[0].1, expected.0, expected.1, expected.0, expected.1
+    );
+
+    // 3. docs をビルドすると、引用のキャプションが setoka の作る文言（setoka.toml:行範囲）になる
+    let work = tempfile::tempdir().unwrap();
+    let root = work.path().join("docs");
+    copy_tree(&docs, &root);
+    let output = Command::new(env!("CARGO_BIN_EXE_setoka"))
+        .arg("--root")
+        .arg(&root)
+        .args(["build", "-q"])
+        .env_remove("RUST_LOG")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "docs のビルドに失敗した: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let html = fs::read_to_string(root.join(PAGE)).unwrap();
+    let captions: Vec<String> = figcaptions(&html)
+        .into_iter()
+        .filter(|c| c.starts_with("setoka.toml"))
+        .collect();
+    let expected_captions: Vec<String> = includes.iter().map(IncludeSpec::default_title).collect();
+    assert_eq!(
+        captions, expected_captions,
+        "code-and-math のページの setoka.toml の引用のキャプションが、原稿の引用（{cited:?}）から setoka が作る文言と違う"
     );
 }
 
@@ -188,11 +264,22 @@ fn 表の範囲の判定は_toml_の書き方に依らない() {
     );
 }
 
-/// 引用と例の範囲は、属性の順に依らず setoka の読み取りで拾う（PR #114 のレビュー指摘）
+/// 引用と例の範囲は、属性の順と値の引用符の有無に依らず setoka の読み取りで拾う（PR #114 のレビュー指摘）
 #[test]
-fn 引用と例の範囲は属性の順に依らず読む() {
+fn 引用と例の範囲は属性の順と値の引用符に依らず読む() {
     let opts = MarkdownOptions::default();
-    let markdown = "````markdown\n```toml lines=27-44 file=\"setoka.toml\"\n````\n\n```toml file=\"setoka.toml\" lines=27-47\n```\n";
-    assert_eq!(setoka_toml_ranges(markdown, &opts), [(27, 47)]);
+    let markdown = "````markdown\n```toml lines=27-44 file=\"setoka.toml\"\n````\n\n```toml file=setoka.toml lines=\"27-47\"\n```\n";
+    let ranges: Vec<(usize, usize)> = setoka_toml_includes(markdown, &opts)
+        .iter()
+        .map(range_of)
+        .collect();
+    assert_eq!(ranges, [(27, 47)]);
     assert_eq!(example_ranges(markdown, &opts), [(27, 44)]);
+}
+
+#[test]
+fn キャプションの取り出し() {
+    let html = "<figure><figcaption>setoka.toml:27-47</figcaption><pre></pre></figure>\
+                <figcaption>図 1: 依存</figcaption>";
+    assert_eq!(figcaptions(html), ["setoka.toml:27-47", "図 1: 依存"]);
 }
