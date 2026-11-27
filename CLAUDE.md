@@ -565,10 +565,18 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     docs-links.yml・`verify` スキルすべて。出力は `docs/dist/`）。cwd からの上方向探索の
     経路は scaffold の e2e が検証する
   - 原稿は `setoka fmt` の正規形・表記は長音符なし（`lint.terms` 準拠）で書く
-- **ci.yml の docs ゲートは docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用）
-  - 特に `docs/setoka.toml` の 27-47 行目（`[markdown]` ブロック）はインクルードの `lines=` で
-    引用されているので、この範囲を動かすと原稿の中身と CI が同時に壊れる
-    （`verify` スキルに直す箇所の一覧あり）
+- **docs のゲートは `scripts/docs-gates.sh` にまとめてあり、docs の原稿と結合している**（新機能ごとに `grep` を 1 行足す運用。
+  ci.yml の docs ステップと `verify` スキルはこのスクリプトを呼ぶだけ = ゲートはスクリプトにだけ書く。v0.22 Phase 107）
+  - `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、原稿（`docs/content/guide/code-and-math.md`）が
+    インクルードの `lines=` で引用している（書き方の例も同じ範囲）。引用と例の範囲がそろっているか・その範囲がこれらの表を漏れ
+    なく・余分なく指しているか・docs をビルドしたときのキャプションがその範囲かは、setoka-cli の結合テスト
+    （`crates/setoka-cli/tests/docs_excerpt.rs`）が確かめる。原稿は setoka の情報文字列の読み取り（`collect_include_specs`）、
+    TOML は kabosu で読み、描画したキャプションから取り出した範囲を原稿の `lines=` と直接比べる（期待値を描画と同じ
+    `IncludeSpec::default_title` で作ると、その関数の回帰を見逃す）（行を動かすと、テストのメッセージが直す場所を示す）。
+    **シェルの正規表現や awk で原稿や TOML を読んで同じことをしない**（属性の順・値の引用符・複数行の文字列・エスケープした
+    キーなどで setoka の読み方とずれ、PR #114 のレビューで 6 回直した）
+  - 公開する crate（`publish = false` の無いもの）が docs の「開発者向け」・この CLAUDE.md の汎用ライブラリの一覧・
+    `publish-crate` スキルの表・ci.yml の package の検査にそろって載っていることも、このスクリプトが照合する
   - **雛形 deploy.yml を変えたら `docs/snippets/deploy.yml` へ写す**（docs は雛形を docs のルートの
     外から `file=` で取り込めないので写しを置いている。v0.20 Phase 91）。ci.yml の `scaffold actions pins` が
     バイト一致と、PR 検証の例 `docs/snippets/pr-check.yml` の actions の SHA・setoka のインストール手順
@@ -595,6 +603,11 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
   - GitHub Actions の `bash -e` でも `!` で反転したコマンドは errexit の対象外で、失敗しても
     次の行へ進む（= ゲートになっていない）
   - `if cmd; then echo "…" >&2; exit 1; fi` の形で明示的に落とす
+  - **ゲートを `&&` で繋がない** — `bash -e` は `A && B` の A の失敗では止まらない（&& の左は errexit の対象外）。
+    docs ステップの `grep -q A && grep -q B` の 10 行は、A の側がゲートになっていなかった（v0.22 Phase 107 で見つけて
+    1 行に 1 つへ分けた）。`||`（`|| true` を含む）・`!` で始まる文・`set +e` も同じくゲートを素通りさせる。
+    `scripts/docs-gates.sh` は起動時に自分を調べ、コメント以外の行にこれらがあれば止まる（正規表現で書き方を 1 つずつ
+    取り締まると、行の継続や引用符の中の `#` ですり抜けた。PR #114 のレビュー指摘）
 - **ci.yml の `run:` に GitHub Actions の式の開始記号（`$` と `{{`）を書かない**
   - 雛形 deploy.yml の中身を grep で縛るときなどに、`${{ steps… }}` を文字列として
     書くと Actions が bash より先に評価して空文字に置き換え、照合が別物になる。

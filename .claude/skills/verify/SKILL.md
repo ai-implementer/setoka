@@ -39,7 +39,7 @@ cargo deny check bans licenses sources   # 要 cargo-deny（版は下記）。CI
 
 ```bash
 cargo test --locked --workspace --exclude jabara --exclude setoka-cli
-cargo test --locked -p setoka-cli --test commands
+cargo test --locked -p setoka-cli --test commands --test docs_excerpt
 # ↓ サンドボックス外で実行する（TCP で待ち受ける）
 cargo test --locked -p jabara
 cargo test --locked -p setoka-cli --bins --test serve
@@ -79,92 +79,29 @@ cargo check --locked -p tankan --target wasm32-unknown-unknown
 
 ## 5. docs サイト検証（このリポジトリ自身のドキュメントサイト）
 
-**`docs/` の原稿・テーマ・記法まわりを触ったら必須。** CI（ci.yml の docs ステップ）と同じ内容。
-
-リポジトリルートから `--root docs` で実行する（`cd docs` しない。Phase 75 の dogfooding。
-出力は `docs/dist/`）。
+**`docs/` の原稿・テーマ・記法まわりを触ったら必須。** CI（ci.yml の docs ステップ）と同じスクリプトを呼ぶ
+（v0.22 Phase 107。以前はここに CI のゲートの一部を手で写していた）。
 
 ```bash
 cargo build -p setoka-cli
-<repo>/target/debug/setoka check --root docs      # fmt 崩れ・壊れリンク・include エラーをまとめて検出
-<repo>/target/debug/setoka build --root docs
-test -f docs/dist/index.html && test -f docs/dist/_search/manifest.json
-# 機能ごとの配信ゲート（CI と同じ。新機能を足したら 1 行増やす）
-grep -q 'http-equiv="refresh"' docs/dist/guide/lint/index.html                      # エイリアス
-grep -q '<figcaption>setoka.toml:27-47</figcaption>' docs/dist/guide/code-and-math/index.html   # インクルード
-grep -q 'id="fig:deps"' docs/dist/development/index.html                            # 図表番号
-grep -q '<a href="#fig:deps">図 1</a>' docs/dist/development/index.html             # 参照の自動補完
-grep -q '<details class="markdown-alert markdown-alert-tip">' docs/dist/guide/writing/index.html  # 折りたたみ
-grep -q 'js/details-target.js' docs/dist/guide/writing/index.html                   # 折りたたみ自動展開 JS
-grep -q 'setoka-sidebar-scroll' docs/dist/index.html                                  # サイドバー位置維持
-grep -q 'class="tab-label"' docs/dist/guide/code-and-math/index.html                # タブ / コードグループ
-grep -q '取り込まれた Markdown 断片です' docs/dist/guide/writing/index.html          # Markdown 断片
-grep -q '<abbr title="Server-Side Rendering' docs/dist/guide/writing/index.html     # 用語集（本文の abbr 化）
-grep -q 'id="ssr"' docs/dist/glossary/index.html                                    # 用語集ページの自動生成
-grep -q 'href="/glossary/"' docs/dist/index.html                                    # 生成ページが nav に載る
-! grep -q '<abbr' docs/dist/glossary/index.html                                     # 用語集ページ自身は abbr 化しない
-grep -q '<strong>「重要」</strong>' docs/dist/guide/writing/index.html              # 約物に隣接した強調
-grep -q '<dl>' docs/dist/guide/writing/index.html                                   # 定義リスト
-grep -q '"docGroups"' docs/dist/_search/manifest.json                               # 検索の絞り込み区分
-grep -q 'パーセントエンコード' docs/dist/guide/writing/index.html                    # URL エンコード（Phase 64）
-test -f docs/dist/guide/internal/index.html                                         # 社内で公開する（Phase 83）
-grep -q 'page_md' docs/dist/guide/llms/index.html                                   # .md の配信を止める設定（Phase 83）
-grep -q 'allowed_hosts' docs/dist/reference/config/index.html                       # Host の検査（Phase 83）
-grep -q '追随する' docs/dist/guide/appearance/index.html                            # テーマ上書きの契約（Phase 65。Phase 84 で「見た目の調整」へ移動）
-grep -q 'シンボリックリンクを辿りません' docs/dist/reference/cli/index.html          # 配信のリンク遮断（Phase 65）
-grep -q -- '--root' docs/dist/reference/cli/index.html                              # グローバルフラグ（Phase 72）
-grep -q -- '--root' docs/dist/reference/config/index.html                           # 上方向探索の但し書き（Phase 72）
-grep -q -- '--quiet' docs/dist/reference/cli/index.html                             # 静粛モード -q / -v（Phase 73）
-grep -q 'id="シェル補完"' docs/dist/reference/cli/index.html                          # シェル補完の節（Phase 74。コード内文字列は span で割れる）
-grep -q '<meta property="og:title"' docs/dist/index.html                          # 共有カード（Phase 76。canonical はフル URL 時だけ）
-grep -q 'id="共有カードogpと-canonical"' docs/dist/guide/deploy/index.html         # OGP の節（Phase 76）
-grep -q 'frontmatter-unrecognized' docs/dist/reference/rules/index.html             # frontmatter の読み違い（Phase 77）
-grep -q 'setoka と同じ版に' docs/dist/guide/deploy/index.html                          # 雛形 deploy.yml の版固定（Phase 77）
-grep -q '<h2 id="frontmatter">frontmatter<a class="anchor" href="#frontmatter" aria-label=' docs/dist/guide/writing/index.html  # 見出しのパーマリンク（Phase 78）
-! grep -rl 'aria-hidden="true" class="anchor"' docs/dist/ --include="*.html"        # 旧形式のアンカーが残っていない（Phase 78）
-grep -q '.anchor:focus-visible' docs/dist/_assets/css/theme.css                     # フォーカスで # を出す（Phase 78）
-grep -q '<p class="page-reading">約 [0-9]* 分で読めます' docs/dist/guide/writing/index.html  # 読了時間（Phase 78）
-grep -q '<html lang="ja">' docs/dist/index.html                                    # toggle では data-theme を付けない（Phase 79）
-grep -q 'prefers-color-scheme: dark' docs/dist/_assets/css/theme.css               # OS ダーク追従（Phase 79）
-grep -q 'prefers-color-scheme: dark' docs/dist/_assets/css/syntect.css             # コードの配色も OS 追従（Phase 79）
-grep -q 'id="ダークモード"' docs/dist/guide/appearance/index.html                   # ダークモードの節（Phase 79。Phase 84 で移動）
-test -f docs/dist/images/og.png                                                     # 共有カードの画像（Phase 80。og:image タグはフル URL の公開ビルドだけ）
-grep -q 'id="既存のフォルダで始める"' docs/dist/guide/install/index.html              # 既存のフォルダで始める（Phase 84）
-grep -q 'id="dist-はサーバで配信する"' docs/dist/guide/install/index.html            # file:// では開けない（Phase 84）
-test -f docs/dist/guide/appearance/index.html && test -f docs/dist/guide/faq/index.html  # 見た目・FAQ の独立ページ（Phase 84）
-grep -q 'id="client-と-ssr-の選び方"' docs/dist/guide/diagrams/index.html           # 図の選び方（Phase 84）
-grep -q 'github.com/ai-implementer/setoka/issues' docs/dist/index.html                  # Issues への導線（Phase 84）
-grep -q -- '--no-fmt' docs/dist/reference/cli/index.html && grep -q 'NO_COLOR' docs/dist/reference/cli/index.html  # check --no-fmt・ログの書式（Phase 85）
-grep -q 'route-case-conflict' docs/dist/reference/rules/index.html                  # 大文字小文字だけが違う URL（Phase 85）
-grep -q '取り込みの失敗' docs/dist/guide/quality/index.html && grep -q 'end list' docs/dist/guide/quality/index.html  # build の報告・fmt が変える書き方（Phase 85）
-test -s docs/dist/_assets/vendor/THIRD-PARTY-LICENSES.txt && test -s docs/dist/_search/THIRD-PARTY-LICENSES.txt && test ! -e docs/dist/_assets/vendor/README.md  # docs にもライセンス表記（Phase 86）
-grep -q 'id="第三者のソフトウェアのライセンス表記"' docs/dist/guide/internal/index.html  # 利用者のサイトに出るライセンス表記の説明（Phase 86）
-grep -q 'id="yaml-の書き方"' docs/dist/guide/writing/index.html  # frontmatter の YAML の読み方（Phase 88）
-grep -q 'id="結果の並び順"' docs/dist/guide/search/index.html && grep -q 'id="検索から外す"' docs/dist/guide/search/index.html  # 検索の並び順・search: false（Phase 89）
-grep -q 'id="faviconフッターヘッダーのリンク"' docs/dist/guide/appearance/index.html  # favicon・フッター・ヘッダーのリンクの説明（Phase 90）
-grep -q 'link-outside-content' docs/dist/reference/rules/index.html && grep -q 'link-outside-content' docs/dist/guide/writing/index.html  # content の外を指すリンク（Phase 91）
-grep -q '出力: ページ' docs/dist/guide/quality/index.html && grep -q '利用者のファイルを優先' docs/dist/guide/quality/index.html  # build の警告と要約の行（Phase 91）
-grep -q 'id="他のツールとの違い"' docs/dist/guide/migrate/index.html && grep -q 'id="生-html-と画像の大きさ"' docs/dist/guide/migrate/index.html  # 他のツールとの違い（Phase 91）
-grep -q '<figcaption>snippets/deploy.yml</figcaption>' docs/dist/guide/deploy/index.html && grep -q 'id="ワークフローの全文"' docs/dist/guide/deploy/index.html  # 雛形 deploy.yml の全文（Phase 91）
-grep -q '<figcaption>snippets/pr-check.yml</figcaption>' docs/dist/guide/quality/index.html && grep -q -- '--no-fmt --format github' docs/dist/guide/quality/index.html  # PR 検証の例・CI の例の --no-fmt（Phase 91）
-grep -q 'id="約束の対象"' docs/dist/reference/compatibility/index.html && grep -q 'id="新しい版に上げる手順"' docs/dist/reference/compatibility/index.html  # 互換性の約束と更新の手順（v0.21 Phase 95）
-grep -q 'id="cargo-binstall-で入れる"' docs/dist/guide/install/index.html && grep -q '第三者がビルドしたバイナリ（quickinstall）や' docs/dist/guide/install/index.html && grep -q 'id="macos-で開いていませんと止められる"' docs/dist/guide/faq/index.html  # インストールの 3 通り・Gatekeeper の FAQ（v0.21 Phase 96）
-grep -q 'pull request は受け付けていません' docs/dist/guide/faq/index.html && test -s CONTRIBUTING.md && test -s .github/ISSUE_TEMPLATE/config.yml  # 問い合わせの受け口（v0.21 Phase 97）
-grep -q 'id="どちらが合うか"' docs/dist/guide/compare/index.html && grep -q 'mdBook v0.5.4' docs/dist/guide/compare/index.html  # mdBook との比較（v0.21 Phase 98）
+scripts/docs-gates.sh          # バイナリは ${CARGO_TARGET_DIR:-target}/debug/setoka。別のものは引数で渡す
 cmp crates/setoka-cli/scaffold/deploy.yml docs/snippets/deploy.yml  # docs の写しは雛形とバイト一致（CI の scaffold actions pins。pr-check.yml の SHA とインストール手順も照合する）
-# サブパス配信の favicon（Phase 90。リリース判定。docs/dist を作り直すので docs の確認の最後に）:
-# setoka build --root docs --base-url /setoka/ → <link rel="icon" href="/setoka/…"> とそのファイルが dist にあること
-! grep -rnE '`[a-z_]+(\.[a-z_]+)+: |`"[a-z_]+": |backend: ["]' docs/content README.md crates/setoka-cli/scaffold/*.md .claude/skills/  # JSON / YAML 風の設定例が無い（Phase 84）
-grep -q 'css/syntect.css' docs/dist/index.html && test -f docs/dist/_assets/css/syntect.css  # syntect.css は有効時だけ
-<repo>/target/debug/setoka search --root docs --section 開発者向け "キャッシュ" | grep -q '/development/'  # エンジン側の絞り込み
-<repo>/target/debug/setoka search --root docs --format json --limit 3 "設定" | jq -e 'any(.[]; .url | startswith("reference/config/"))'  # 「設定」で設定のページが上位 3 件（Phase 89。リリース判定）
-# SSR フォールバック検出: backend:ssr のサイトで mermaid.js が読まれたら tankan の回帰
-grep -rlE 'src="[^"]*vendor/mermaid\.min\.js"' docs/dist/ --include="*.html" && echo "NG: フォールバック発生"
 ```
 
-**`docs/setoka.toml` の 27-47 行目**（`[markdown]` から `[markdown.glossary.terms]` の末尾まで）は
-インクルードの `lines=` で引用されている。この範囲を動かすと原稿の中身とゲートが同時に壊れるので、
-`docs/content/guide/code-and-math.md` の `lines=` 3 箇所と ci.yml の grep を同時に直す。
+- `scripts/docs-gates.sh` は `setoka check --root docs`・`build --root docs`・機能ごとの配信ゲート（生成物の grep）・
+  検索の照合（`setoka search`。jq が要る）・SSR フォールバックの検出・`--base-url /setoka/` の favicon の確認・
+  公開する crate が文書（docs の「開発者向け」・CLAUDE.md・`publish-crate` スキル・ci.yml の package の検査）に
+  載っているかの照合を行う。止まったら、止まった行と文言が出る
+- **新しい機能・原稿の節のゲートはスクリプトに足す**（ci.yml とこのスキルには書かない）。ゲートを素通りさせる書き方
+  （`&&`・`||`・`!` で始まる文・`set +e`。`bash -e` は `A && B` の A の失敗などで止まらない）は使えず、スクリプトが起動時に自分を
+  調べて止まる
+- `docs/setoka.toml` の `[markdown]` とその下の表（`[markdown.…]`）は、`docs/content/guide/code-and-math.md`
+  の `lines=` で引用されている（書き方の例も同じ範囲）。引用と例の範囲がそろっているか・その範囲がこれらの表を漏れなく・余分なく
+  指しているか・docs をビルドしたときのキャプション（`setoka.toml:行範囲`）がその範囲かは、setoka-cli の結合テスト
+  （`crates/setoka-cli/tests/docs_excerpt.rs`。2 節の `--test docs_excerpt`。docs を一時ディレクトリへ写してビルドする）が確かめる。
+  `docs/setoka.toml` の行を動かしたら、テストのメッセージの案内に従って表の並びか `lines=`（引用と例。説明の文の例も合わせる）を
+  直す。スクリプトは原稿も TOML も読まない
+- 終わったときの `docs/dist/` は既定の base で作り直してある（`run` スキルで開ける）
 
 ## 6. e2e（CLI 実機）
 

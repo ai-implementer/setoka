@@ -70,16 +70,17 @@ INSTA_UPDATE=always cargo test -p setoka-render
 `__search_html.snap`（Phase 54 で追加。llms 系は HTML を含まないので無関係）。フィクスチャの base_url は `/docs/` なので、
 `data-base` を渡している場合は `data-base="/docs/"` が焼き付き、**base_url 追随のテストを兼ねる**。
 
-### 5. ci.yml へ配信ゲートを 1 行
+### 5. docs のゲートを 1 行
 
-`.github/workflows/ci.yml` の docs ステップへ:
+`scripts/docs-gates.sh` へ（ci.yml の docs ステップと `verify` スキルがこのスクリプトを呼ぶ。1 行に 1 つのゲートにし、
+`&&` で繋がない）:
 
-```yaml
-          # 折りたたみ内へのアンカージャンプを開く JS が配信される
-          grep -q 'js/details-target.js' dist/guide/writing/index.html
+```bash
+# 折りたたみ内へのアンカージャンプを開く JS が配信される
+grep -q 'js/details-target.js' docs/dist/guide/writing/index.html
 ```
 
-インライン script なら中身の特徴的な文字列で照合する（`grep -q 'setoka-sidebar-scroll' dist/index.html`）。
+インライン script なら中身の特徴的な文字列で照合する（`grep -q 'setoka-sidebar-scroll' docs/dist/index.html`）。
 
 ### 6. 実機確認
 
@@ -95,7 +96,7 @@ INSTA_UPDATE=always cargo test -p setoka-render
 画面専用の定義（ダーク配色等）は `@media screen` に置く。印刷対応は**ファイル末尾**の
 `@media print` ブロックへ足す（レスポンシブ MQ はメディアタイプ無指定 = print でも成立するため、
 末尾 = 後勝ちの位置が上書きの前提。Phase 55 のブロックコメント参照）。
-CSS の配信ゲートも JS と同様に ci.yml へ 1 行（例: `grep -q '@media print' dist/_assets/css/theme.css`）。
+CSS の配信ゲートも JS と同様に `scripts/docs-gates.sh` へ 1 行（例: `grep -q '@media print' docs/dist/_assets/css/theme.css`）。
 
 ## テンプレート（partial）を足す場合
 
