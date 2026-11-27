@@ -553,7 +553,7 @@ Host / Origin の検査・シンボリックリンクの遮断を、ほかの静
     足した（kunenbo 43 本）
 - 工数: 中
 
-### 107 docs ゲートの一本化と dogfooding ⬜
+### 107 docs ゲートの一本化と dogfooding ✅
 
 **概要**: ci.yml と verify スキルに二重に書いている docs ゲートを、1 つのスクリプトにまとめて両方から呼ぶ
 （10-07 見直しの F6）。v0.22 の切り出しを、文書（CLAUDE.md の依存の図・`publish-crate` スキル・docs の
