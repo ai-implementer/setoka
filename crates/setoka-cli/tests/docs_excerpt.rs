@@ -7,8 +7,9 @@
 //!    属性は順不同・値の引用符の有無も setoka のとおり。例 = 4 つのバッククォートで囲んだ Markdown の中のフェンスの行も、
 //!    その行を 1 つの Markdown として同じ関数に渡す）
 //! 2. その範囲が `[markdown]` の表を漏れなく・余分なく指している（TOML は kabosu で読む）
-//! 3. docs をビルドすると、引用のキャプションがその範囲になる（docs を一時ディレクトリへ写してビルドし、期待する文言は
-//!    setoka がキャプションに使う [`setoka_core::IncludeSpec::default_title`] で作る）
+//! 3. docs をビルドすると、引用のキャプションがその範囲になる（docs を一時ディレクトリへ写してビルドし、キャプションの
+//!    文字列 `パス:開始-終わり` から取り出した範囲を、原稿から読んだ [`IncludeSpec`] の `path` と `lines` と直接比べる。
+//!    期待値を描画と同じ `IncludeSpec::default_title` で作ると、その関数が壊れたときに見逃す）
 //!
 //! 以前はシェルや awk で原稿と TOML を読んでいたが、属性の順・値の引用符・複数行の文字列・エスケープした引用符付きの
 //! キーなどで見逃しと誤りが続いた（PR #114 のレビュー指摘）。読み取りは setoka と kabosu の 1 実装に任せる。
@@ -232,11 +233,32 @@ fn 原稿が引用する_setoka_toml_の範囲は_markdown_の表を指し_ビ�
         .into_iter()
         .filter(|c| c.starts_with("setoka.toml"))
         .collect();
-    let expected_captions: Vec<String> = includes.iter().map(IncludeSpec::default_title).collect();
+    // キャプションの文字列から行の範囲を取り出し、原稿から読んだ IncludeSpec の path と lines と直接比べる。
+    // 期待値を描画と同じ IncludeSpec::default_title で作ると、その関数が壊れたときに両方が同じように変わって
+    // 見逃す（PR #114 のレビュー指摘）
+    let rendered: Vec<Option<(String, (usize, usize))>> =
+        captions.iter().map(|c| parse_caption(c)).collect();
+    let wanted: Vec<Option<(String, (usize, usize))>> = includes
+        .iter()
+        .map(|spec| Some((spec.path.clone(), range_of(spec))))
+        .collect();
     assert_eq!(
-        captions, expected_captions,
-        "code-and-math のページの setoka.toml の引用のキャプションが、原稿の引用（{cited:?}）から setoka が作る文言と違う"
+        rendered, wanted,
+        "code-and-math のページの setoka.toml の引用のキャプション（{captions:?}）が、原稿の引用（{cited:?}）と違う"
     );
+}
+
+/// キャプション `パス:開始-終わり`（1 行だけなら `パス:行`）の、パスと行の範囲。この形でなければ `None`
+fn parse_caption(caption: &str) -> Option<(String, (usize, usize))> {
+    let (path, range) = caption.rsplit_once(':')?;
+    let (start, end) = match range.split_once('-') {
+        Some((s, e)) => (s.parse().ok()?, e.parse().ok()?),
+        None => {
+            let n = range.parse().ok()?;
+            (n, n)
+        }
+    };
+    Some((path.to_string(), (start, end)))
 }
 
 /// 表の範囲の求め方が、awk で読んでいたときに見逃した書き方に依らないこと（PR #114 のレビューの再現）
@@ -282,4 +304,14 @@ fn キャプションの取り出し() {
     let html = "<figure><figcaption>setoka.toml:27-47</figcaption><pre></pre></figure>\
                 <figcaption>図 1: 依存</figcaption>";
     assert_eq!(figcaptions(html), ["setoka.toml:27-47", "図 1: 依存"]);
+    assert_eq!(
+        parse_caption("setoka.toml:27-47"),
+        Some(("setoka.toml".to_string(), (27, 47)))
+    );
+    assert_eq!(
+        parse_caption("setoka.toml:7"),
+        Some(("setoka.toml".to_string(), (7, 7)))
+    );
+    assert_eq!(parse_caption("setoka.toml"), None, "範囲の無いキャプション");
+    assert_eq!(parse_caption("setoka.toml:27-"), None);
 }

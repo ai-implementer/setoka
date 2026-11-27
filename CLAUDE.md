@@ -571,7 +571,8 @@ setoka-index はページ抽出とファイル I/O だけの薄い呼び出し�
     インクルードの `lines=` で引用している（書き方の例も同じ範囲）。引用と例の範囲がそろっているか・その範囲がこれらの表を漏れ
     なく・余分なく指しているか・docs をビルドしたときのキャプションがその範囲かは、setoka-cli の結合テスト
     （`crates/setoka-cli/tests/docs_excerpt.rs`）が確かめる。原稿は setoka の情報文字列の読み取り（`collect_include_specs`）、
-    TOML は kabosu、キャプションの文言は `IncludeSpec::default_title` で作る（行を動かすと、テストのメッセージが直す場所を示す）。
+    TOML は kabosu で読み、描画したキャプションから取り出した範囲を原稿の `lines=` と直接比べる（期待値を描画と同じ
+    `IncludeSpec::default_title` で作ると、その関数の回帰を見逃す）（行を動かすと、テストのメッセージが直す場所を示す）。
     **シェルの正規表現や awk で原稿や TOML を読んで同じことをしない**（属性の順・値の引用符・複数行の文字列・エスケープした
     キーなどで setoka の読み方とずれ、PR #114 のレビューで 6 回直した）
   - 公開する crate（`publish = false` の無いもの）が docs の「開発者向け」・この CLAUDE.md の汎用ライブラリの一覧・
