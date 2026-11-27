@@ -1017,7 +1017,7 @@ dependencies = [
 
 [[package]]
 name = "mikan-wasm"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "mikan",
  "serde_json",
@@ -1519,7 +1519,7 @@ dependencies = [
 
 [[package]]
 name = "setoka-cli"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "setoka-config"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "kabosu",
  "tempfile",
@@ -1550,7 +1550,7 @@ dependencies = [
 
 [[package]]
 name = "setoka-core"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "comrak",
  "globset",
@@ -1569,7 +1569,7 @@ dependencies = [
 
 [[package]]
 name = "setoka-index"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "fst",
  "mikan",
@@ -1586,7 +1586,7 @@ dependencies = [
 
 [[package]]
 name = "setoka-render"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "amanatsu",
  "insta",
@@ -1607,7 +1607,7 @@ dependencies = [
 
 [[package]]
 name = "setoka-theme"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "rust-embed",
 ]
