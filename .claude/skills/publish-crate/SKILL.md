@@ -14,7 +14,7 @@ description: 汎用ライブラリ（tankan / mikan / kabosu / shikuwasa / amana
 | mikan | 検索エンジン | native / wasm で 1 実装共有。版を上げると検索 wasm も作り直す（CI の `search wasm inputs`）。**publish の前に `crates/mikan/clippy.toml` を消し、`lib.rs` に `#![cfg_attr(test, allow(clippy::disallowed_methods))]` を足す**（v0.22 Phase 106 で当面ワークスペースの書き込みの口の縛りを外した。src を変えるので wasm の作り直しと同じ PR で行う。ROADMAP「その他の候補」） |
 | kabosu | TOML パーサ（依存ゼロ・no_std + alloc） | **publish 前に fuzz を必ず一度回す** |
 | jabara | 静的サイトの開発サーバ（配信・ライブリロード・監視・Host / Origin の検査。v0.22 Phase 105 で setoka-server を改名） | serve のテストは TCP をバインドする（サンドボックスの外で動かす）。文言は日本語で setoka のコマンドや設定に触れない（setoka の案内は setoka-cli が足す）。`ServeOptions` は `#[non_exhaustive]` なので、項目を足しても破壊的変更にならない |
-| hebesu | 日本語の表記ゆれの検査（依存ゼロ。v0.22 Phase 104） | ルールの名前は setoka の診断の名前と同じ（setoka-core の lint.rs のテストが縛る）。文言は日本語。単独の CLI は v0.23 の候補 |
+| hebesu | 日本語の表記ゆれの検査（依存ゼロ。v0.22 Phase 104） | ルールの名前は setoka の診断の名前と同じ（setoka-core の lint.rs のテストが縛る）。文言は日本語。単独の CLI は v0.24 の候補 |
 | amanatsu | OpenAPI / JSON Schema の静的 HTML 化（v0.22 Phase 103） | crates.io の shikuwasa（json）に依存する（ワークスペースの `shikuwasa` の依存に `version` を書いてある）。shikuwasa の版を上げて新しい API を使ったら、**先に shikuwasa を publish** してから amanatsu を publish する。出力の文言は日本語・CSS は同梱しない（クラスの一覧は README） |
 | kunenbo | 出力先への安全な書き込み（相対パスの検証・経路のシンボリックリンクの検査・残ったファイルの掃除。v0.22 Phase 106 で setoka-core の output.rs から切り出した） | ログは出さない（掃除の警告はコールバックで渡す。setoka-core の `output::remove_orphans` が切り出しの前と同じ文言でログに出す）。ワークスペースの `clippy.toml` が std::fs の書き込みを禁じているので、crate のルートで `clippy::disallowed_methods` を許している |
 | shikuwasa | YAML の安全な読み込み（saphyr の上。v0.22 Phase 102） | 0.1.0 は publish 前に fuzz を回した（11-23）。feature `json` の `to_json` は serde_json を引く。saphyr を上げたら別名の上限（loader の `alias_limit`）と文言の対応表（`load.rs` の `scan_message`）を見直す |
